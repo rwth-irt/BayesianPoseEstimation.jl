@@ -1,0 +1,47 @@
+// @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
+// Copyright (c) 2020, Institute of Automatic Control - RWTH Aachen University
+// All rights reserved. 
+{
+	"name": "OpenGL.jl",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"extensions": [
+		"epivision.vscode-file-header",
+		"gruntfuggly.todo-tree",
+		"julialang.language-julia",
+		"mhutchie.git-graph",
+		"ms-toolsai.jupyter",
+		"streetsidesoftware.code-spell-checker",
+	],
+	"postCreateCommand": "/bin/sh .devcontainer/postcreate.sh",
+	"runArgs": [
+		// Graphics devices only work on native Linux host, comment on Windows
+		// Intel
+		"--device=/dev/dri:/dev/dri",
+		// Comment if nvidia-docker is unavailable
+		"--gpus=all",
+		// Write to X11 server of host
+		"--volume=/tmp/.X11-unix:/tmp/.X11-unix:rw",
+	],
+	"containerEnv": {
+		// Native Linux host
+		"DISPLAY": "${localEnv:DISPLAY}",
+		// Windows host
+		// "DISPLAY": "host.docker.internal:0.0",
+		// "LIBGL_ALWAYS_INDIRECT": "0",
+
+		"QT_X11_NO_MITSHM": "1",
+		// If NVIDIA Prime Profile On-Demand is active, uncomment both to use NVIDIA GPU
+		// Integrated graphics are used otherwise
+		"__NV_PRIME_RENDER_OFFLOAD": "1",
+		"__GLX_VENDOR_LIBRARY_NAME": "nvidia",
+	},
+	// Set *default* container specific settings.json values on container create.
+	"settings": {
+		"julia.environmentPath": "${containerWorkspaceFolder}",
+		"powerHeader.autoInsert.enable": true,
+		"powerHeader.commentMode": "line",
+		"powerHeader.template": "file://${containerWorkspaceFolder}/copyright_template.txt",
+		"terminal.integrated.defaultProfile.linux": "bash",	},
+}

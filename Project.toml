@@ -1,0 +1,18 @@
+name = "TuringDepth"
+uuid = "ea9e20e3-5ec9-4a18-b9a5-f98be19e20e6"
+authors = ["Tim Redick <t.redick@irt.rwth-aachen.de>"]
+version = "0.1.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
+GLAbstraction = "ca6e7d0a-b0c9-59ca-8aba-aebf11497e1c"
+GLFW = "f7f18e0c-5ee9-5ccd-a5bf-e8befd85ed98"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+MCMCChains = "c7f686f2-ff18-58e9-bc7b-31028e88f75d"
+ModernGL = "66fc600b-dfda-50eb-8b99-91cfa97b1301"
+Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
+SciGL = "e33cfb9f-2574-42f7-bc46-3c25fa028886"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
