@@ -89,13 +89,19 @@ function Base.merge(s::AbstractSample{T}, others::AbstractSample{T}...) where {T
 end
 
 # TODO only add same Types?
-#TODO This would imply the conversion of a Sample to an ConstrainedSample, which I think I like
-function add(a::V, b::W) where {T,U,V<:AbstractSample{T,U},W<:AbstractSample{T,U}}
+#TODO This would require the explicit conversion of a Sample to an ConstrainedSample, which I think I like
+function add(a::V, b::V) where {T,U,V<:AbstractSample{T,U}}
     c = @set a.θ = NamedTuple{T,U}(collect(a.θ) + collect(b.θ))
-    @set a.ℓ = -Inf
+    @set c.ℓ = -Inf
 end
+Base.+(a::V, b::V) where {T,U,V<:AbstractSample{T,U}} = add(a, b)
 
-# Base .- (a::NamedTuple{T,U}, b::NamedTuple{T,U}) where {T,U} = NamedTuple{T,U}(collect(a) - collect(b))
+
+function subtract(a::V, b::V) where {T,U,V<:AbstractSample{T,U}}
+    c = @set a.θ = NamedTuple{T,U}(collect(a.θ) - collect(b.θ))
+    @set c.ℓ = -Inf
+end
+Base.-(a::V, b::V) where {T,U,V<:AbstractSample{T,U}} = subtract(a, b)
 
 # TODO remove
 using Soss, MeasureTheory
@@ -110,5 +116,6 @@ a = rand(m(e = 1))
 tr = xform(m(;))
 s = Sample(a, ℓ(a))
 cs = ConstrainedSample(s, tr)
-add(s, cs)
+add(cs, cs)
 # transform_logdensity(tr, ℓ, s_inv - [10])
+s + s - s - s
