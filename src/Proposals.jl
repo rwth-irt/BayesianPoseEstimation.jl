@@ -4,21 +4,36 @@
 
 using Random
 
-+(a::NamedTuple{T,U}, b::NamedTuple{T,U}) where {T,U} = NamedTuple{T,U}(collect(a) + collect(b))
-
--(a::NamedTuple{T,U}, b::NamedTuple{T,U}) where {T,U} = NamedTuple{T,U}(collect(a) - collect(b))
-
 """
     AbstractProposal
 Has a `model` which supports rand() and logdensity
 """
 abstract type AbstractProposal end
 
+"""
+    rand(rng, q)
+Generate a new raw state `θ` using the `model` of the proposal `q`.
+Whether the sample is Constrained or not is determined 
+"""
 Base.rand(rng::Random.AbstractRNG, q::AbstractProposal) = rand(rng, q.model)
 
-Base.rand(q::AbstractProposal) = rand(Random.GLOBAL_RNG, q.model)
+"""
+    rand(q)
+Generate a new raw state `θ` using the `model` of the proposal `q`.
+"""
+Base.rand(q::AbstractProposal) = rand(Random.GLOBAL_RNG, q)
 
+"""
+    logdensity(q, θ)
+Evaluate the logdensity of a state given the `model` form the proposal `q`.
+"""
 logdensity(q::AbstractProposal, θ) = logdensity(q.model | θ)
+
+"""
+    logdensity(q, θ)
+Evaluate the logdensity of a sample given the `model` form the proposal `q`.
+"""
+logdensity(q::AbstractProposal, s::AbstractSample) = logdensity(q | state(s))
 
 """
     propose(q, θ)
@@ -30,7 +45,22 @@ propose(q::AbstractProposal, θ) = θ + rand(q)
     propose(q, θ)
 For the general case of dependent samples.
 """
+function propose(q::AbstractProposal, s::AbstractSample)
+    @set s.θ = propose(q, s.θ)
+end
+
+"""
+    propose(q, θ)
+For the general case of dependent samples.
+"""
 transition_probability(q::AbstractProposal, θ, θ_cond) = logdensity(q, θ - θ_cond)
+
+"""
+    is_constrained(x::AbstractProposal)
+Implement IsConstrained trait.
+"""
+is_constrained(x::AbstractProposal) = is_constrained(x.model)
+
 
 """
     Proposal
@@ -40,25 +70,6 @@ struct Proposal <: AbstractProposal
     model
 end
 
-"""
-    IndependentProposal
-Propose samples independent from the previous one.
-"""
-struct IndependentProposal <: AbstractProposal
-    model
-end
-
-"""
-    propose(q, θ)
-For the general case of dependent samples.
-"""
-propose(q::IndependentProposal, θ) = rand(q)
-
-"""
-    propose(q, θ)
-For the general case of dependent samples.
-"""
-transition_probability(q::IndependentProposal, θ, θ_cond) = logdensity(q, θ)
 
 
 """
@@ -73,4 +84,80 @@ end
     propose(q, θ)
 For symmetric proposals, the forward and backward transition probability cancels out
 """
-transition_probability(q::IndependentProposal, θ, θ_cond) = 0
+transition_probability(q::SymmetricProposal, θ, θ_cond) = 0
+
+
+
+"""
+    IndependentProposal
+Propose samples independent from the previous one.
+"""
+struct IndependentProposal <: AbstractProposal
+    model
+end
+
+"""
+    propose(q, θ)
+Independent samples are just random values from the model.
+"""
+propose(q::IndependentProposal, θ) = rand(q)
+
+"""
+    propose(q, θ)
+For independent proposals, the transition probability does not depend on the previous sample.
+
+"""
+transition_probability(q::IndependentProposal, θ, θ_cond) = logdensity(q, θ)
+
+"""
+    propose(q)
+This method returns a new sample without a prior sample.
+Whether a `ConstrainedSample` or  `Sample` is returned is determined via the IsConstrained trait.
+"""
+propose(q::IndependentProposal) = _propose(q, is_constrained(q))
+
+"""
+    _propose(q, ::Type{ConstrainedSample})
+This method returns a new `ConstrainedSample` without a prior sample.
+"""
+function _propose(q::IndependentProposal, ::IsConstrained{true})
+    θ = rand(q)
+    tr = xform(q.model)
+    ConstrainedSample(θ, -Inf, tr)
+end
+
+"""
+    _propose(q, ::Type{ConstrainedSample})
+Independent samples are just random values from the model.
+This method returns a new `Sample` without a prior sample.
+"""
+function _propose(q::IndependentProposal, ::IsConstrained{false})
+    θ = rand(q)
+    tr = xform(q.model)
+    Sample(θ, -Inf)
+end
+
+#TODO Does GibbsProposal make sense? Each Gibbs variable-block belongs to a sampler like MH, ConditionalGibbs, ...
+
+"""
+    GibbsProposal
+Allows different proposals for different sets of state variables.
+"""
+struct GibbsProposal <: AbstractProposal
+    # TODO type safe data structure? Min. iterable
+    # TODO should should the model have the correct form (required variables as args, ist it predictive???) or have models and a set of variables. The latter would probably require transforming the model over and over again. Better provide convenience constructor for generating the correct model.
+    model
+    proposals::Vector{AbstractProposal}
+end
+
+
+# TODO does it make sense to always sample the variables which are in the hierarchy below the previous variable?
+"""
+    rand(rng, q)
+Generate a new sample randomly using one of the `models` given the other parameters.
+"""
+function Base.rand(rng::Random.AbstractRNG, q::GibbsProposal)
+    # TODO Random does not make sense because sampling algorithm needs to know, which sampler is used for the Block (MH, ConditionalGibbs, etc...)
+    m = rand(q.models)
+    rand(rng, m)
+end

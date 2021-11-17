@@ -2,39 +2,45 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO always sample in constrained state? guess independent sampling should be in constrained space by default?
-# TODO is it possible to infer it from the function or should I actually make a new proposal type
-# function f_sample_proposal(s::AbstractSample, f::Function)
-#     θ = f(state(s))
-#     s_new = copy(s)
-#     state!(s_new, θ)
-# end
+using AbstractMCMC
+using Accessors
+using Random
 
-# TODO alternatively: Dispatch depends on type 
-# function f_sample_proposal(s::T, f::Function)
-#     θ = f(unconstrained_state(s))
-#     s_new = copy(s)
-#     unconstrained_state!(s_new, θ)
-# end
-
+#TODO I will probably want to use it for other samplers, too. Move somewhere else
+"""
+    PosteriorModel
+Has a data conditioned function to evaluate the posterior density up to a constant ℓ(θ)~p(y|θ)p(θ) 
+"""
+struct PosteriorModel{T<:Function} <: AbstractMCMC.AbstractModel
+    ℓ::T
+end
 
 """
-    mh_step(s, f, q, ℓ)
-Metropolis-Hastings step which returns the next sample of the chain based on the previous sample `s`.
-The function `f(s)` is used to propose a new sample with the probability `q(s,s_cond)=q(s|s_cond)`.
-Both samples are evaluated using the likelihood function `ℓ(s)`
+    MetropolisHastings
+Different MetropolisHastings samplers only differ by their proposals.
 """
-function mh_step(s::T, f::Function, q::Function, ℓ::Function; rng::AbstractRNG = Random.GLOBAL_RNG) where {T}
+struct MetropolisHastings{T<:AbstractProposal} <: AbstractMCMC.AbstractSampler
+    q::T
+end
+
+"""
+    step(sample, log_density, sampler, state)
+Implementing the AbstractMCMC interface.
+"""
+function step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::AbstractSample)
     # propose new sample
-    s_new = f(s)
+    s = propose(sampler.q, state)
+    proposal = @set s.ℓ = model.ℓ
     # acceptance ratio
-    # TODO use likelihood*prior or joint (=l*p)
-    α = ℓ(s_new) - ℓ(s) + q(s, s_new) - q(s_new, s)
+    α = (proposal.ℓ -
+         state.ℓ +
+         transition_probability(sampler.q, state, proposal) -
+         transition_probability(sampler.q, proposal, state))
     if log(rand(rng)) > α
         # reject
-        return s
+        return state, state
     else
         # accept (always the case if difference positive since log([0,1])->[-inf,0])
-        return s_new
+        return proposal, proposal
     end
 end
