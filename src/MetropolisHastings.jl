@@ -27,7 +27,8 @@ end
     step(sample, log_density, sampler, state)
 Implementing the AbstractMCMC interface.
 """
-function step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::AbstractSample)
+function step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
+    #TODO split into prior and likelihood since Bernoulli cannot be transformed (and does not need to since it is part of the observation not the estimated state)
     # propose new sample
     s = propose(sampler.q, state)
     proposal = @set s.ℓ = model.ℓ

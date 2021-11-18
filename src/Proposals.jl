@@ -6,7 +6,7 @@ using Random
 
 """
     AbstractProposal
-Has a `model` which supports rand() and logdensity
+Has a `model` which supports rand() and logpdf
 """
 abstract type AbstractProposal end
 
@@ -24,16 +24,16 @@ Generate a new raw state `θ` using the `model` of the proposal `q`.
 Base.rand(q::AbstractProposal) = rand(Random.GLOBAL_RNG, q)
 
 """
-    logdensity(q, θ)
-Evaluate the logdensity of a state given the `model` form the proposal `q`.
+    logpdf(q, θ)
+Evaluate the logpdf of a state given the `model` form the proposal `q`.
 """
-logdensity(q::AbstractProposal, θ) = logdensity(q.model | θ)
+logpdf(q::AbstractProposal, θ) = logpdf(q.model | θ)
 
 """
-    logdensity(q, θ)
-Evaluate the logdensity of a sample given the `model` form the proposal `q`.
+    logpdf(q, θ)
+Evaluate the logpdf of a sample given the `model` form the proposal `q`.
 """
-logdensity(q::AbstractProposal, s::AbstractSample) = logdensity(q | state(s))
+logpdf(q::AbstractProposal, s::Sample) = logpdf(q | state(s))
 
 """
     propose(q, θ)
@@ -45,7 +45,7 @@ propose(q::AbstractProposal, θ) = θ + rand(q)
     propose(q, θ)
 For the general case of dependent samples.
 """
-function propose(q::AbstractProposal, s::AbstractSample)
+function propose(q::AbstractProposal, s::Sample)
     @set s.θ = propose(q, s.θ)
 end
 
@@ -53,13 +53,7 @@ end
     propose(q, θ)
 For the general case of dependent samples.
 """
-transition_probability(q::AbstractProposal, θ, θ_cond) = logdensity(q, θ - θ_cond)
-
-"""
-    is_constrained(x::AbstractProposal)
-Implement IsConstrained trait.
-"""
-is_constrained(x::AbstractProposal) = is_constrained(x.model)
+transition_probability(q::AbstractProposal, θ, θ_cond) = logpdf(q, θ - θ_cond)
 
 
 """
@@ -69,7 +63,6 @@ Propose samples from the previous one by using a general proposal distribution.
 struct Proposal <: AbstractProposal
     model
 end
-
 
 
 """
@@ -85,7 +78,6 @@ end
 For symmetric proposals, the forward and backward transition probability cancels out
 """
 transition_probability(q::SymmetricProposal, θ, θ_cond) = 0
-
 
 
 """
@@ -107,34 +99,16 @@ propose(q::IndependentProposal, θ) = rand(q)
 For independent proposals, the transition probability does not depend on the previous sample.
 
 """
-transition_probability(q::IndependentProposal, θ, θ_cond) = logdensity(q, θ)
+transition_probability(q::IndependentProposal, θ, θ_cond) = logpdf(q, θ)
 
 """
     propose(q)
 This method returns a new sample without a prior sample.
-Whether a `ConstrainedSample` or  `Sample` is returned is determined via the IsConstrained trait.
 """
-propose(q::IndependentProposal) = _propose(q, is_constrained(q))
-
-"""
-    _propose(q, ::Type{ConstrainedSample})
-This method returns a new `ConstrainedSample` without a prior sample.
-"""
-function _propose(q::IndependentProposal, ::IsConstrained{true})
+function propose(q::IndependentProposal)
     θ = rand(q)
     tr = xform(q.model)
-    ConstrainedSample(θ, -Inf, tr)
-end
-
-"""
-    _propose(q, ::Type{ConstrainedSample})
-Independent samples are just random values from the model.
-This method returns a new `Sample` without a prior sample.
-"""
-function _propose(q::IndependentProposal, ::IsConstrained{false})
-    θ = rand(q)
-    tr = xform(q.model)
-    Sample(θ, -Inf)
+    Sample(θ, -Inf, tr)
 end
 
 #TODO Does GibbsProposal make sense? Each Gibbs variable-block belongs to a sampler like MH, ConditionalGibbs, ...

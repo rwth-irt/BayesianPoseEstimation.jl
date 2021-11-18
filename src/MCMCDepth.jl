@@ -5,15 +5,15 @@
 module MCMCDepth
 
 # lib includes
-include("IsConstrainedTrait.jl")
 include("Samples.jl")
 include("Proposals.jl")
 include("MetropolisHastings.jl")
 include("Visualization.jl")
-include("CircularTransform.jl")
+# Extensions
+include("TransformVariablesExtensions.jl")
+include("MeasureTheoryExtensions.jl")
 
 # Samples
-export ConstrainedSample
 export Sample
 
 export log_probability
@@ -33,7 +33,9 @@ export transition_probability
 # Visualization
 export colorize_depth
 
-# CircularTransform
+# Extensions
 export as○, as_circular
+export CircularUniform
+export UniformInterval
 
 end # module
