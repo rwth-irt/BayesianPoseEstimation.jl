@@ -9,12 +9,12 @@ using Images
     colorize_depth(depth; color_scheme, rev)
 Takes a `depth` image which is some kind of Matrix{Float}, normalizes the values to [0,1] and colorizes it using the `color_scheme`.
 """
-function colorize_depth(depth; color_scheme=:viridis, rev=true)
+function colorize_depth(depth; color_scheme = :viridis, rev = true)
     # offset: ignore 0s by setting them to inf
-    depth_img = [ifelse(x == 0, Inf, x) for x in depth]  
+    depth_img = [ifelse(iszero(x), Inf, x) for x in depth]
     depth_img = depth .- minimum(depth_img)
     # set inf to 0 again
-    depth_img = [ifelse(isinf(x), 0, x) for x in depth_img]
+    depth_img = [ifelse(isinf(x), zero(x), x) for x in depth_img]
     # scale
     depth_img = depth_img ./ maximum(depth_img)
     # colorize

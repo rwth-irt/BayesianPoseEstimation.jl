@@ -1,9 +1,23 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
+using BenchmarkTools
 using MCMCDepth
 using Soss, MeasureTheory
 using TransformVariables
+
+d = MixtureMeasure([Normal(), Uniform()], [0.1, 1 - 0.1])
+@benchmark logdensity(d, 0.5)
+inac_logdensity(μ::MixtureMeasure, x) = log(sum(w + exp(MeasureTheory.logdensity(m, x)) for (w, m) in zip(μ.weights, μ.components) if !iszero(w)))
+@benchmark inac_logdensity(d, 0.5)
+
+test_unsafe(components, weights, x) = logsumexp(log(w) + MeasureTheory.logdensity(m, x) for (w, m) in zip(weights, components) if !iszero(w))
+@code_warntype test_unsafe([Normal(), Uniform()], [0.1, 0.9], 0.5)
+@benchmark test_unsafe([Normal(), Uniform()], [0.1, 0.9], 0.5)
+@benchmark logsumexp!([1, 2, log(1), log(2)])
+@benchmark log(2 * exp(0.1) + 3 * exp(0.5))
+@benchmark logsumexp([log(2) + 0.1, log(3) + exp(0.5)])
+
 
 # Extensions
 rand(UniformInterval(1, 2))

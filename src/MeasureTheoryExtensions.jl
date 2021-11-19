@@ -2,7 +2,10 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using LogExpFunctions
 using MeasureTheory
+using Random
+using StatsBase
 using TransformVariables
 
 """
@@ -51,3 +54,25 @@ MeasureTheory.distproxy(::CircularUniform{()}) = Dists.Uniform(0, 2π)
 MeasureTheory.logdensity(::CircularUniform{()}, x) = -log(2π)
 
 TransformVariables.as(::CircularUniform{()}) = as○
+
+
+"""
+    MixtureMeasure
+Mixture of several Measures `components` which are associated with their corresponding `weights`.
+p(θ) = w₁p(θ₁) + w₂p(θ₂) + ...
+"""
+struct MixtureMeasure{T<:Tuple,U<:AbstractWeights} <: AbstractMeasure
+    components::T # Tuple instead of array for type safety with different types
+    weights::U
+end
+
+MixtureMeasure(components, weights::AbstractVector) = MixtureMeasure(Tuple(components), Weights(weights / sum(weights), 1))
+
+Base.show(io::IO, d::MixtureMeasure) = print(io, "MixtureMeasure\ncomponents: [$(d.components)]\nweights: $(d.weights))")
+
+MeasureTheory.logdensity(μ::MixtureMeasure, x) = logsumexp(log(w) + MeasureTheory.logdensity(m, x) for (w, m) in zip(μ.weights, μ.components) if !iszero(w))
+
+MeasureTheory.basemeasure(::MixtureMeasure) = Lebesgue(ℝ)
+
+StatsBase.sample(rng::AbstractRNG, d::MixtureMeasure) = d.components[sample(rng, d.weights)]
+Base.rand(rng::AbstractRNG, T::Type, μ::MixtureMeasure) = rand(rng, T, sample(rng, μ))

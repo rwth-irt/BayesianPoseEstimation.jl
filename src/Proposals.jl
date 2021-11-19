@@ -2,11 +2,12 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using MeasureTheory
 using Random
 
 """
     AbstractProposal
-Has a `model` which supports rand() and logpdf
+Has a `model` which supports rand() and logdensity
 """
 abstract type AbstractProposal end
 
@@ -24,16 +25,16 @@ Generate a new raw state `θ` using the `model` of the proposal `q`.
 Base.rand(q::AbstractProposal) = rand(Random.GLOBAL_RNG, q)
 
 """
-    logpdf(q, θ)
-Evaluate the logpdf of a state given the `model` form the proposal `q`.
+    logdensity(q, θ)
+Evaluate the logdensity of a state given the `model` form the proposal `q`.
 """
-logpdf(q::AbstractProposal, θ) = logpdf(q.model | θ)
+MeasureTheory.logdensity(q::AbstractProposal, θ) = logdensity(q.model | θ)
 
 """
-    logpdf(q, θ)
-Evaluate the logpdf of a sample given the `model` form the proposal `q`.
+    logdensity(q, θ)
+Evaluate the logdensity of a sample given the `model` form the proposal `q`.
 """
-logpdf(q::AbstractProposal, s::Sample) = logpdf(q | state(s))
+MeasureTheory.logdensity(q::AbstractProposal, s::Sample) = logdensity(q | state(s))
 
 """
     propose(q, θ)
@@ -53,7 +54,7 @@ end
     propose(q, θ)
 For the general case of dependent samples.
 """
-transition_probability(q::AbstractProposal, θ, θ_cond) = logpdf(q, θ - θ_cond)
+transition_probability(q::AbstractProposal, θ, θ_cond) = logdensity(q, θ - θ_cond)
 
 
 """
@@ -99,7 +100,7 @@ propose(q::IndependentProposal, θ) = rand(q)
 For independent proposals, the transition probability does not depend on the previous sample.
 
 """
-transition_probability(q::IndependentProposal, θ, θ_cond) = logpdf(q, θ)
+transition_probability(q::IndependentProposal, θ, θ_cond) = logdensity(q, θ)
 
 """
     propose(q)
