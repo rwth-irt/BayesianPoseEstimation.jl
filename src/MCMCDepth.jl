@@ -36,6 +36,7 @@ export colorize_depth
 # Extensions
 export as○, as_circular
 export CircularUniform
+export BinaryMixture
 export MixtureMeasure
 export UniformInterval
 

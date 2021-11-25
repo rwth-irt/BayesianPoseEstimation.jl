@@ -6,18 +6,69 @@ using MCMCDepth
 using Soss, MeasureTheory
 using TransformVariables
 
-d = MixtureMeasure([Normal(), Uniform()], [0.1, 1 - 0.1])
-@benchmark logdensity(d, 0.5)
-inac_logdensity(μ::MixtureMeasure, x) = log(sum(w + exp(MeasureTheory.logdensity(m, x)) for (w, m) in zip(μ.weights, μ.components) if !iszero(w)))
-@benchmark inac_logdensity(d, 0.5)
+bernoulli_simple = @model o begin
+    oc .~ Bernoulli.(o)
+end
 
-test_unsafe(components, weights, x) = logsumexp(log(w) + MeasureTheory.logdensity(m, x) for (w, m) in zip(weights, components) if !iszero(w))
-@code_warntype test_unsafe([Normal(), Uniform()], [0.1, 0.9], 0.5)
-@benchmark test_unsafe([Normal(), Uniform()], [0.1, 0.9], 0.5)
-@benchmark logsumexp!([1, 2, log(1), log(2)])
-@benchmark log(2 * exp(0.1) + 3 * exp(0.5))
-@benchmark logsumexp([log(2) + 0.1, log(3) + exp(0.5)])
+likelihood_simple = @model oc begin
+    y ~ For(oc) do o
+        if o
+            Normal()
+        else
+            Exponential()
+        end
+    end
+end
 
+likelihood_mixture = @model o begin
+    y ~ For(o) do i
+        MixtureMeasure([Normal(), Exponential()], [i, 1.0 - i])
+    end
+end
+
+likelihood_binary = @model o begin
+    y ~ For(o) do i
+        BinaryMixture(Normal(), Exponential(), i, 1.0 - i)
+    end
+end
+
+function posterior_logdensity(model, prior_model, o::T, y::U) where {T,U}
+    oc = rand(prior_model(o))
+    logdensity(model(oc) | y)
+end
+
+function posterior_logdensity_mix(model, o::T, y::U) where {T,U}
+    logdensity(model(o) | y)
+end
+
+o_ = (; o = rand.(UniformInterval.(zeros(500, 500), 1)))
+oc_ = rand(bernoulli_simple(o_))
+y_ = rand(likelihood_simple(oc_))
+y_ = rand(likelihood_mixture(o_))
+y_ = rand(likelihood_binary(o_))
+mean(y_.y)
+MixtureMeasure([Normal(), Exponential()], [0.1, 1.0 - 0.1])
+BinaryMixture(Normal(), Exponential(), 1, 9)
+# log_weights_ = (log(w) for w in μ.weights)
+
+@code_warntype posterior_logdensity(likelihood_simple, bernoulli_simple, o_, y_)
+@code_warntype posterior_logdensity_mix(likelihood_mixture, o_, y_)
+@code_warntype posterior_logdensity_mix(likelihood_binary, o_, y_)
+@benchmark posterior_logdensity_mix(likelihood_mixture, o_, y_)
+@benchmark posterior_logdensity_mix(likelihood_binary, o_, y_)
+@benchmark posterior_logdensity(likelihood_simple, bernoulli_simple, o_, y_)
+# TODO logsumexp is way slower than logaddexp
+@benchmark logsumexp([1.0, 2.0])
+@benchmark logsumexp(1.0, 2.0)
+@benchmark logaddexp(1.0, 2.0)
+
+# TODO not type safe: For(eachindex(o))
+# TODO not type safe: MixtureMeasure([Normal(), Exponential()], [i, 1 - i] (1-i might be Int)
+test_simple = @model o begin
+    y ~ For(o) do i
+        MixtureMeasure([Normal(), Exponential()], [i, 1.0 - i])
+    end
+end
 
 # Extensions
 rand(UniformInterval(1, 2))
