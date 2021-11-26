@@ -4,16 +4,28 @@
 
 using AbstractMCMC
 using Accessors
+using MeasureTheory
 using Random
 
 #TODO I will probably want to use it for other samplers, too. Move somewhere else
 """
     PosteriorModel
-Has a data conditioned function to evaluate the posterior density up to a constant ℓ(θ)~p(y|θ)p(θ) 
+Models the posterior logdensity p(θ|y)~ℓ(y|θ)q(θ) up to a constant.
+`q` is the prior model and should support a rand(q) and logdensity(q, θ).
+`ℓ` is the observation model / likelihood for a sample.
 """
-struct PosteriorModel{T<:Function} <: AbstractMCMC.AbstractModel
-    ℓ::T
+struct PosteriorModel <: AbstractMCMC.AbstractModel
+    # TODO constrain types?
+    q
+    ℓ
 end
+
+"""
+    logdensity(m, s)
+Non-corrected logdensity of the of the sample `s` given the measure `m`.
+"""
+MeasureTheory.logdensity(m::PosteriorModel, s::Sample) =
+    logdensity(m.q, s) + logdensity(m.ℓ, s)
 
 """
     MetropolisHastings
@@ -24,17 +36,42 @@ struct MetropolisHastings{T<:AbstractProposal} <: AbstractMCMC.AbstractSampler
 end
 
 """
-    step(sample, log_density, sampler, state)
-Implementing the AbstractMCMC interface.
+    propose(rng, m, s)
+Propose a new sample for the MetropolisHastings sampler.
 """
-function step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
+propose(rng::AbstractRNG, m::MetropolisHastings, s) = propose(rng, m.q, s)
+
+"""
+    propose(m, s)
+Propose a new sample for the MetropolisHastings sampler.
+"""
+propose(m::MetropolisHastings, s) = propose(Random.GLOBAL_RNG, m.q, s)
+
+"""
+    step(sample, log_density, sampler)
+Implementing the AbstractMCMC interface for the initial step.
+"""
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, ::MetropolisHastings)
+    proposal = IndependentProposal(model.q)
+    sample = propose(rng, proposal)
+    println(log_probability(sample))
+    state = @set sample.p = logdensity(model, sample)
+    # sample, state are the same for MH
+    return state, state
+end
+
+"""
+    step(sample, log_density, sampler, state)
+Implementing the AbstractMCMC interface for steps given a state from the last step.
+"""
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
     #TODO split into prior and likelihood since Bernoulli cannot be transformed (and does not need to since it is part of the observation not the estimated state)
     # propose new sample
-    s = propose(sampler.q, state)
-    proposal = @set s.ℓ = model.ℓ
+    sample = propose(rng, sampler, state)
+    proposal = @set sample.p = logdensity(model, sample)
     # acceptance ratio
-    α = (proposal.ℓ -
-         state.ℓ +
+    α = (log_probability(proposal) -
+         log_probability(state) +
          transition_probability(sampler.q, state, proposal) -
          transition_probability(sampler.q, proposal, state))
     if log(rand(rng)) > α

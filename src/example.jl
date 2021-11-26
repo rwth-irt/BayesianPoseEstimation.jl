@@ -6,6 +6,25 @@ using MCMCDepth
 using Soss, MeasureTheory
 using TransformVariables
 
+# Proposals
+prio_m = @model begin
+    a ~ Uniform()
+end
+prop_m = @model begin
+    a ~ Normal(1, 0.1)
+end
+ind_prop = IndependentProposal(prio_m)
+s = propose(ind_prop)
+sym_prop = SymmetricProposal(prop_m)
+s2 = propose(sym_prop, s)
+prop = Proposal(prop_m)
+s3 = propose(sym_prop, s2)
+transition_probability(prop, s3, s2)
+transition_probability(prop, s2, s3)
+transition_probability(sym_prop, s2, s3)
+
+# Performance
+
 bernoulli_simple = @model o begin
     oc .~ Bernoulli.(o)
 end
@@ -75,7 +94,16 @@ rand(UniformInterval(1, 2))
 logpdf(UniformInterval(0.0, 2.0), 0)
 rand(CircularUniform())
 logpdf(CircularUniform(), 2π + 0.001)
-transform(as(CircularUniform()), 100)
+transform(as((; a = as(Array, as○, 2), b = as_unit_interval)), [100; 200; 10])
+
+circ_m = @model begin
+    a ~ For(1:2) do i
+        UniformInterval(1, 2)
+    end
+end
+sample = Sample(circ_m)
+state(sample)
+log_probability(sample)
 
 prior_m = @model begin
     r ~ CircularUniform()
@@ -86,7 +114,7 @@ prior_m = @model begin
 end
 
 prior_ℓ(x) = logdensity(prior_m | x)
-prior_t = xform(prior_m(;))
+prior_t = xform(prior_m | (;))
 θ1 = rand(prior_m)
 prior_ℓ(θ1)
 

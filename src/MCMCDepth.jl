@@ -18,6 +18,7 @@ export Sample
 
 export log_probability
 export merge
+export raw_state
 export state
 export unconstrained_state
 
@@ -29,6 +30,10 @@ export SymmetricProposal
 
 export propose
 export transition_probability
+
+# MetropolisHastings
+export PosteriorModel
+export MetropolisHastings
 
 # Visualization
 export colorize_depth

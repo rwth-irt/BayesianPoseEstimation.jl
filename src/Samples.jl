@@ -3,12 +3,15 @@
 # All rights reserved. 
 
 using Accessors
+using MeasureTheory, Soss
+using Random
 using TransformVariables
 
 """
     Sample(θ, p, t)
 Might have a constrained parameter Domain, e.g. θᵢ ∈ ℝ⁺.
 Consists of the current raw state `θ::Vector{Float64}`, the probability `p` and a transformation rule `t`.
+Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
 """
 struct Sample{T,U}
     θ::Vector{Float64}
@@ -27,10 +30,28 @@ function Sample(θ::NamedTuple, p, t::TransformVariables.TransformTuple)
 end
 
 """
+    Sample(m)
+Create a sample by sampling from a model.
+"""
+function Sample(rng::AbstractRNG, m::Soss.AbstractModel)
+    θ = rand(rng, m)
+    # xform requires ConditionalModel, conditioning on nothing does not change the model except converting it a ConditionalModel
+    tr = xform(m | (;))
+    Sample(θ, -Inf, tr)
+end
+
+"""
+    Sample(m)
+Create a sample by sampling from a model.
+"""
+Sample(m::Soss.AbstractModel) = Sample(Random.GLOBAL_RNG, m)
+
+"""
     state(s)
 State of the parameters in the model domain.
+Returns a `NamedTuple` with the variable names and their model domain values.
 """
-state(s::Sample) = transform(s.t, collect(s.θ))
+state(s::Sample) = transform(s.t, s.θ)
 
 """
     log_probability(s)
@@ -42,10 +63,35 @@ function log_probability(s::Sample)
 end
 
 """
+    logdensity(m, s)
+Non-corrected logdensity of the of the sample `s` given the measure `m`.
+"""
+MeasureTheory.logdensity(m::AbstractMeasure, s::Sample) = logdensity(m, state(s))
+
+"""
+    logdensity(m, s)
+Non-corrected logdensity of the of the sample `s` given the model `m`.
+"""
+# Required to solve ambiguity for ConditionalModel
+MeasureTheory.logdensity(m::Soss.ConditionalModel, s::Sample) = logdensity(m, state(s))
+
+"""
+    flatten(x)
+Flattens x to return a 1D array.
+"""
+function flatten(x)
+    y = reduce(vcat, x)
+    if length(y) == 1
+        return [y]
+    end
+    return y
+end
+
+"""
     +(s, θ)
 Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
 """
-Base.:+(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ + reduce(vcat, θ)
+Base.:+(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ + flatten(θ)
 
 """
     +(s, θ)
@@ -64,7 +110,7 @@ Base.:+(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a + b.θ
     -(s, θ)
 Subtract raw state `θ` from the raw state (unconstrained domain) of the sample `s`.
 """
-Base.:-(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ - reduce(vcat, θ)
+Base.:-(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ - faltten(θ)
 
 """
     -(s, θ)
@@ -77,7 +123,7 @@ Base.:-(s::Sample{T,U}, θ::AbstractVector) where {T,U,V} = @set s.θ = s.θ - �
 Subtract the raw states (unconstrained domain) of two samples.
 Only same type is supported to prevent surprises in the return type.
 """
-Base.:-(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a + b.θ
+Base.:-(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a - b.θ
 
 s = Sample([1.0, 2.0, 3.0], 1.0, as((; a = as_unit_interval, b = as(Vector, asℝ₊, 2))))
 st = state(s)
