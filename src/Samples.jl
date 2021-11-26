@@ -10,7 +10,7 @@ using TransformVariables
 """
     Sample(θ, p, t)
 Might have a constrained parameter Domain, e.g. θᵢ ∈ ℝ⁺.
-Consists of the current raw state `θ::Vector{Float64}`, the probability `p` and a transformation rule `t`.
+Consists of the current raw state `θ::Vector{Float64}`, the (uncorrected) posterior probability `p` and a transformation rule `t`.
 Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
 """
 struct Sample{T,U}
@@ -55,7 +55,7 @@ state(s::Sample) = transform(s.t, s.θ)
 
 """
     log_probability(s)
-Jacobian-corrected posterior log probability of the of this sample.
+Jacobian-corrected posterior log probability of the sample.
 """
 function log_probability(s::Sample)
     _, ℓ_t = transform_and_logjac(s.t, s.θ)
@@ -79,13 +79,7 @@ MeasureTheory.logdensity(m::Soss.ConditionalModel, s::Sample) = logdensity(m, st
     flatten(x)
 Flattens x to return a 1D array.
 """
-function flatten(x)
-    y = reduce(vcat, x)
-    if length(y) == 1
-        return [y]
-    end
-    return y
-end
+flatten(x) = collect(Iterators.flatten(x))
 
 """
     +(s, θ)

@@ -48,24 +48,22 @@ Propose a new sample for the MetropolisHastings sampler.
 propose(m::MetropolisHastings, s) = propose(Random.GLOBAL_RNG, m.q, s)
 
 """
-    step(sample, log_density, sampler)
+    step(rng, model, sampler)
 Implementing the AbstractMCMC interface for the initial step.
+Proposes one sample from the prior distribution of the PosteriorModel
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, ::MetropolisHastings)
-    proposal = IndependentProposal(model.q)
-    sample = propose(rng, proposal)
-    println(log_probability(sample))
+    sample = propose(rng, IndependentProposal(model.q))
     state = @set sample.p = logdensity(model, sample)
     # sample, state are the same for MH
     return state, state
 end
 
 """
-    step(sample, log_density, sampler, state)
+    step(sample, model, sampler, state)
 Implementing the AbstractMCMC interface for steps given a state from the last step.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
-    #TODO split into prior and likelihood since Bernoulli cannot be transformed (and does not need to since it is part of the observation not the estimated state)
     # propose new sample
     sample = propose(rng, sampler, state)
     proposal = @set sample.p = logdensity(model, sample)
