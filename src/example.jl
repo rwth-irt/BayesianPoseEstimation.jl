@@ -97,9 +97,10 @@ logpdf(CircularUniform(), 2π + 0.001)
 transform(as((; a = as(Array, as○, 2), b = as_unit_interval)), [100; 200; 10])
 
 circ_m = @model begin
-    a ~ For(1:2) do i
+    a ~ For(1:3) do i
         UniformInterval(1, 2)
     end
+    b ~ Normal()
 end
 sample = Sample(circ_m)
 state(sample)
@@ -142,3 +143,27 @@ s2 = s1 + rand(proposal_m)
 s2 = s2 + rand(proposal_m)
 state(s2)
 obs_ℓ(state(s2), y1)
+
+# Gibbs
+using MCMCDepth
+using Soss, MeasureTheory
+m = @model begin
+    a ~ Uniform()
+    b ~ Exponential(a)
+end
+ip = IndependentProposal(m)
+s1 = propose(ip)
+transition_probability(ip, s1, s1)
+
+b_m = Soss.likelihood(m, :b)
+gp = GibbsProposal{IndependentProposal}(m, :b)
+s2 = propose(gp, s1)
+transition_probability(gp, s2, s1)
+logdensity(b_m(state(s2)), s1)
+
+gp2 = GibbsProposal(gp)
+s3 = propose(gp2, s2)
+transition_probability(gp2, s3, s2)
+
+mh = MetropolisHastings(ip)
+Gibbs(mh, MetropolisHastings(gp))

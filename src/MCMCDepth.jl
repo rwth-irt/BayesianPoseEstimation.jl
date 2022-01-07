@@ -7,7 +7,9 @@ module MCMCDepth
 # lib includes
 include("Samples.jl")
 include("Proposals.jl")
+include("Models.jl")
 include("MetropolisHastings.jl")
+include("Gibbs.jl")
 include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
@@ -23,6 +25,7 @@ export state
 export unconstrained_state
 
 # Proposals
+export AnalyticProposal
 export GibbsProposal
 export IndependentProposal
 export Proposal
@@ -31,9 +34,14 @@ export SymmetricProposal
 export propose
 export transition_probability
 
-# MetropolisHastings
+# Model
 export PosteriorModel
+
+# MetropolisHastings
 export MetropolisHastings
+
+# Gibbs
+export Gibbs
 
 # Visualization
 export colorize_depth

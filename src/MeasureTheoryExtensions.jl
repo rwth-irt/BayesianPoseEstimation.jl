@@ -16,7 +16,7 @@ f(x; a, b) = \\frac{1}{b - a}, \\quad a \\le x \\le b
 ```
 """
 
-@parameterized UniformInterval(a, b)
+@parameterized UniformInterval(a, b) ≪ Lebesgue(ℝ)
 
 function MeasureTheory.basemeasure(d::UniformInterval{(:a, :b)})
     inbounds(x) = d.a <= x <= d.b
@@ -39,7 +39,7 @@ Uses the CircularTransform for continuity.
 ```
 """
 
-@parameterized CircularUniform()
+@parameterized CircularUniform() ≪ Lebesgue(ℝ)
 
 function MeasureTheory.basemeasure(::CircularUniform{()})
     inbounds(x) = 0 <= x <= 2π

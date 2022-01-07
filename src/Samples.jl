@@ -2,6 +2,8 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# bundle_samples for the Sample type
+using AbstractMCMC, TupleVectors
 using Accessors
 using MeasureTheory, Soss
 using Random
@@ -54,6 +56,13 @@ Returns a `NamedTuple` with the variable names and their model domain values.
 state(s::Sample) = transform(s.t, s.θ)
 
 """
+    raw_state(s)
+State of the parameters in the unconstrained domain.
+Returns a `NamedTuple` with the variable names and their model domain values.
+"""
+raw_state(s::Sample{T,U}) where {T,U} = NamedTuple{T}(s.θ)
+
+"""
     log_probability(s)
 Jacobian-corrected posterior log probability of the sample.
 """
@@ -104,7 +113,7 @@ Base.:+(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a + b.θ
     -(s, θ)
 Subtract raw state `θ` from the raw state (unconstrained domain) of the sample `s`.
 """
-Base.:-(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ - faltten(θ)
+Base.:-(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ - flatten(θ)
 
 """
     -(s, θ)
@@ -119,6 +128,34 @@ Only same type is supported to prevent surprises in the return type.
 """
 Base.:-(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a - b.θ
 
-s = Sample([1.0, 2.0, 3.0], 1.0, as((; a = as_unit_interval, b = as(Vector, asℝ₊, 2))))
-st = state(s)
-state(s + st)
+"""
+    merge(as, bs...)
+Left-to-Right merges the samples as with bs.
+This means the the rightmost state is used.
+The original transformation rule of as is kept to ensure compatibility with the original sample.
+Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
+"""
+function Base.merge(as::Sample, bs::Sample...)
+    merged_state = merge(state(as), map(x -> state(x), bs)...)
+    Sample(merged_state, -Inf, as.t)
+end
+
+"""
+    bundle_samples(samples, model, sampler, state, chain_type[; kwargs...])
+Bundle all `samples` that were sampled from the `model` with the given `sampler` in a chain.
+The final `state` of the `sampler` can be included in the chain. The type of the chain can
+be specified with the `chain_type` argument.
+By default, this method returns `samples`.
+"""
+function AbstractMCMC.bundle_samples(
+    samples::Vector{<:Sample},
+    ::AbstractMCMC.AbstractModel,
+    ::AbstractMCMC.AbstractSampler,
+    ::Any,
+    ::Type{TupleVector};
+    start = 1,
+    step = 1
+)
+    states = map(state, samples)
+    TupleVector(states[start:step:end])
+end

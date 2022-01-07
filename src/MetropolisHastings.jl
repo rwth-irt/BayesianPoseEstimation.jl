@@ -4,28 +4,9 @@
 
 using AbstractMCMC
 using Accessors
-using MeasureTheory
 using Random
 
 #TODO I will probably want to use it for other samplers, too. Move somewhere else
-"""
-    PosteriorModel
-Models the posterior logdensity p(θ|y)~ℓ(y|θ)q(θ) up to a constant.
-`q` is the prior model and should support a rand(q) and logdensity(q, θ).
-`ℓ` is the observation model / likelihood for a sample.
-"""
-struct PosteriorModel <: AbstractMCMC.AbstractModel
-    # TODO constrain types?
-    q
-    ℓ
-end
-
-"""
-    logdensity(m, s)
-Non-corrected logdensity of the of the sample `s` given the measure `m`.
-"""
-MeasureTheory.logdensity(m::PosteriorModel, s::Sample) =
-    logdensity(m.q, s) + logdensity(m.ℓ, s)
 
 """
     MetropolisHastings
@@ -35,17 +16,25 @@ struct MetropolisHastings{T<:AbstractProposal} <: AbstractMCMC.AbstractSampler
     q::T
 end
 
+Base.show(io::IO, mh::MetropolisHastings) = print(io, "MetropolisHastings with proposal:\n$(model(mh.q))")
+
+"""
+    proposal(mh)
+Get the proposal model of the Sampler.
+"""
+proposal(mh::MetropolisHastings) = mh.q
+
+"""
+    proposal(mh)
+Set the proposal model of the Sampler.
+"""
+set_proposal(mh::MetropolisHastings, q::AbstractProposal) = @set mh.q = q
+
 """
     propose(rng, m, s)
 Propose a new sample for the MetropolisHastings sampler.
 """
 propose(rng::AbstractRNG, m::MetropolisHastings, s) = propose(rng, m.q, s)
-
-"""
-    propose(m, s)
-Propose a new sample for the MetropolisHastings sampler.
-"""
-propose(m::MetropolisHastings, s) = propose(Random.GLOBAL_RNG, m.q, s)
 
 """
     step(rng, model, sampler)
@@ -56,7 +45,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, ::Metropolis
     sample = propose(rng, IndependentProposal(model.q))
     state = @set sample.p = logdensity(model, sample)
     # sample, state are the same for MH
-    return state, state
+    state, state
 end
 
 """
