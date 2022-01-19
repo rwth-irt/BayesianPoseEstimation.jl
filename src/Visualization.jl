@@ -25,3 +25,17 @@ function colorize_depth(depth; color_scheme = :viridis, rev = true)
     # Colorize only foreground
     [ifelse(x > 0, c_scheme[x], RGB()) for x in depth_img]
 end;
+
+"""
+    colorize_depth(probability; color_scheme, rev)
+Takes a `prob_img` image which has values ∈ [0,1], `color_scheme`.
+"""
+function colorize_probability(prob_img; color_scheme = :viridis, rev = false)
+    # colorize
+    c_scheme = ColorSchemes.eval(color_scheme)
+    if rev
+        c_scheme = reverse(c_scheme)
+    end
+    # Colorize only foreground
+    [ifelse(x > 0, c_scheme[x], RGB()) for x in prob_img]
+end;
