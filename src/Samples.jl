@@ -91,53 +91,108 @@ Flattens x to return a 1D array.
 flatten(x) = collect(Iterators.flatten(x))
 
 """
-    +(s, θ)
-Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
+    ranges(nt)
+Helps to find which range of the raw state belongs to which variable.
+Returns a dictionary of UnitRange for each key in the NamedTuple
 """
-Base.:+(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ + flatten(θ)
+function ranges(nt::NamedTuple{T,U}) where {T,U}
+    d = Dict{Symbol,UnitRange{Int64}}()
+    iter = 1
+    for var_name in T
+        l = length(nt[var_name])
+        d[var_name] = iter:(iter+l-1)
+        iter = iter + l
+    end
+    return d
+end
 
 """
-    +(s, θ)
-Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
+    ranges(nt)
+Helps to find which range of the raw state belongs to which variable.
+Returns a dictionary of UnitRange for each key in the NamedTuple
 """
-Base.:+(s::Sample{T,U}, θ::AbstractVector) where {T,U,V} = @set s.θ = s.θ + θ
+ranges(s::Sample) = ranges(state(s))
 
 """
     +(a, b)
 Add the raw states (unconstrained domain) of two samples.
-Only same type is supported to prevent surprises in the return type.
+Optimized case for two samples of the same type.
 """
-Base.:+(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a + b.θ
+Base.:+(a::Sample{T,U}, b::Sample{T,U}) where {T,U} = @set a.θ = a.θ + b.θ
 
 """
-    -(s, θ)
-Subtract raw state `θ` from the raw state (unconstrained domain) of the sample `s`.
+    add!(a, b)
+Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
+Modifies a
 """
-Base.:-(s::Sample{T,U}, θ::NamedTuple{T,V}) where {T,U,V} = @set s.θ = s.θ - flatten(θ)
-
-"""
-    -(s, θ)
-Subtract raw state `θ` from the raw state (unconstrained domain) of the sample `s`.
-"""
-Base.:-(s::Sample{T,U}, θ::AbstractVector) where {T,U,V} = @set s.θ = s.θ - θ
+function add!(a::Sample, b::Sample)
+    a_ranges = ranges(a)
+    b_ranges = ranges(b)
+    for var_name in keys(a_ranges)
+        if var_name in keys(b_ranges)
+            a.θ[a_ranges[var_name]] = a.θ[a_ranges[var_name]] + b.θ[b_ranges[var_name]]
+        end
+    end
+    a
+end
 
 """
     +(a, b)
+Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
+"""
+Base.:+(a::Sample, b::Sample) = add!(deepcopy(a), b)
+
+"""
+    +(a, b)
+Add the raw states (unconstrained domain) of two samples.
+Optimized case for two samples of the same type.
+"""
+Base.:+(a::Sample{T,U}, b::Sample{T,U}) where {T,U} = @set a.θ = a.θ + b.θ
+
+"""
+    +(a, b)
+Add a NamedTuple `b` interpreted as raw state to the raw state of two `a``.
+Modifies `a`.
+"""
+function add!(a::Sample, b::NamedTuple)
+    a_ranges = ranges(a)
+    b_ranges = ranges(b)
+    b_values = flatten(b)
+    for var_name in keys(a_ranges)
+        if var_name in keys(b)
+            a.θ[a_ranges[var_name]] = a.θ[a_ranges[var_name]] + b_values[b_ranges[var_name]]
+        end
+    end
+    a
+end
+
+"""
+    +(a, b)
+Add a NamedTuple `b` interpreted as raw state to the raw state of two `a``.
+"""
+Base.:+(a::Sample, b::NamedTuple) = add!(deepcopy(a), b)
+
+"""
+    -(a, b)
 Subtract the raw states (unconstrained domain) of two samples.
 Only same type is supported to prevent surprises in the return type.
 """
-Base.:-(a::Sample{T,U}, b::Sample{T,V}) where {T,U,V} = a - b.θ
+function Base.:-(a::Sample, b::Sample)
+    negative_b = @set b.θ = -b.θ
+    a + negative_b
+end
+
 
 """
-    merge(as, bs...)
+    merge(a, b...)
 Left-to-Right merges the samples as with bs.
 This means the the rightmost state is used.
 The original transformation rule of as is kept to ensure compatibility with the original sample.
 Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
 """
-function Base.merge(as::Sample, bs::Sample...)
-    merged_state = merge(state(as), map(x -> state(x), bs)...)
-    Sample(merged_state, -Inf, as.t)
+function Base.merge(a::Sample, b::Sample...)
+    merged_state = merge(state(a), map(x -> state(x), b)...)
+    Sample(merged_state, -Inf, a.t)
 end
 
 """
