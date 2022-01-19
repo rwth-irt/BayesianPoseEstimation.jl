@@ -59,3 +59,9 @@ is_identity(tr::TransformVariables.ArrayTransform) = is_identity(tr.transformati
 Returns true if all inner transforms are identity, i.e. map ℝ → ℝ
 """
 is_identity(tr::TransformVariables.TransformTuple) = mapreduce(is_identity, &, collect(tr.transformations))
+
+"""
+    is_identity(tr)
+Returns true if the transforms of the sample are identity, i.e. map ℝ → ℝ
+"""
+is_identity(s::Sample) = is_identity(s.t)

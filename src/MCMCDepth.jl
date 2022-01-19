@@ -45,6 +45,7 @@ export Gibbs
 
 # Visualization
 export colorize_depth
+export colorize_probability
 
 # Extensions
 export as○, as_circular
