@@ -2,9 +2,44 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 using BenchmarkTools
-using MCMCDepth
 using Soss, MeasureTheory
+using MCMCDepth
 using TransformVariables
+
+# Samples
+using Soss, MeasureTheory
+using MCMCDepth
+sample_m = @model begin
+    b ~ Normal(0, 2)
+    a ~ Normal(b, 1)
+end
+s1 = Sample(sample_m)
+
+sample_m2 = @model begin
+    #a ~ Normal(0, 1)
+    b ~ Normal(1, 2)
+    c .~ Normal.([0, 0], 1)
+end
+s2 = Sample(sample_m2)
+s1 + s2
+s1.θ + reverse(s2.θ)
+s1 - s2
+s1.θ - reverse(s2.θ)
+nt = state(s2)
+MCMCDepth.flatten(nt)
+s1 + nt
+
+m1 = @model begin
+    o .~ UniformInterval.([0 0; 0 0], 1)
+    b ~ Uniform()
+end
+s1 = Sample(m1)
+
+m2 = @model begin
+    o .~ UniformInterval.([0 0; 0 0], 1)
+end
+s2 = Sample(m2)
+merge(s1, s2)
 
 # Proposals
 prio_m = @model begin
@@ -24,7 +59,6 @@ transition_probability(prop, s2, s3)
 transition_probability(sym_prop, s2, s3)
 
 # Performance
-
 bernoulli_simple = @model o begin
     oc .~ Bernoulli.(o)
 end
@@ -148,16 +182,21 @@ obs_ℓ(state(s2), y1)
 using MCMCDepth
 using Soss, MeasureTheory
 m = @model begin
-    a ~ Uniform()
-    b ~ Exponential(a)
+    a ~ Normal(0, 1)
+    b ~ Normal(a, 1)
 end
+
 ip = IndependentProposal(m)
 s1 = propose(ip)
 transition_probability(ip, s1, s1)
 
-b_m = Soss.likelihood(m, :b)
-gp = GibbsProposal{IndependentProposal}(m, :b)
-s2 = propose(gp, s1)
+#b_m = Soss.likelihood(m, :b)
+#s2 = Sample(b_m)
+gpb = GibbsProposal{SymmetricProposal}(m, :b)
+s2 = propose(gpb, s1)
+gpa = GibbsProposal{SymmetricProposal}(m, :a)
+s3 = propose(gpa, s2)
+
 transition_probability(gp, s2, s1)
 logdensity(b_m(state(s2)), s1)
 
@@ -167,3 +206,9 @@ transition_probability(gp2, s3, s2)
 
 mh = MetropolisHastings(ip)
 Gibbs(mh, MetropolisHastings(gp))
+
+# TransformVariables
+using TransformVariables
+t = as_unit_interval
+transform(t, -200)
+inverse(t, eps())

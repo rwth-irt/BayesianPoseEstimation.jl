@@ -93,7 +93,8 @@ struct SymmetricProposal{T<:AbstractMeasure} <: AbstractProposal
     end
 
     function SymmetricProposal(m::T) where {T<:Soss.AbstractModel}
-        if !is_identity(xform(m | (;)))
+        # TODO workaround for Gibbs which moves variables to the arguments
+        if isempty(arguments(m)) && !is_identity(xform(m | (;)))
             throw(DomainError(m, "Model is not unconstrained, i.e. requires maps to a domain which is not ℝ"))
         end
         new{T}(m)
@@ -151,7 +152,12 @@ end
 Convenience constructor which automatically transforms the `model`` so only the variables `var` will be proposed.
 Since Gibbs assumes all other variables to be known, the required dependencies are moved to the `args` of the model.
 """
-GibbsProposal{Q}(model::AbstractMeasure, var::Symbol...) where {Q<:AbstractProposal} = Soss.likelihood(model, var...) |> Q |> GibbsProposal
+function GibbsProposal{Q}(model::AbstractMeasure, var::Symbol...) where {Q<:AbstractProposal}
+    # Sanity check is only executed without arguments
+    SymmetricProposal(model)
+    # Move var to arguments & create GibbsProposal
+    Soss.likelihood(Model(model), var...) |> Q |> GibbsProposal
+end
 
 """
     model(q)
