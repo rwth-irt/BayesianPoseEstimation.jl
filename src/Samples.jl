@@ -114,13 +114,6 @@ Returns a dictionary of UnitRange for each key in the NamedTuple
 ranges(s::Sample) = ranges(state(s))
 
 """
-    +(a, b)
-Add the raw states (unconstrained domain) of two samples.
-Optimized case for two samples of the same type.
-"""
-Base.:+(a::Sample{T,U}, b::Sample{T,U}) where {T,U} = @set a.θ = a.θ + b.θ
-
-"""
     add!(a, b)
 Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
 Modifies a
@@ -134,6 +127,18 @@ function add!(a::Sample, b::Sample)
         end
     end
     a
+end
+
+"""
+    add!(a, b)
+Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
+Optimized case for two samples of the same type.
+Modifies a
+"""
+function add!(a::Sample{T,U}, b::Sample{T,U}) where {T,U}
+    for (i, v) in enumerate(b.θ)
+        a.θ[i] = a.θ[i] + v
+    end
 end
 
 """
