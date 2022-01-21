@@ -14,6 +14,8 @@ include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
 include("MeasureTheoryExtensions.jl")
+# Inference
+include("Main.jl")
 
 # Samples
 export Sample
@@ -41,6 +43,7 @@ export PosteriorModel
 export MetropolisHastings
 
 # Gibbs
+export AnalyticGibbs
 export Gibbs
 
 # Visualization
@@ -53,5 +56,13 @@ export CircularUniform
 export BinaryMixture
 export MixtureMeasure
 export UniformInterval
+
+# Main script
+export destroy_render_context
+export init_render_context
+export main
+export render_to_cpu
+export render_pose
+export render_pose!
 
 end # module
