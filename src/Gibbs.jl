@@ -22,7 +22,15 @@ struct Gibbs{T<:Tuple} <: AbstractMCMC.AbstractSampler
 
     # Make sure that every sampler is wrapped by a GibbsSampler
     function Gibbs(samplers)
-        gibbsified = map(GibbsifySampler, samplers)
+        gibbsified = map(samplers) do sampler
+            # avoid unnecessary double wrapping
+            if isa(proposal(sampler), GibbsProposal)
+                return sampler
+            else
+                gibbs_proposal = proposal(sampler) |> GibbsProposal
+                set_proposal(sampler, gibbs_proposal)
+            end
+        end
         new{typeof(gibbsified)}(gibbsified)
     end
 end
@@ -33,14 +41,14 @@ Convenience constructor for varargs instead of Tuple of samplers
 """
 Gibbs(sampler::AbstractMCMC.AbstractSampler...) = Gibbs(sampler)
 
-"""
-    GibbsifySampler
-Wraps the proposal model in a GibbsProposal
-"""
-function GibbsifySampler(sampler::AbstractMCMC.AbstractSampler)
-    gibbs_proposal = proposal(sampler) |> GibbsProposal
-    set_proposal(sampler, gibbs_proposal)
-end
+# TODO remove
+# """
+#     gibbsify_sampler
+# Wraps the proposal model in a GibbsProposal
+# """
+# function gibbsify_sampler(sampler::AbstractMCMC.AbstractSampler)
+
+# end
 
 function Base.show(io::IO, g::Gibbs)
     println(io, "Gibbs with internal samplers:")
@@ -70,14 +78,13 @@ Cycles through the internal samplers using a random permutation
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Gibbs, state::Sample)
     # TODO Wikipedia: practical implementations just cycle
     perm = randperm(length(sampler.samplers))
-    sample = copy(state)
     for i in perm
         # Internal samplers decide whether to accept or reject the sample
         # Will be a recursion for internal Gibbs samplers
-        _, sample = AbstractMCMC.step(rng, model, sampler.samplers[i], sample)
+        _, state = AbstractMCMC.step(rng, model, sampler.samplers[i], state)
     end
     # sample, state
-    sample, sample
+    state, state
 end
 
 
@@ -86,11 +93,23 @@ end
 Samples a group of variables analytically from a conditional posterior distribution.
 Thus, a prior sample is required to condition the model on.
 """
-struct AnalyticGibbs{T<:AnalyticProposal} <: AbstractMCMC.AbstractSampler
+struct AnalyticGibbs{T<:GibbsProposal{AnalyticProposal}} <: AbstractMCMC.AbstractSampler
     f::T
 end
 
 # AnalyticalGibbs is not able to propose a sample during the initial step
+"""
+    proposal(mh)
+Get the proposal model of the Sampler.
+"""
+proposal(mh::AnalyticGibbs) = mh.f
+
+"""
+    proposal(mh)
+Set the proposal model of the Sampler.
+"""
+set_proposal(mh::AnalyticGibbs, f::GibbsProposal{AnalyticProposal}) = @set mh.f = f
+
 
 """
     propose(m, s)
@@ -104,7 +123,7 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 AnalyticalGibbs always accepts the sample, since it is always the best possible sample given the prior sample
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::AnalyticGibbs, state::Sample)
-    sample = propose(rng, sampler, state)
+    new_state = propose(rng, sampler, state)
     # sample, state
     new_state, new_state
 end
