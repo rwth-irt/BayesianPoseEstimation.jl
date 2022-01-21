@@ -6,10 +6,12 @@ using ColorSchemes
 using Images
 
 """
-    colorize_depth(depth; color_scheme, rev)
-Takes a `depth` image which is some kind of Matrix{Float}, normalizes the values to [0,1] and colorizes it using the `color_scheme`.
+    colorize_depth(img; color_scheme, rev)
+Takes a depth image `img` which is some kind of Matrix{Float}, normalizes the values to [0,1] and colorizes it using the `color_scheme`.
 """
-function colorize_depth(depth; color_scheme = :viridis, rev = true)
+function colorize_depth(img; color_scheme = :viridis, rev = true)
+    # OpenGL and Julia have different conventions for columns and rows
+    depth = transpose(img[:, end:-1:1])
     # offset: ignore 0s by setting them to inf
     depth_img = [ifelse(iszero(x), Inf, x) for x in depth]
     depth_img = depth .- minimum(depth_img)
@@ -27,10 +29,12 @@ function colorize_depth(depth; color_scheme = :viridis, rev = true)
 end;
 
 """
-    colorize_depth(probability; color_scheme, rev)
-Takes a `prob_img` image which has values ∈ [0,1], `color_scheme`.
+    colorize_depth(img; color_scheme, rev)
+Takes a probability image `img` which has values ∈ [0,1], `color_scheme`.
 """
-function colorize_probability(prob_img; color_scheme = :viridis, rev = false)
+function colorize_probability(img; color_scheme = :viridis, rev = false)
+    # OpenGL and Julia have different conventions for columns and rows
+    prob_img = transpose(img[:, end:-1:1])
     # colorize
     c_scheme = ColorSchemes.eval(color_scheme)
     if rev
