@@ -28,7 +28,7 @@ end
 
 MeasureTheory.distproxy(d::UniformInterval{(:a, :b)}) = Dists.Uniform(d.a, d.b)
 
-MeasureTheory.logdensity(d::UniformInterval{(:a, :b)}, x) = -log(d.b - d.a)
+MeasureTheory.logdensity(d::UniformInterval{(:a, :b)}, x) = 0.0
 
 TransformVariables.as(d::UniformInterval{(:a, :b)}) = as(Real, d.a, d.b)
 
