@@ -5,7 +5,6 @@
 using LogExpFunctions
 using MeasureTheory
 using Random
-using StatsBase
 using TransformVariables
 
 """
@@ -74,12 +73,22 @@ MixtureMeasure(components, weights::Vector{T}) where {T<:Number} = MixtureMeasur
 
 Base.show(io::IO, d::MixtureMeasure) = print(io, "MixtureMeasure\ncomponents: [$(d.components)]\nlog weights: $(d.log_weights))")
 
-MeasureTheory.logdensity(μ::MixtureMeasure, x) = logsumexp(log_w + MeasureTheory.logdensity(m, x) for (log_w, m) in zip(μ.log_weights, μ.components))
+MeasureTheory.logdensity(μ::MixtureMeasure, x)::Float64 = logsumexp(log_w + MeasureTheory.logdensity(m, x) for (log_w, m) in zip(μ.log_weights, μ.components))
 
 MeasureTheory.basemeasure(::MixtureMeasure) = Lebesgue(ℝ)
 
-StatsBase.sample(rng::AbstractRNG, d::MixtureMeasure) = d.components[sample(rng, Weights(exp.(d.log_weights)))]
-Base.rand(rng::AbstractRNG, T::Type, μ::MixtureMeasure) = rand(rng, T, sample(rng, μ))
+function Base.rand(rng::AbstractRNG, T::Type, μ::MixtureMeasure)
+    u = rand(rng)
+    sum = 0.0
+    for (log_w, c) in zip(μ.log_weights, μ.components)
+        sum = sum + exp(log_w)
+        if sum >= u
+            return rand(rng, T, c)
+        end
+    end
+    # fallback for numerical errors
+    return rand(rng, T, last(μ.components))
+end
 
 """
     BinaryMixture

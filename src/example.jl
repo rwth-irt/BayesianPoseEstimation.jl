@@ -9,6 +9,7 @@ using TransformVariables
 # Samples
 using Soss, MeasureTheory
 using MCMCDepth
+using Traceur
 sample_m = @model begin
     b ~ Normal(0, 2)
     a ~ Normal(b, 1)
@@ -124,11 +125,38 @@ test_simple = @model o begin
 end
 
 # Extensions
+using Plots
+using TransformVariables
+unicodeplots()
 rand(UniformInterval(1, 2))
 logpdf(UniformInterval(0.0, 2.0), 0)
 rand(CircularUniform())
 logpdf(CircularUniform(), 2π + 0.001)
 transform(as((; a = as(Array, as○, 2), b = as_unit_interval)), [100; 200; 10])
+
+x = -0.5:0.1:7
+plot(x, [pdf(CircularUniform(), x) for x in x])
+cr = [rand(CircularUniform()) for _ in 1:10000]
+maximum(cr)
+using StatsPlots
+ea_histogram(cr)
+
+mm = MixtureMeasure([Normal(0, 1), Normal(10, 5)], [1, 0.1])
+bm = BinaryMixture(Normal(0, 1), Normal(10, 5), 1, 0.1)
+x = -5:0.1:15
+# plot(x, [[pdf(mm, x) for x in x], [pdf(bm, x) for x in x]])
+plot(x, [[pdf(mm, x) for x in x], [pdf(bm, x) for x in x]])
+plot(x, [[logdensity(mm, x) for x in x], [logdensity(bm, x) for x in x]])
+scatter([rand(mm) for _ in 1:100])
+scatter([rand(bm) for _ in 1:100])
+@trace(logdensity(mm, 0.5), maxdepth = 2)
+
+ui = UniformInterval(0, 1)
+ul = UniformInterval(0, 2)
+pdf(ui, 1)
+x = -1:0.1:3
+plot(x, [[pdf(ui, x) for x in x], [pdf(ul, x) for x in x]])
+scatter([[rand(ui) for _ in 1:100], [rand(ul) for _ in 1:100]])
 
 circ_m = @model begin
     a ~ For(1:3) do i
