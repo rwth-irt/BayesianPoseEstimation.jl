@@ -156,7 +156,7 @@ function GibbsProposal{Q}(model::AbstractMeasure, var::Symbol...) where {Q<:Abst
     # Sanity check is only executed without arguments
     SymmetricProposal(model)
     # Move var to arguments & create GibbsProposal
-    Soss.likelihood(Model(model), var...) |> Q |> GibbsProposal
+    Soss.likelihood(Model(model), var...)(argvals(model)) |> Q |> GibbsProposal
 end
 
 """

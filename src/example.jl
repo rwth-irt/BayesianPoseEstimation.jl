@@ -5,7 +5,6 @@ using BenchmarkTools
 using Soss, MeasureTheory
 using MCMCDepth
 using TransformVariables
-
 # Samples
 using Soss, MeasureTheory
 using MCMCDepth
@@ -128,7 +127,7 @@ end
 using Plots
 using TransformVariables
 unicodeplots()
-rand(UniformInterval(1, 2))
+@code_warntype logdensity(UniformInterval(1, 2), 1.5)
 logpdf(UniformInterval(0.0, 2.0), 0)
 rand(CircularUniform())
 logpdf(CircularUniform(), 2π + 0.001)
@@ -141,7 +140,14 @@ maximum(cr)
 using StatsPlots
 ea_histogram(cr)
 
-mm = MixtureMeasure([Normal(0, 1), Normal(10, 5)], [1, 0.1])
+using Soss, MeasureTheory
+using MCMCDepth
+@code_warntype MixtureMeasure((Normal(), Exponential()), [1.0, 2])
+@code_warntype BinaryMixture(Normal(), Exponential(), 1.0, 2)
+@code_warntype logdensity(BinaryMixture(Normal(), Exponential(), 1.0, 2), 1.0)
+@code_warntype logdensity(MixtureMeasure((Normal(), Exponential()), [1.0, 2]), 1.0)
+
+mm = MixtureMeasure((Normal(0, 1), Normal(10, 5)), [1, 0.1])
 bm = BinaryMixture(Normal(0, 1), Normal(10, 5), 1, 0.1)
 x = -5:0.1:15
 # plot(x, [[pdf(mm, x) for x in x], [pdf(bm, x) for x in x]])
@@ -209,12 +215,12 @@ obs_ℓ(state(s2), y1)
 # Gibbs
 using MCMCDepth
 using Soss, MeasureTheory
-m = @model begin
-    a ~ Normal(0, 1)
+m = @model p begin
+    a ~ Normal(p, 1)
     b ~ Normal(a, 1)
 end
-
-ip = IndependentProposal(m)
+argvals(m(p = 1))
+ip = IndependentProposal(m(p = 1))
 s1 = propose(ip)
 transition_probability(ip, s1, s1)
 

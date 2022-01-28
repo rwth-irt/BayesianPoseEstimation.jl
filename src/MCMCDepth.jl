@@ -37,8 +37,22 @@ export SymmetricProposal
 export propose
 export transition_probability
 
-# Model
+# Models
+export DepthExponential
+export DepthExponentialUniform
+export DepthImageMeasure
+export DepthNormal
+export DepthNormalExponential
+export DepthNormalExponentialUniform
+export DepthNormalUniform
+export DepthUniform
 export PosteriorModel
+
+export image_association
+export pixel_association
+export pose_depth_model
+export preprocess
+
 
 # MetropolisHastings
 export MetropolisHastings
@@ -53,8 +67,8 @@ export colorize_probability
 
 # Extensions
 export as○, as_circular
-export CircularUniform
 export BinaryMixture
+export CircularUniform
 export MixtureMeasure
 export UniformInterval
 
