@@ -3,8 +3,6 @@
 # All rights reserved. 
 using GLAbstraction, GLFW, SciGL
 # TODO How to avoid adding them (automatically install / use with SciGL.jl)
-# using LinearAlgebra, CoordinateTransformations, Rotations
-#using Soss, MeasureTheory
 using CoordinateTransformations, Rotations
 
 """
