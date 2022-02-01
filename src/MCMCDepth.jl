@@ -7,6 +7,7 @@ module MCMCDepth
 # lib includes
 include("Samples.jl")
 include("Proposals.jl")
+include("Parameters.jl")
 include("Models.jl")
 include("MetropolisHastings.jl")
 include("Gibbs.jl")
@@ -37,6 +38,11 @@ export SymmetricProposal
 export propose
 export transition_probability
 
+# Parameters
+export DepthImageParameters
+export PriorParameters
+export RandomWalkParameters
+
 # Models
 export DepthExponential
 export DepthExponentialUniform
@@ -46,13 +52,14 @@ export DepthNormalExponential
 export DepthNormalExponentialUniform
 export DepthNormalUniform
 export DepthUniform
-export PosteriorModel
+export WrappedModel
 
 export image_association
 export pixel_association
 export pose_depth_model
 export preprocess
-
+export prior_depth_model
+export random_walk_proposal
 
 # MetropolisHastings
 export MetropolisHastings
@@ -64,6 +71,12 @@ export Gibbs
 # Visualization
 export colorize_depth
 export colorize_probability
+export density_variable
+export mean_image
+export plot_variable
+export polar_density_variable
+export polar_histogram_variable
+export scatter_position
 
 # Extensions
 export as○, as_circular

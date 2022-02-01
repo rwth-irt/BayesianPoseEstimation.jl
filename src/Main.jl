@@ -30,7 +30,7 @@ function render_pose(framebuffer, shader, scene, object, t, r)
         push!(scene.meshes, object)
     end
     object.pose.t = Translation(t)
-    object.pose.R = RotZYX(r...)
+    object.pose.R = RotXYZ(r...)
     render_to_cpu(framebuffer, shader, scene)
 end
 
@@ -44,7 +44,7 @@ function render_pose!(framebuffer, shader, scene, object, t, r)
         push!(scene.meshes, object)
     end
     object.pose.t = Translation(t)
-    object.pose.R = RotZYX(r...)
+    object.pose.R = RotXYZ(r...)
     render_to_cpu(framebuffer, shader, scene)
 end
 
