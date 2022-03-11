@@ -5,6 +5,7 @@
 using LogExpFunctions
 using MeasureTheory
 using Random
+using StatsBase
 using TransformVariables
 
 """
@@ -62,34 +63,25 @@ p(θ) = w₁p(θ₁) + w₂p(θ₂) + ...
 """
 struct MixtureMeasure{T<:Tuple} <: AbstractMeasure
   components::T # Tuple instead of array for type safety with different types
-  log_weights::Vector{Float64}
+  weights::Weights{Float64,Float64,Vector{Float64}}
+
   function MixtureMeasure(components::T, weights::Vector{<:Number}) where {T<:Tuple}
-    new{T}(components, log.(weights / sum(weights)))
+    w_sum = sum(weights)
+    new{T}(components, Weights(weights / w_sum, w_sum))
   end
 end
 
-Base.show(io::IO, d::MixtureMeasure) = print(io, "MixtureMeasure\n  components: [$(d.components)]\n  log weights: $(d.log_weights))")
+Base.show(io::IO, d::MixtureMeasure) = print(io, "MixtureMeasure\n  components: [$(d.components)]\n  weights: $(d.weights))")
 
-MeasureTheory.logdensity(μ::MixtureMeasure, x)::Float64 = logsumexp(log_w + MeasureTheory.logdensity(m, x) for (log_w, m) in zip(μ.log_weights, μ.components))
+MeasureTheory.logdensity(μ::MixtureMeasure, x)::Float64 = logsumexp(log(w) + MeasureTheory.logdensity(m, x) for (w, m) in zip(μ.weights, μ.components))
 MeasureTheory.basemeasure(::MixtureMeasure) = Lebesgue(ℝ)
 
-function Base.rand(rng::AbstractRNG, T::Type, μ::MixtureMeasure)
-  u = rand(rng)
-  sum = 0.0
-  for (log_w, c) in zip(μ.log_weights, μ.components)
-    sum = sum + exp(log_w)
-    if sum >= u
-      return rand(rng, T, c)
-    end
-  end
-  # fallback for numerical errors
-  return rand(rng, T, last(μ.components))
-end
+Base.rand(rng::AbstractRNG, T::Type, μ::MixtureMeasure) = rand(rng, T, μ.components[sample(rng, μ.weights)])
 
 """
     BinaryMixture
-Mixture of several Measures `components` which are associated with their corresponding `weights`.
-p(θ) = w₁p(θ₁) + w₂p(θ₂) + ...
+Mixture of two Measures as `components` which are associated with their corresponding `weights`.
+p(θ) = w₁p(θ₁) + w₂p(θ₂)
 """
 struct BinaryMixture{T,U} <: AbstractMeasure
   c1::T
@@ -101,7 +93,7 @@ end
 
 BinaryMixture(c1, c2, w1::Number, w2::Number) = BinaryMixture(c1, c2, Float64(w1), Float64(w2))
 
-Base.show(io::IO, d::BinaryMixture) = print(io, "BinaryMixture\nc  omponents: $(d.c1), $(d.c2) \n  log weights: $(d.log_w1), $(d.log_w2)")
+Base.show(io::IO, d::BinaryMixture) = print(io, "BinaryMixture\ncomponents: $(d.c1), $(d.c2) \n  log weights: $(d.log_w1), $(d.log_w2)")
 
 MeasureTheory.logdensity(μ::BinaryMixture, x)::Float64 = logaddexp(μ.log_w1 + logdensity(μ.c1, x), μ.log_w2 + logdensity(μ.c2, x))
 MeasureTheory.basemeasure(::BinaryMixture) = Lebesgue(ℝ)
