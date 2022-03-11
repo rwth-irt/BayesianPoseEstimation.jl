@@ -8,6 +8,22 @@ using GLAbstraction, GLFW, SciGL
 using CoordinateTransformations, Rotations
 
 """
+    init_render_context(width, height)
+Initializes the OpenGL context for rendering depth images off screen with the given size.
+
+Returns a tuple `(window, framebuffer, depth_prog)` containing the GLFW Window context, the framebuffer to render depth images to and the shader program.
+"""
+function init_render_context(width = 150, height = 150, n_chains = 1)
+    window = context_offscreen(width, height)
+    tiles = Tiles(width, height, n_chains)
+    framebuffer = depth_framebuffer(size(tiles)...)
+    enable_depth_stencil()
+    set_clear_color()
+    depth_prog = GLAbstraction.Program(SimpleVert, DepthFrag)
+    window, framebuffer, depth_prog
+end
+
+"""
     render_depth(framebuffer, shader, scene)
 Renders a depth image and loads it into the CPU memory.
 Returns the depth image in OpenGL convention, which requires `transpose(iamge[:, end:-1:1])` for correct display
@@ -46,22 +62,6 @@ function render_pose!(framebuffer, shader, scene, object, t, r)
     object.pose.t = Translation(t)
     object.pose.R = RotXYZ(r...)
     render_to_cpu(framebuffer, shader, scene)
-end
-
-"""
-    init_render_context(width, height)
-Initializes the OpenGL context for rendering depth images off screen with the given size.
-
-Returns a tuple `(window, framebuffer, depth_prog)` containing the GLFW Window context, the framebuffer to render depth images to and the shader program.
-"""
-function init_render_context(width = 150, height = 150)
-    # Init OpenGL offscreen render context
-    window = context_offscreen(width, height)
-    framebuffer = depth_framebuffer(width, height)
-    enable_depth_stencil()
-    set_clear_color()
-    depth_prog = GLAbstraction.Program(SimpleVert, DepthFrag)
-    window, framebuffer, depth_prog
 end
 
 """

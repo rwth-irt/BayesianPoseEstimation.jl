@@ -66,8 +66,7 @@ Creates a 3D scatter plot of the column matrix.
 function scatter_position(M::AbstractMatrix, c_grad = :viridis)
   # z value for color in order of the samples
   mz = [1:length(M[1, :])...]
-  scatter(M[1, :], M[2, :], M[3, :],
-    marker_z = mz, color = cgrad(c_grad), label = "Sample Number", markersize = 3, xlabel = "x", ylabel = "y", zlabel = "z")
+  scatter(M[1, :], M[2, :], M[3, :], marker_z = mz, color = cgrad(c_grad), label = "Sample Number", markersize = 3, xlabel = "x", ylabel = "y", zlabel = "z")
 end
 
 """
@@ -115,7 +114,7 @@ Line plot of the variable.
 """
 function plot_variable(chains, var_name, step = 1, palette = :tol_bright, label = ["x" "y" "z"])
   M = convert(Matrix, chains, var_name, step)
-  plot(transpose(M), palette = palette)
+  scatter(transpose(M), palette = palette, markersize = 2)
 end
 
 """

@@ -50,5 +50,7 @@ Base.@kwdef struct RandomWalkParameters
   cov_t::Matrix{Float64} = Diagonal(σ_t)
   σ_r::Vector{Float64} = [0.05, 0.05, 0.05]
   cov_r::Matrix{Float64} = Diagonal(σ_r)
-  σ_o::Matrix{Float64} = fill(0.05, 100, 100)
+  σ_o::Float64 = 0.05
+  width::Int64 = 100
+  height::Int64 = 100
 end

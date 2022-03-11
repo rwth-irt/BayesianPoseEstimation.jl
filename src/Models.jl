@@ -155,7 +155,7 @@ function image_association(s::Sample, z::AbstractMatrix{<:Real}, prior_o::Abstra
   μ = render_fn(st.t, st.r)
   # Also broadcast over the prior, protect params from broadcasting
   # TODO use previous sample as prior for o instead of prior_o?
-  o = pixel_association.(μ, z, prior_o, tuple(image_params))
+  o = pixel_association.(μ, z, prior_o, (image_params,))
   tr = as((; o = as(Array, as𝕀, size(o))))
   Sample((; o = o), -Inf, tr)
 end
