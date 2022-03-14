@@ -6,6 +6,75 @@ using AbstractMCMC
 using MeasureTheory, Soss
 using Random
 
+# Model factory function manipulators
+# Partial application of functions can be used to condition function parameters
+# Given gen_f(;a,b), partial(gen_f, a=1) returns a function generator of the form gen_b(;b)
+
+# TODO export. Is this the correct file or create a new one?
+
+"""
+  partial(fn, args...; kwargs...)
+Partial applications of the keyword arguments, can be used to condition the model until only one argument is left.
+"""
+function partial(fn::Function, args...; kwargs...)
+  (x...; y...) -> fn(args..., x...; kwargs..., y...)
+end
+
+"""
+  |(fn, nt)
+Syntactic sugar for partial(fn; kwargs...)
+"""
+(|)(fn::Function, nt::NamedTuple) = partial(fn; nt...)
+
+"""
+  |(fn, t)
+Syntactic sugar for partial(fn, args...)
+"""
+(|)(fn::Function, t::Tuple) = partial(fn, t...)
+
+"""
+  kwarg_to_arg(fn, ::Val{S})
+Assumes that fn has only a single keyword argument with name `S`.
+This argument is replaced by a regular positional argument.
+In code: `f(;a) → f(a)`
+"""
+# WARN sym::Symbol (; sym => val) not type stable, instead use Val{S}
+kwarg_to_arg(fn::Function, ::Val{S}) where {S} = x -> fn(; (; S => x)...)
+
+"""
+  kwarg_to_arg(fn, s)
+Assumes that fn has only a single keyword argument with name `s`.
+This argument is replaced by a regular positional argument.
+In code: `f(;a) → f(a)`
+"""
+kwarg_to_arg(fn::Function, s::Symbol) = kwarg_to_arg(fn, Val(s))
+
+# Adapter from MeasureTheory.jl to AbstractMCMC.jl
+
+"""
+  WrappedModel
+Wrapper around an `AbstractMeasure`` for compatibility with AbstractMCMC's sample method.
+"""
+struct WrappedModel{T<:AbstractMeasure} <: AbstractMCMC.AbstractModel
+  model::T
+end
+
+"""
+  logdensity(pm, s)
+Evaluates the logdensity of the internal model
+"""
+MeasureTheory.logdensity(pm::WrappedModel, s::Sample) = logdensity(pm.model, s)
+
+"""
+  rand(rng, pm)
+Calls rand on the internal model
+"""
+Base.rand(rng::AbstractRNG, pm::WrappedModel) = rand(rng, pm.model)
+
+# Adapter
+
+# Models for the depth pixels
+
 """
   DepthNormal(μ, p)
 Normal distribution intended for observing the expected object.
@@ -51,26 +120,6 @@ Assumes a normal distribution for the object and a mixture of an exponential and
 Given the expected depth `μ` and object association probability `o`.
 """
 DepthNormalExponentialUniform(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthExponentialUniform(p), o, 1.0 - o)
-
-"""
-  WrappedModel
-Wrapper around an `AbstractMeasure`` for compatibility with AbstractMCMC's sample method.
-"""
-struct WrappedModel{T<:AbstractMeasure} <: AbstractMCMC.AbstractModel
-  model::T
-end
-
-"""
-  logdensity(pm, s)
-Evaluates the logdensity of the internal model
-"""
-MeasureTheory.logdensity(pm::WrappedModel, s::Sample) = logdensity(pm.model, s)
-
-"""
-  rand(rng, pm)
-Calls rand on the internal model
-"""
-Base.rand(rng::AbstractRNG, pm::WrappedModel) = rand(rng, pm.model)
 
 """
   prior_depth_model(model)
