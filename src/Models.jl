@@ -6,43 +6,8 @@ using AbstractMCMC
 using MeasureTheory, Soss
 using Random
 
-# Model factory function manipulators
-# Partial application of functions can be used to condition function parameters
-# Given gen_f(;a,b), partial(gen_f, a=1) returns a function generator of the form gen_b(;b)
-
-# TODO export. Is this the correct file or create a new one?
-
 """
-  partial(fn, args...; kwargs...)
-Partial applications of the keyword arguments, can be used to condition the model until only one argument is left.
-"""
-function partial(fn::Function, args...; kwargs...)
-  (x...; y...) -> fn(args..., x...; kwargs..., y...)
-end
-
-"""
-  |(fn, nt)
-Syntactic sugar for partial(fn; kwargs...)
-"""
-(|)(fn::Function, nt::NamedTuple) = partial(fn; nt...)
-
-"""
-  |(fn, t)
-Syntactic sugar for partial(fn, args...)
-"""
-(|)(fn::Function, t::Tuple) = partial(fn, t...)
-
-"""
-  kwarg_to_arg(fn, ::Val{S})
-Assumes that fn has only a single keyword argument with name `S`.
-This argument is replaced by a regular positional argument.
-In code: `f(;a) → f(a)`
-"""
-# WARN sym::Symbol (; sym => val) not type stable, instead use Val{S}
-kwarg_to_arg(fn::Function, ::Val{S}) where {S} = x -> fn(; (; S => x)...)
-
-"""
-  kwarg_to_arg(fn, s)
+    kwarg_to_arg(fn, s)
 Assumes that fn has only a single keyword argument with name `s`.
 This argument is replaced by a regular positional argument.
 In code: `f(;a) → f(a)`
@@ -52,21 +17,21 @@ kwarg_to_arg(fn::Function, s::Symbol) = kwarg_to_arg(fn, Val(s))
 # Adapter from MeasureTheory.jl to AbstractMCMC.jl
 
 """
-  WrappedModel
+    WrappedModel
 Wrapper around an `AbstractMeasure`` for compatibility with AbstractMCMC's sample method.
 """
 struct WrappedModel{T<:AbstractMeasure} <: AbstractMCMC.AbstractModel
-  model::T
+    model::T
 end
 
 """
-  logdensity(pm, s)
+    logdensity(pm, s)
 Evaluates the logdensity of the internal model
 """
 MeasureTheory.logdensity(pm::WrappedModel, s::Sample) = logdensity(pm.model, s)
 
 """
-  rand(rng, pm)
+    rand(rng, pm)
 Calls rand on the internal model
 """
 Base.rand(rng::AbstractRNG, pm::WrappedModel) = rand(rng, pm.model)
@@ -76,59 +41,59 @@ Base.rand(rng::AbstractRNG, pm::WrappedModel) = rand(rng, pm.model)
 # Models for the depth pixels
 
 """
-  DepthNormal(μ, p)
+    DepthNormal(μ, p)
 Normal distribution intended for observing the expected object.
 Given the expected depth `μ`.
 """
 DepthNormal(μ, p::DepthImageParameters) = Normal(μ, p.pix_σ)
 
 """
-  DepthExponential(p)
+    DepthExponential(p)
 Exponential distribution intended for observing an occlusion.
 """
 DepthExponential(p::DepthImageParameters) = Exponential(p.pix_θ)
 
 """
-  DepthUniform(p)
+    DepthUniform(p)
 Uniform distribution intended for observing random outliers.
 """
 DepthUniform(p::DepthImageParameters) = UniformInterval(p.min_depth, p.max_depth)
 
 """
-  DepthExponentialUniform(p)
+    DepthExponentialUniform(p)
 Mixture of exponential and uniform distribution intended for observing an occlusion or random outlier.
 """
 DepthExponentialUniform(p::DepthImageParameters) = BinaryMixture(DepthExponential(p), DepthUniform(p), p.mix_exponential, 1 - p.mix_exponential)
 
 """
-  DepthNormalExponential(μ, o, p)
+    DepthNormalExponential(μ, o, p)
 Assumes a normal distribution for the object and an uniform distribution for random outliers.
 Given the expected depth `μ` and object association probability `o`.
 """
 DepthNormalExponential(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthExponential(p), o, 1.0 - o)
 
 """
-  DepthNormalUniform(μ, o, p)
+    DepthNormalUniform(μ, o, p)
 Assumes a normal distribution for the object and an exponential distribution for occlusions.
 Given the expected depth `μ` and object association probability `o`.
 """
 DepthNormalUniform(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthUniform(p), o, 1.0 - o)
 
 """
-  DepthNormalExponentialUniform(μ, o, p)
+    DepthNormalExponentialUniform(μ, o, p)
 Assumes a normal distribution for the object and a mixture of an exponential and uniform distribution for occlusions and outliers.
 Given the expected depth `μ` and object association probability `o`.
 """
 DepthNormalExponentialUniform(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthExponentialUniform(p), o, 1.0 - o)
 
 """
-  prior_depth_model(model)
+    prior_depth_model(model)
 Model containing all the variables required to sample z.
 """
 prior_depth_model(model) = prior(Model(model), :z)(argvals(model))
 
 """
-  DepthImageMeasure(μ, o, m_pix, filter_fn, prep_fn)
+    DepthImageMeasure(μ, o, m_pix, filter_fn, prep_fn)
 Optimized measure for handling observation of depth images.
 
 During inference it takes care of missing values in the expected depth `μ` and only evaluates the logdensity for pixels with depth 0 < z < max_depth.
@@ -140,9 +105,9 @@ Each pixel is assumed to be independent and the measurement can be described by 
 For the generative model, the whole image is generated.
 """
 struct DepthImageMeasure <: AbstractMeasure
-  μ::Matrix{Float64}
-  o::Matrix{Float64}
-  params::DepthImageParameters
+    μ::Matrix{Float64}
+    o::Matrix{Float64}
+    params::DepthImageParameters
 end
 MeasureTheory.basemeasure(::DepthImageMeasure) = Lebesgue{ℝ}
 TransformVariables.as(d::DepthImageMeasure) = as(Array, asℝ, (d.params.width, d.params.height))
@@ -151,66 +116,66 @@ Base.show(io::IO, d::DepthImageMeasure) = print(io, "DepthImageMeasure\n  Parame
 
 # Generate independent random numbers from m_pix(μ, o)
 function Base.rand(rng::AbstractRNG, T::Type, d::DepthImageMeasure)
-  map(zip(d.μ, d.o)) do (μ, o)
-    random_depth = rand(rng, T, d.params.pixel_measure(μ, o, d.params))
-    d.params.min_depth < random_depth < d.params.max_depth ? random_depth : zero(random_depth)
-  end
+    map(zip(d.μ, d.o)) do (μ, o)
+        random_depth = rand(rng, T, d.params.pixel_measure(μ, o, d.params))
+        d.params.min_depth < random_depth < d.params.max_depth ? random_depth : zero(random_depth)
+    end
 end
 
 function MeasureTheory.logdensity(d::DepthImageMeasure, z)
-  # Only sum the logdensity for values for which filter_fn is true
-  ind = findall(x -> d.params.min_depth < x < d.params.max_depth, d.μ)
-  sum = 0.0
-  for i in ind
-    # Preprocess the measurement
-    z_i = d.params.min_depth < z[i] < d.params.max_depth ? z[i] : zero(z[i])
-    sum = sum + logdensity(d.params.pixel_measure(d.μ[i], d.o[i], d.params), z_i)
-  end
-  sum
+    # Only sum the logdensity for values for which filter_fn is true
+    ind = findall(x -> d.params.min_depth < x < d.params.max_depth, d.μ)
+    sum = 0.0
+    for i in ind
+        # Preprocess the measurement
+        z_i = d.params.min_depth < z[i] < d.params.max_depth ? z[i] : zero(z[i])
+        sum = sum + logdensity(d.params.pixel_measure(d.μ[i], d.o[i], d.params), z_i)
+    end
+    sum
 end
 
 """
-  pixel_association(μ, z, q, params)
+    pixel_association(μ, z, q, params)
 Probability of the pixel being associated to the object.
 Given an expected depth of `μ` and observation of `z` the posterior is calculated using Bayes Law with the prior `q`.
 The distribution of observing the object is constructed via `d_is(μ)` and other observations are explained by `d_not(μ)`
 """
 function pixel_association(μ::Real, z::Real, q::Real, params::DepthImageParameters)::Float64
-  # If the rendered value is invalid, we do not know more than before => prior
-  if μ <= 0.0
-    return q
-  end
-  prior_likelihood = pdf(params.association_is(μ, params), z) * q
-  # Marginalize Bernoulli distributed by summing out o
-  marginal = prior_likelihood + pdf(params.association_not(params), z) * (1 - q)
-  # Normalized posterior
-  posterior = prior_likelihood / marginal
-  # robust for transformation as𝕀 ∈ (0,1), might get numerically 0.0 or 1.0
-  if posterior < eps()
-    return eps()
-  elseif posterior > 1 - eps()
-    return 1 - eps()
-  else
-    return posterior
-  end
+    # If the rendered value is invalid, we do not know more than before => prior
+    if μ <= 0.0
+        return q
+    end
+    prior_likelihood = pdf(params.association_is(μ, params), z) * q
+    # Marginalize Bernoulli distributed by summing out o
+    marginal = prior_likelihood + pdf(params.association_not(params), z) * (1 - q)
+    # Normalized posterior
+    posterior = prior_likelihood / marginal
+    # robust for transformation as𝕀 ∈ (0,1), might get numerically 0.0 or 1.0
+    if posterior < eps()
+        return eps()
+    elseif posterior > 1 - eps()
+        return 1 - eps()
+    else
+        return posterior
+    end
 end
 
 """
-  image_association(s, z, prior_o, image_params, render_fn)
+    image_association(s, z, prior_o, image_params, render_fn)
 Uses the render image state of the sample `s.μ` and then calls `pixel_association` with each rendered pixel for the observed depth `z`.
 """
 function image_association(s::Sample, z::AbstractMatrix{<:Real}, prior_o::AbstractMatrix{<:Real}, image_params::DepthImageParameters, render_fn::Base.Callable)
-  st = state(s)
-  μ = render_fn(st.t, st.r)
-  # Also broadcast over the prior, protect params from broadcasting
-  # TODO use previous sample as prior for o instead of prior_o?
-  o = pixel_association.(μ, z, prior_o, (image_params,))
-  tr = as((; o = as(Array, as𝕀, size(o))))
-  Sample((; o = o), -Inf, tr)
+    st = state(s)
+    μ = render_fn(st.t, st.r)
+    # Also broadcast over the prior, protect params from broadcasting
+    # TODO use previous sample as prior for o instead of prior_o?
+    o = pixel_association.(μ, z, prior_o, (image_params,))
+    tr = as((; o = as(Array, as𝕀, size(o))))
+    Sample((; o = o), -Inf, tr)
 end
 
 """
-  nonzero_indices(img)
+    nonzero_indices(img)
 Returns a list of indices for the nonzero pixels in the image.
 """
 nonzero_indices(img) = findall(!iszero, img)

@@ -8,6 +8,7 @@ module MCMCDepth
 include("Samples.jl")
 include("Proposals.jl")
 include("Parameters.jl")
+include("FunctionManipulation.jl")
 include("Models.jl")
 include("MetropolisHastings.jl")
 include("Gibbs.jl")
