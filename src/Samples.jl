@@ -15,11 +15,16 @@ Might have a constrained parameter Domain, e.g. θᵢ ∈ ℝ⁺.
 Consists of the current raw state `θ::Vector{Float64}`, the (uncorrected) posterior probability `p` and a transformation rule `t`.
 Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
 """
-struct Sample{T,U}
+struct Sample{T,U<:TransformVariables.TransformTuple}
     θ::Vector{Float64}
     p::Float64
-    t::TransformVariables.TransformTuple{NamedTuple{T,U}}
+    t::U
+    # Extract variable names from the TransformTuple
+    Sample(θ::AbstractVector, p, t::TransformVariables.TransformTuple{<:NamedTuple{T}}) where {T} = new{T,typeof(t)}(θ, p, t)
 end
+
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(log_probability(s))\n  Variables: $(variables(s))")
+
 
 """
     Sample(θ, p, t)
@@ -27,6 +32,7 @@ Create a sample from `θ::NamedTuple` containing the current state and its proba
 `t` is a transformation from the unconstrained to the constrained space.
 """
 function Sample(θ::NamedTuple, p, t::TransformVariables.TransformTuple)
+    # Memory access error using Revise?
     θ_raw = inverse(t, θ)
     Sample(θ_raw, p, t)
 end
@@ -49,6 +55,12 @@ Create a sample by sampling from a model.
 Sample(m::Soss.AbstractModel) = Sample(Random.GLOBAL_RNG, m)
 
 """
+    variables(Sample)
+Returns a tuple of the variable names.
+"""
+variables(::Sample{T}) where {T} = T
+
+"""
     state(s)
 State of the parameters in the model domain.
 Returns a `NamedTuple` with the variable names and their model domain values.
@@ -60,7 +72,7 @@ state(s::Sample) = transform(s.t, s.θ)
 State of the parameters in the unconstrained domain.
 Returns a `NamedTuple` with the variable names and their model domain values.
 """
-raw_state(s::Sample{T,U}) where {T,U} = NamedTuple{T}(s.θ)
+raw_state(s::Sample{T}) where {T} = NamedTuple{T}(s.θ)
 
 """
     log_probability(s)
@@ -95,7 +107,7 @@ flatten(x) = collect(Iterators.flatten(x))
 Helps to find which range of the raw state belongs to which variable.
 Returns a dictionary of UnitRange for each key in the NamedTuple
 """
-function ranges(nt::NamedTuple{T,U}) where {T,U}
+function ranges(nt::NamedTuple{T}) where {T}
     d = Dict{Symbol,UnitRange{Int64}}()
     iter = 1
     for var_name in T
@@ -135,7 +147,7 @@ Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
 Optimized case for two samples of the same type.
 Modifies a
 """
-function add!(a::Sample{T,U}, b::Sample{T,U}) where {T,U}
+function add!(a::Sample{T}, b::Sample{T}) where {T}
     for (i, v) in enumerate(b.θ)
         a.θ[i] = a.θ[i] + v
     end
@@ -152,7 +164,7 @@ Base.:+(a::Sample, b::Sample) = add!(deepcopy(a), b)
 Add the raw states (unconstrained domain) of two samples.
 Optimized case for two samples of the same type.
 """
-Base.:+(a::Sample{T,U}, b::Sample{T,U}) where {T,U} = @set a.θ = a.θ + b.θ
+Base.:+(a::Sample{T}, b::Sample{T}) where {T} = @set a.θ = a.θ + b.θ
 
 """
     +(a, b)
