@@ -5,6 +5,7 @@
 using AbstractMCMC
 using Accessors
 using MeasureTheory
+using TransformVariables
 
 struct GibbsInternal
   SamplerType
@@ -57,7 +58,7 @@ Proposes one sample from the prior distribution of the model.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, sampler::Gibbs)
   sample = propose(rng, sampler.initial)
-  state = @set sample.p = logdensity(model, sample)
+  state = @set sample.logp = transform_logdensity(model, sample)
   # TODO if (ever) using something else than MH & AnalyticalGibbs, each sampler might require it's own state.
   # sample, state
   state, state
@@ -124,7 +125,7 @@ Proposes one sample from the prior distribution of the model.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, sampler::AnalyticGibbs)
   sample = propose(rng, sampler.initial)
-  state = @set sample.p = logdensity(model, sample)
+  state = @set sample.logp = transform_logdensity(model, sample)
   # sample, state
   state, state
 end
@@ -137,7 +138,7 @@ AnalyticalGibbs always accepts the sample, since it is always the best possible 
 function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, sampler::AnalyticGibbs, state::Sample)
   sample = propose(rng, sampler, state)
   # Even though it is always accepted different samplers expect a valid log probability for the previous sample to avoid re-evaluating the logdensity multiple times
-  sample = @set sample.p = logdensity(model, sample)
+  sample = @set sample.logp = transform_logdensity(model, sample)
   # sample, state
   sample, sample
 end

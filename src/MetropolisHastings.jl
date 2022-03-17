@@ -5,6 +5,7 @@
 using AbstractMCMC
 using Accessors
 using Random
+using TransformVariables
 
 """
     MetropolisHastings
@@ -48,8 +49,8 @@ Proposes one sample from the initial proposal model of `mh`.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, mh::MetropolisHastings)
     sample = propose(rng, mh)
-    # TODO wasteful? Make p mutable or generate
-    state = @set sample.p = logdensity(model, sample)
+    # TODO Should the initial sample be corrected since it is drawn from the prior and not the unconstrained space?
+    state = @set sample.logp = transform_logdensity(model, sample)
     # sample, state are the same for MH
     state, state
 end
@@ -60,15 +61,15 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, sampler::MetropolisHastings, state::Sample)
     # old sample requires a valid log probability
-    if isinf(log_probability(state))
-        state = @set state.p = logdensity(model, state)
+    if isinf(logp(state))
+        state = @set state.logp = transform_logdensity(model, state)
     end
     # propose new sample
     sample = propose(rng, sampler, state)
-    sample = @set sample.p = logdensity(model, sample)
+    sample = @set sample.logp = transform_logdensity(model, sample)
     # acceptance ratio
-    α = (log_probability(sample) -
-         log_probability(state) +
+    α = (logp(sample) -
+         logp(state) +
          transition_probability(proposal(sampler), state, sample) -
          transition_probability(proposal(sampler), sample, state))
     if log(rand(rng)) > α

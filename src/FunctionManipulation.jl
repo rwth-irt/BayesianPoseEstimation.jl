@@ -7,6 +7,9 @@
 The idea is to use generator functions for Measures with a simple way to condition on different parameters.
 Partial application of functions can be seen as a way to accomplish this.
 Given gen_f(;a,b), partial(gen_f, a=1) returns a function generator of the form gen_b(;b)
+
+Based on ideas from PartialFunctions.jl https://github.com/archermarx/PartialFunctions.jl/blob/master/src/PartialFunctions.jl
+Main difference is that mapping the kwargs to args is more flexible and possible in any step of the partial application
 """
 
 # WARN args... and kwargs... lead to Tuple{Symbol} which is non-bits
@@ -40,10 +43,6 @@ It might behave unexpected in a way, that the parameter is prepend to the positi
 This is necessary to allow that future parameters can be appended to this function.
 """
 kwarg_to_arg(f::Function, ::Val{S}) where {S} = (s, x...; y...) -> f(x...; (; S => s)..., y...)
-
-
-# Based on ideas from PartialFunctions.jl https://github.com/archermarx/PartialFunctions.jl/blob/master/src/PartialFunctions.jl
-# Main difference is that mapping the kwargs to args is more flexible and possible in any step of the partial application
 
 """
     ManipulatedFunction

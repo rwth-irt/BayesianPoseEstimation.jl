@@ -6,13 +6,6 @@ using AbstractMCMC
 using MeasureTheory, Soss
 using Random
 
-"""
-    kwarg_to_arg(fn, s)
-Assumes that fn has only a single keyword argument with name `s`.
-This argument is replaced by a regular positional argument.
-In code: `f(;a) → f(a)`
-"""
-kwarg_to_arg(fn::Function, s::Symbol) = kwarg_to_arg(fn, Val(s))
 
 # Adapter from MeasureTheory.jl to AbstractMCMC.jl
 

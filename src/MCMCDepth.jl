@@ -23,7 +23,7 @@ include("Main.jl")
 export Sample
 
 export flatten
-export log_probability
+export logp
 export merge
 export raw_state
 export state

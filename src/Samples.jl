@@ -12,18 +12,18 @@ using TransformVariables
 """
     Sample(θ, p, t)
 Might have a constrained parameter Domain, e.g. θᵢ ∈ ℝ⁺.
-Consists of the current raw state `θ::Vector{Float64}`, the (uncorrected) posterior probability `p` and a transformation rule `t`.
+Consists of the unconstrained raw state `θ::Vector{Float64}`, the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))` and a transformation rule `t`.
 Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
 """
 struct Sample{T,U<:TransformVariables.TransformTuple}
     θ::Vector{Float64}
-    p::Float64
+    logp::Float64
     t::U
     # Extract variable names from the TransformTuple
     Sample(θ::AbstractVector, p, t::TransformVariables.TransformTuple{<:NamedTuple{T}}) where {T} = new{T,typeof(t)}(θ, p, t)
 end
 
-Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(log_probability(s))\n  Variables: $(variables(s))")
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logp(s))\n  Variables: $(variables(s))")
 
 
 """
@@ -75,19 +75,16 @@ Returns a `NamedTuple` with the variable names and their model domain values.
 raw_state(s::Sample{T}) where {T} = NamedTuple{T}(s.θ)
 
 """
-    log_probability(s)
+    logp(s)
 Jacobian-corrected posterior log probability of the sample.
 """
-function log_probability(s::Sample)
-    _, ℓ_t = transform_and_logjac(s.t, s.θ)
-    s.p + ℓ_t
-end
+logp(s::Sample) = s.logp
 
 """
     logdensity(m, s)
 Non-corrected logdensity of the of the sample `s` given the measure `m`.
 """
-MeasureTheory.logdensity(m::AbstractMeasure, s::Sample) = logdensity(m, state(s))
+MeasureTheory.logdensity(m::Soss.AbstractMeasure, s::Sample) = logdensity(m, state(s))
 
 """
     logdensity(m, s)
@@ -95,6 +92,24 @@ Non-corrected logdensity of the of the sample `s` given the model `m`.
 """
 # Required to solve ambiguity for ConditionalModel
 MeasureTheory.logdensity(m::Soss.ConditionalModel, s::Sample) = logdensity(m, state(s))
+
+"""
+    transform_logdensity(m, s)
+Jacobian-corrected logdensity of the of the sample `s` given the model `m`.
+"""
+function TransformVariables.transform_logdensity(m::AbstractMeasure, s::Sample)
+    f(y) = logdensity(m, y)
+    transform_logdensity(s.t, f, s.θ)
+end
+
+"""
+    transform_logdensity(m, s)
+Jacobian-corrected logdensity of the of the sample `s` given the model `m`.
+"""
+function TransformVariables.transform_logdensity(m::Soss.ConditionalModel, s::Sample)
+    f(y) = logdensity(m, y)
+    transform_logdensity(s.t, f, s.θ)
+end
 
 """
     flatten(x)
