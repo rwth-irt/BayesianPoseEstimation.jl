@@ -1,8 +1,8 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
-
 using CUDA
+using GLAbstraction
 using SciGL
 
 """
@@ -15,13 +15,12 @@ Basically, these are tiled map-reductions.
 # TODO Threaded implementations?
 
 """
-    reduce(op, A, tiles, n)
-Applies the reduction operation to `n` tiles.
-Returns a vector of size `n`.
+    reduce(op, A, tiles)
+Applies the reduction operation to the tiles.
 """
-function Base.reduce(op, A::AbstractMatrix, tiles::Tiles, n::Integer = length(tiles))
-    res = Vector{Float64}(undef, n)
-    for i = 1:n
+function Base.reduce(op, A::AbstractMatrix, tiles::Tiles)
+    res = Vector{Float64}(undef, length(tiles))
+    for i = 1:length(tiles)
         tile_view = view_tile(A, tiles, i)
         res[i] = reduce(op, tile_view)
     end
@@ -29,13 +28,13 @@ function Base.reduce(op, A::AbstractMatrix, tiles::Tiles, n::Integer = length(ti
 end
 
 """
-    map(f, A, tiles, n)
+    map(f, A, tiles)
 Element wise mapping of the function matrix to each tile.
 The function matrix must have the same size as one tile.
 """
-function Base.map(f::AbstractMatrix{<:Function}, A::AbstractMatrix, tiles::Tiles, n::Integer = length(tiles))
+function Base.map(f::AbstractMatrix{<:Function}, A::AbstractMatrix, tiles::Tiles)
     res = copy(A)
-    for i = 1:n
+    for i = 1:length(tiles)
         tile_view = view_tile(res, tiles, i)
         tile_view .= map.(f, tile_view)
     end
@@ -43,12 +42,12 @@ function Base.map(f::AbstractMatrix{<:Function}, A::AbstractMatrix, tiles::Tiles
 end
 
 """
-    map!(f, A, tiles, n)
+    map!(f, A, tiles)
 Element wise mapping of the function matrix to each tile.
 The function matrix must have the same size as one tile.
 """
-function Base.map!(f::AbstractMatrix{<:Function}, A::AbstractMatrix, tiles::Tiles, n::Integer = length(tiles))
-    for i = 1:n
+function Base.map!(f::AbstractMatrix{<:Function}, A::AbstractMatrix, tiles::Tiles)
+    for i = 1:length(tiles)
         tile_view = view_tile(A, tiles, i)
         tile_view .= map.(f, tile_view)
     end
@@ -56,14 +55,14 @@ function Base.map!(f::AbstractMatrix{<:Function}, A::AbstractMatrix, tiles::Tile
 end
 
 """
-    mapreduce(f, op, A, tiles, n)
+    mapreduce(f, op, A, tiles)
 Element wise mapping of the function matrix to each tile.
 The function matrix must have the same size as one tile.
-The reduction operation reduces the Matrix to a vector of length n.
+The reduction operation reduces the Matrix to a vector of length(tiles).
 """
-function Base.mapreduce(f::AbstractMatrix{<:Function}, op, A::AbstractMatrix, tiles::Tiles, n::Integer = length(tiles))
-    mapped = map(f, A, tiles, n)
-    reduce(op, mapped, tiles, n)
+function Base.mapreduce(f::AbstractMatrix{<:Function}, op, A::AbstractMatrix, tiles::Tiles)
+    mapped = map(f, A, tiles)
+    reduce(op, mapped, tiles)
 end
 
 # Map reduction as tiled CUDA kernel
@@ -74,13 +73,13 @@ maybe_float32(::Val{true}, x) = Float32(x) # For testing
 
 """
     mapreduce(f, op, A, tiles, out)
-Element wise mapping of the function matrix to each tile.
+CUDA kernel for element wise mapping of the function matrix to each tile in A.
 The function matrix must have the same size as one tile.
-The reduction operation reduces the Matrix to the vector out.
+The reduction operation reduces the Matrix to a vector of length(n_blocks).
 
-Choose: length(out) = block_size = N, shmem = n_threads * sizeof(T
+Choose: length(out) = block_size = N, shmem = n_threads * sizeof(T)
 """
-function Base.mapreduce(f::AbstractArray{<:Function}, op, A::AbstractMatrix, tiles::Tiles, out::CuDeviceVector{T}) where {T}
+function Base.mapreduce(f::CuDeviceMatrix{<:Function}, op, A::Union{CuDeviceMatrix,CuDeviceTexture}, tiles::Tiles, out::CuDeviceVector{T}) where {T}
     # aliases for readability
     thread_id = threadIdx().x
     block_id = blockIdx().x
@@ -102,6 +101,36 @@ function Base.mapreduce(f::AbstractArray{<:Function}, op, A::AbstractMatrix, til
     end
     return nothing
 end
+
+"""
+    mapreduce(f, op, A, tiles, n_threads)
+CUDA kernel for element wise mapping of the function matrix to each tile.
+The function matrix must have the same size as one tile.
+The reduction operation reduces the Matrix to a vector of length(tiles).
+"""
+function Base.mapreduce(f::CuMatrix{<:Function}, op, A::Union{CuMatrix,CuTexture}, tiles::Tiles, n_threads = 256)
+    n_blocks = length(tiles)
+    out = CuVector{Float32}(undef, n_blocks)
+    shmem_size = n_threads * sizeof(eltype(out))
+    CUDA.@cuda blocks = n_blocks threads = n_threads shmem = shmem_size mapreduce(f, op, A, tiles, out)
+    out
+end
+
+"""
+    mapreduce(f, op, A, tiles, n_threads)
+CUDA kernel for element wise mapping of the function matrix to each tile.
+The function matrix must have the same size as one tile.
+The reduction operation reduces the Matrix to a vector of length(tiles).
+"""
+Base.mapreduce(f::AbstractMatrix{<:Function}, op, A::Union{CuMatrix,CuTexture}, tiles::Tiles, n_threads = 256) = mapreduce(CuArray(f), op, A, tiles, n_threads)
+
+"""
+    mapreduce(f, op, A, tiles, n_threads)
+CUDA kernel for element wise mapping of the function matrix to each tile.
+The function matrix must have the same size as one tile.
+The reduction operation reduces the Matrix to a vector of length(tiles).
+"""
+Base.mapreduce(f::AbstractMatrix{<:Function}, op, A::GLAbstraction.Texture, tiles::Tiles, n_threads = 256) = mapreduce(f, op, A, CuTexture(tiles), n_threads)
 
 # Test the GPU implementation against the CPU implementation
 M = rand(4, 6)
