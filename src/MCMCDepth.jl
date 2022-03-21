@@ -82,7 +82,7 @@ export scatter_position
 
 # Extensions
 export as○, as_circular
-export gpu_measure
+export cpu_measure, gpu_measure
 export BinaryMixture
 export CircularUniform
 export MixtureMeasure
