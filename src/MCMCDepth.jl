@@ -16,6 +16,7 @@ include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
 include("MeasureTheoryExtensions.jl")
+include("GpuMeasures.jl")
 # Inference
 include("Main.jl")
 
@@ -81,6 +82,7 @@ export scatter_position
 
 # Extensions
 export as○, as_circular
+export gpu_measure
 export BinaryMixture
 export CircularUniform
 export MixtureMeasure
