@@ -24,13 +24,13 @@ cpu_measure(d::GpuNormal) = Normal(d.μ, d.σ)
 
 Base.show(io::IO, d::GpuNormal) = print(io, "GpuNormal, μ: $(d.μ), σ: $(d.σ)")
 
-function MeasureTheory.logdensity(d::GpuNormal, x)
+function MeasureTheory.logdensity(d::GpuNormal, x::T) where {T}
     μ = d.μ
     σ² = d.σ^2
-    -0.5 * ((x - μ)^2 / σ²)
+    -T(0.5) * ((x - μ)^2 / σ²)
 end
 
-MeasureTheory.logpdf(d::GpuNormal, x) = logdensity(d, x) - log(d.σ) - log(sqrt(2 * pi))
+MeasureTheory.logpdf(d::GpuNormal, x::T) where {T} = logdensity(d, x) - log(d.σ) - log(sqrt(T(2π)))
 
 Base.rand(d::GpuNormal, dims::Integer...) = CUDA.randn(dims...; mean=d.μ, stddev=d.σ)
 function Random.rand!(curand_rng::AbstractRNG, d::GpuNormal, M::CuArray)
@@ -81,7 +81,7 @@ gpu_measure(::CircularUniform) = GpuUniformInterval(0, 2π)
 
 Base.show(io::IO, d::GpuUniformInterval) = print(io, "GpuUniformInterval, a: $(d.a), b: $(d.b)")
 
-MeasureTheory.logdensity(d::GpuUniformInterval, x) = d.a <= x <= d.b ? 0.0 : -Inf
+MeasureTheory.logdensity(d::GpuUniformInterval, x::T) where {T} = d.a <= x <= d.b ? zero(T) : -typemax(T)
 MeasureTheory.logpdf(d::GpuUniformInterval, x) = logdensity(d, x) - log(d.b - d.a)
 
 Base.rand(d::GpuUniformInterval, dims::Integer...) = CUDA.rand(dims...) .* (d.b - d.a) .+ d.a
@@ -99,9 +99,9 @@ struct GpuBinaryMixture{T<:AbstractMeasure,U<:AbstractMeasure} <: AbstractMeasur
     c2::U
     log_w1::Float32
     log_w2::Float32
+    GpuBinaryMixture(c1::T, c2::U, log_w1::Real, log_w2::Real) where {T,U} = new{T,U}(c1, c2, Float32(log_w1), Float32(log_w2))
 end
-
-GpuBinaryMixture(d::BinaryMixture) = GpuBinaryMixture(gpu_measure(d.c1), gpu_measure(d.c2), Float32(d.log_w1), Float32(d.log_w2))
+GpuBinaryMixture(d::BinaryMixture) = GpuBinaryMixture(gpu_measure(d.c1), gpu_measure(d.c2), d.log_w1, d.log_w2)
 
 gpu_measure(d::BinaryMixture) = GpuBinaryMixture(d)
 cpu_measure(d::GpuBinaryMixture) = BinaryMixture(cpu_measure(d.c1), cpu_measure(d.c2), exp(d.log_w1), exp(d.log_w2))
