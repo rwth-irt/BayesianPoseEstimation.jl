@@ -33,6 +33,7 @@ TransformVariables.inverse(::Circular, x::Number) = x
 """
     as○
 Transform ℝ → [0,2π)
+Written as `as\bigcirc`
 """
 const as○ = Circular()
 

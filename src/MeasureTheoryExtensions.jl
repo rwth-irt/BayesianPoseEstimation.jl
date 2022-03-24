@@ -51,7 +51,7 @@ end
 
 MeasureTheory.distproxy(::CircularUniform{()}) = Dists.Uniform(0, 2π)
 
-MeasureTheory.logdensity(::CircularUniform{()}, x) = -log(2π)
+MeasureTheory.logdensity(::CircularUniform{()}, x) = 0.0
 
 TransformVariables.as(::CircularUniform{()}) = as○
 
