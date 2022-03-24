@@ -3,33 +3,66 @@
 # All rights reserved. 
 using BenchmarkTools
 using CUDA, MCMCDepth, MeasureTheory
+using Plots
+using Test
 
 # GpuNormal
-gn = Normal(1.0, 2.0) |> gpu_measure
-M = rand(gn, 100, 100)
+gn = Normal(10.0, 2.0) |> gpu_measure
+M = rand(gn, 1)
+histogram(flatten(M))
 rand!(gn, M)
+histogram(flatten(M))
 logpdf.((gn,), M)
-logpdf(gn, 1.0) ≈ logpdf(cpu_measure(gn), 1.0)
+@test logpdf(gn, 1.0) ≈ logpdf(cpu_measure(gn), 1.0)
 
 # GpuExponential
 ge = Exponential(0.1) |> gpu_measure
 M = rand(ge, 100, 100)
+histogram(flatten(M))
 rand!(ge, M)
+histogram(flatten(M))
 GE = CUDA.fill(ge, size(M))
 logpdf.(GE, M)
-logpdf(ge, 1.0) ≈ logpdf(cpu_measure(ge), 1.0)
+@test logpdf(ge, 1.0) ≈ logpdf(cpu_measure(ge), 1.0)
 
 # GpuUniformInterval
 gu = UniformInterval(1.0, 10.0) |> gpu_measure
 M = rand(gu, 100, 100)
+histogram(flatten(M))
 rand!(gu, M)
+histogram(flatten(M))
 MeasureTheory.logpdf.((gu,), M)
-logpdf(gu, 0.5) == logpdf(UniformInterval(1.0, 10.0), 0.5)
-logpdf(gu, 1.5) ≈ logpdf(cpu_measure(gu), 1.5)
+@test logpdf(gu, 0.5) == logpdf(cpu_measure(gu), 0.5)
+@test logpdf(gu, 1.5) ≈ logpdf(cpu_measure(gu), 1.5)
+
+# GpuCircularUniform
+gcu = CircularUniform() |> gpu_measure
+M = rand(gcu, 3, 3)
+histogram(flatten(M))
+rand!(gcu, M)
+histogram(flatten(M))
+MeasureTheory.logpdf.((gcu,), M)
+@test logpdf(gcu, 0.5) == logpdf(cpu_measure(gcu), 0.5)
+@test logpdf(gcu, 1.5) ≈ logpdf(cpu_measure(gcu), 1.5)
 
 # GpuBinaryMixture
 gbm = BinaryMixture(Normal(1.0, 2.0), Normal(10.0, 0.1), 0.1, 0.9) |> gpu_measure
 M = rand(gbm, 100, 100);
+histogram(flatten(M))
 rand!(gbm, M);
+histogram(flatten(M))
 logpdf.((gbm,), M)
-logpdf(gbm, 1.0) ≈ logpdf(cpu_measure(gbm), 1.0)
+@test logpdf(gbm, 1.0) ≈ logpdf(cpu_measure(gbm), 1.0)
+
+# GpuProductMeasure
+pm = For(10, 10, 100) do i, j, k
+    Normal()
+end
+gpm = pm |> gpu_measure
+M = rand(gpm);
+histogram(flatten(M))
+rand!(gpm, M);
+histogram(flatten(M))
+logdensity(gpm, M)
+logpdf(gpm, M)
+@test reduce(+, logpdf(gpm, M)) ≈ logpdf(cpu_measure(gpm), M)

@@ -82,11 +82,16 @@ export scatter_position
 
 # Extensions
 export as○, as_circular
+export BinaryMixture, CircularUniform, MixtureMeasure, UniformInterval
+
+export AbstractGpuMeasure
 export cpu_measure, gpu_measure
-export BinaryMixture
-export CircularUniform
-export MixtureMeasure
-export UniformInterval
+export GpuBinaryMixture
+export GpuCircularUniform
+export GpuExponential
+export GpuNormal
+export GpuUniformInterval
+export GpuProductMeasure
 
 # Main script
 export destroy_render_context
