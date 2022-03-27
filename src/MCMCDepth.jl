@@ -5,7 +5,9 @@
 module MCMCDepth
 
 # lib includes
+include("Variables.jl")
 include("Samples.jl")
+include("MeasureTheoryAdapter.jl")
 include("Proposals.jl")
 include("Parameters.jl")
 include("FunctionManipulation.jl")
@@ -20,15 +22,20 @@ include("GpuMeasures.jl")
 # Inference
 include("Main.jl")
 
+# SampleVariables
+export ModelVariable
+export SampleVariable
+export model_value
+export raw_value
+
 # Samples
 export Sample
 
 export flatten
 export logp
 export merge
-export raw_state
-export state
 export unconstrained_state
+export vars
 
 # Proposals
 export AnalyticProposal
@@ -82,7 +89,11 @@ export scatter_position
 
 # Extensions
 export as○, as_circular
-export BinaryMixture, CircularUniform, MixtureMeasure, UniformInterval
+export BinaryMixture
+export CircularUniform
+export MixtureMeasure
+export UniformInterval
+export VectorizedMeasure
 
 export AbstractGpuMeasure
 export cpu_measure, gpu_measure
@@ -92,6 +103,7 @@ export GpuExponential
 export GpuNormal
 export GpuUniformInterval
 export GpuProductMeasure
+export GpuVectorizedMeasure
 
 # Main script
 export destroy_render_context

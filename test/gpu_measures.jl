@@ -1,14 +1,18 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
-# All rights reserved. 
-using BenchmarkTools
+# All rights reserved.
 using CUDA, MCMCDepth, MeasureTheory
 using Plots
 using Test
 
 # GpuNormal
 gn = Normal(10.0, 2.0) |> gpu_measure
-M = rand(gn, 1)
+M = rand(CURAND.default_rng(), Float64, gn, 100, 100)
+@test eltype(M) == Float64
+M = rand(Float32, gn, 100, 100)
+@test eltype(M) == Float32
+M = rand(gn, 100, 100)
+@test eltype(M) == Float32
 histogram(flatten(M))
 rand!(gn, M)
 histogram(flatten(M))
@@ -37,7 +41,7 @@ MeasureTheory.logpdf.((gu,), M)
 
 # GpuCircularUniform
 gcu = CircularUniform() |> gpu_measure
-M = rand(gcu, 3, 3)
+M = rand(gcu, 100, 100)
 histogram(flatten(M))
 rand!(gcu, M)
 histogram(flatten(M))
@@ -59,10 +63,34 @@ pm = For(10, 10, 100) do i, j, k
     Normal()
 end
 gpm = pm |> gpu_measure
+M = rand(CURAND.default_rng(), Float64, gpm);
+@test eltype(M) == Float64
+M = rand(Float32, gpm);
+@test eltype(M) == Float32
 M = rand(gpm);
+@test eltype(M) == Float32
 histogram(flatten(M))
 rand!(gpm, M);
 histogram(flatten(M))
 logdensity(gpm, M)
 logpdf(gpm, M)
-@test reduce(+, logpdf(gpm, M)) ≈ logpdf(cpu_measure(gpm), M)
+@test logpdf(gpm, M) ≈ logpdf(cpu_measure(gpm), Array(M))
+@test logdensity(gpm, M) ≈ logdensity(cpu_measure(gpm), Array(M))
+
+
+# GpuVectorizedMeasure
+vm = VectorizedMeasure(Normal(1.0, 2.0), 10, 10, 100)
+gvm = vm |> gpu_measure
+M = rand(CURAND.default_rng(), Float64, gvm);
+@test eltype(M) == Float64
+M = rand(Float32, gvm);
+@test eltype(M) == Float32
+M = rand(gvm);
+@test eltype(M) == Float32
+histogram(flatten(M))
+rand!(gvm, M);
+histogram(flatten(M))
+logdensity(gvm, M)
+logpdf(gvm, M)
+@test logpdf(gvm, M) |> Array ≈ logpdf(cpu_measure(gvm), Array(M))
+@test logdensity(gvm, M) |> Array ≈ logdensity(cpu_measure(gvm), Array(M))
