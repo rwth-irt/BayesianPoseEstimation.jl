@@ -11,6 +11,8 @@ M = rand(CURAND.default_rng(), Float64, gn, 100, 100)
 @test eltype(M) == Float64
 M = rand(Float32, gn, 100, 100)
 @test eltype(M) == Float32
+M = rand(Float16, gn, 100, 100)
+@test eltype(M) == Float16
 M = rand(gn, 100, 100)
 @test eltype(M) == Float32
 histogram(flatten(M))
@@ -50,7 +52,7 @@ MeasureTheory.logpdf.((gcu,), M)
 @test logpdf(gcu, 1.5) ≈ logpdf(cpu_measure(gcu), 1.5)
 
 # GpuBinaryMixture
-gbm = BinaryMixture(Normal(1.0, 2.0), Normal(10.0, 0.1), 0.1, 0.9) |> gpu_measure
+gbm = BinaryMixture(Normal(1.0, 1.0), Normal(10.0, 2), 0.1, 0.9) |> gpu_measure
 M = rand(gbm, 100, 100);
 histogram(flatten(M))
 rand!(gbm, M);

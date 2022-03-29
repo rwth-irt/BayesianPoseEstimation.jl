@@ -14,9 +14,9 @@ using TransformVariables
 Interface: Implement `gpu_measure(cpu_measure)` & `cpu_measure(gpu_measure)`.
 """
 abstract type AbstractGpuMeasure <: AbstractMeasure end
-Random.rand!(d::AbstractGpuMeasure, M::CuArray) = rand!(CURAND.default_rng(), d, M)
+Random.rand!(d::AbstractGpuMeasure, M::CuArray) = rand!(CUDA.RNG(), d, M)
 Base.rand(rng::AbstractRNG, ::Type{T}, d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) where {T} = rand!(rng, d, CuArray{T}(undef, dim, dims...))
-Base.rand(::Type{T}, d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) where {T} = rand(CURAND.default_rng(), T, d, dim, dims...)
+Base.rand(::Type{T}, d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) where {T} = rand(CUDA.RNG(), T, d, dim, dims...)
 Base.rand(d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) = rand(Float32, d, dim, dims...)
 
 # GpuNormal
@@ -43,7 +43,14 @@ end
 
 MeasureTheory.logpdf(d::GpuNormal, x::T) where {T} = logdensity(d, x) - log(d.σ) - log(sqrt(T(2π)))
 
-Random.rand!(curand_rng::AbstractRNG, d::GpuNormal, M::CuArray) = randn!(curand_rng, M; mean=d.μ, stddev=d.σ)
+scale_shift_normal(x, μ, σ) = σ * x + μ
+
+function Random.rand!(rng::AbstractRNG, d::GpuNormal, M::CuArray)
+    randn!(rng, M)
+        map!(M, M) do x
+        scale_shift_normal(x, d.μ, d.σ)
+    end
+end
 
 TransformVariables.as(::GpuNormal) = asℝ
 
@@ -66,8 +73,8 @@ MeasureTheory.logpdf(d::GpuExponential, x) = logdensity(d, x) + log(d.λ)
 
 uniform_to_exp(x, λ) = log(x) / (-λ)
 
-function Random.rand!(curand_rng::AbstractRNG, d::GpuExponential, M::CuArray)
-    rand!(curand_rng, M)
+function Random.rand!(rng::AbstractRNG, d::GpuExponential, M::CuArray)
+    rand!(rng, M)
     map!(M, M) do x
         uniform_to_exp(x, d.λ)
     end
@@ -95,8 +102,8 @@ MeasureTheory.logpdf(d::GpuUniformInterval, x) = logdensity(d, x) - log(d.b - d.
 
 scale_uniform(x, a, b) = x * (b - a) + a
 
-function Random.rand!(curand_rng::AbstractRNG, d::GpuUniformInterval, M::CuArray)
-    rand!(curand_rng, M)
+function Random.rand!(rng::AbstractRNG, d::GpuUniformInterval, M::CuArray)
+    rand!(rng, M)
     map!(M, M) do x
         scale_uniform(x, d.a, d.b)
     end
@@ -115,7 +122,7 @@ Base.show(io::IO, ::GpuCircularUniform) = print(io, "GpuCircularUniform")
 MeasureTheory.logdensity(::GpuCircularUniform, x) = logdensity(GpuUniformInterval(0, 2π), x)
 MeasureTheory.logpdf(d::GpuCircularUniform, x) = logdensity(d, x) - log(2π)
 
-Random.rand!(curand_rng::AbstractRNG, ::GpuCircularUniform, M::CuArray) = rand!(curand_rng, GpuUniformInterval(0, 2π), M)
+Random.rand!(rng::AbstractRNG, ::GpuCircularUniform, M::CuArray) = rand!(rng, GpuUniformInterval(0, 2π), M)
 
 TransformVariables.as(::GpuCircularUniform) = as○
 
@@ -139,7 +146,7 @@ MeasureTheory.logdensity(d::GpuBinaryMixture, x) = logaddexp(d.log_w1 + logpdf(d
 MeasureTheory.logpdf(d::GpuBinaryMixture, x) = logdensity(d, x)
 
 function Random.rand!(rng::AbstractRNG, d::GpuBinaryMixture, M::CuArray{T}) where {T}
-    CURAND.curandGenerateUniform(rng, M, length(M))
+    rand!(rng, M)
     M .= log.(M)
     c1_ind = M .< d.log_w1
     M[c1_ind] .= rand(rng, T, d.c1, count(c1_ind .> 0))
@@ -181,7 +188,7 @@ function Random.rand!(d::GpuProductMeasure, M::CuArray)
     if d.size != size(M)
         @warn "Dimension mismatch of GpuProductMeasure and Array: $(d.size) != $(size(M))"
     end
-    rand!(CURAND.default_rng(), d.internal, M)
+    rand!(CUDA.RNG(), d.internal, M)
 end
 Random.rand(rng::AbstractRNG, T::Type, d::GpuProductMeasure) = rand(rng, T, d.internal, d.size...)
 Random.rand(T::Type, d::GpuProductMeasure) = rand(T, d.internal, d.size...)
@@ -223,7 +230,7 @@ function Random.rand!(d::GpuVectorizedMeasure, M::CuArray)
     if d.size != size(M)
         @warn "Dimension mismatch of GpuVectorizedMeasure and Array: $(d.size) != $(size(M))"
     end
-    rand!(CURAND.default_rng(), d.internal, M)
+    rand!(CUDA.RNG(), d.internal, M)
 end
 Random.rand(rng::AbstractRNG, T::Type, d::GpuVectorizedMeasure) = rand(rng, T, d.internal, d.size...)
 Random.rand(T::Type, d::GpuVectorizedMeasure) = rand(T, d.internal, d.size...)
