@@ -5,74 +5,43 @@
 # bundle_samples for the Sample type
 using AbstractMCMC, TupleVectors
 using Accessors
-using MeasureTheory, Soss
-using Random
 using TransformVariables
 
 """
-    Sample(θ, p, t)
-Might have a constrained parameter Domain, e.g. θᵢ ∈ ℝ⁺.
-Consists of the unconstrained raw state `θ::Vector{Float64}`, the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))` and a transformation rule `t`.
+    Sample(vars, logp)
+Consists of the unconstrained state `vars` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
 Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
 """
-struct Sample{T,U<:TransformVariables.TransformTuple}
-    θ::Vector{Float64}
+struct Sample{T,V<:Tuple{Vararg{AbstractVariable}}}
+    vars::NamedTuple{T, V}
     logp::Float64
-    t::U
-    # Extract variable names from the TransformTuple
-    Sample(θ::AbstractVector, p, t::TransformVariables.TransformTuple{<:NamedTuple{T}}) where {T} = new{T,typeof(t)}(θ, p, t)
 end
 
-Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logp(s))\n  Variables: $(variables(s))")
-
-
-"""
-    Sample(θ, p, t)
-Create a sample from `θ::NamedTuple` containing the current state and its probability `p`.
-`t` is a transformation from the unconstrained to the constrained space.
-"""
-function Sample(θ::NamedTuple, p, t::TransformVariables.TransformTuple)
-    # Memory access error using Revise?
-    θ_raw = inverse(t, θ)
-    Sample(θ_raw, p, t)
-end
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logp(s))\n  Variable names: $(names(s))")
 
 """
-    Sample(m)
-Create a sample by sampling from a model.
-"""
-function Sample(rng::AbstractRNG, m::Soss.AbstractModel)
-    θ = rand(rng, m)
-    # xform requires ConditionalModel, conditioning on nothing does not change the model except converting it a ConditionalModel
-    tr = xform(m | (;))
-    Sample(θ, -Inf, tr)
-end
-
-"""
-    Sample(m)
-Create a sample by sampling from a model.
-"""
-Sample(m::Soss.AbstractModel) = Sample(Random.GLOBAL_RNG, m)
-
-"""
-    variables(Sample)
+    names(Sample)
 Returns a tuple of the variable names.
 """
-variables(::Sample{T}) where {T} = T
+names(::Sample{T}) where T = T
 
 """
-    state(s)
-State of the parameters in the model domain.
-Returns a `NamedTuple` with the variable names and their model domain values.
+    vars(Sample)
+Returns a named tuple of the vars.
 """
-state(s::Sample) = transform(s.t, s.θ)
+vars(s::Sample) = s.vars
 
 """
-    raw_state(s)
-State of the parameters in the unconstrained domain.
-Returns a `NamedTuple` with the variable names and their model domain values.
+    state(s, var_name)
+Returns the state in the model domain of the variable `var_name`.
 """
-raw_state(s::Sample{T}) where {T} = NamedTuple{T}(s.θ)
+model_value(s::Sample, var_name::Symbol) = model_value(vars(s)[var_name])
+
+"""
+    raw_state(s, var_name)
+Returns the state in the unconstrained domain of the variable `var_name`.
+"""
+raw_value(s::Sample, var_name::Symbol) = raw_value(vars(s)[var_name])
 
 """
     logp(s)
@@ -81,64 +50,10 @@ Jacobian-corrected posterior log probability of the sample.
 logp(s::Sample) = s.logp
 
 """
-    logdensity(m, s)
-Non-corrected logdensity of the of the sample `s` given the measure `m`.
-"""
-MeasureTheory.logdensity(m::Soss.AbstractMeasure, s::Sample) = logdensity(m, state(s))
-
-"""
-    logdensity(m, s)
-Non-corrected logdensity of the of the sample `s` given the model `m`.
-"""
-# Required to solve ambiguity for ConditionalModel
-MeasureTheory.logdensity(m::Soss.ConditionalModel, s::Sample) = logdensity(m, state(s))
-
-"""
-    transform_logdensity(m, s)
-Jacobian-corrected logdensity of the of the sample `s` given the model `m`.
-"""
-function TransformVariables.transform_logdensity(m::AbstractMeasure, s::Sample)
-    f(y) = logdensity(m, y)
-    transform_logdensity(s.t, f, s.θ)
-end
-
-"""
-    transform_logdensity(m, s)
-Jacobian-corrected logdensity of the of the sample `s` given the model `m`.
-"""
-function TransformVariables.transform_logdensity(m::Soss.ConditionalModel, s::Sample)
-    f(y) = logdensity(m, y)
-    transform_logdensity(s.t, f, s.θ)
-end
-
-"""
     flatten(x)
 Flattens x to return a 1D array.
 """
 flatten(x) = collect(Iterators.flatten(x))
-
-"""
-    ranges(nt)
-Helps to find which range of the raw state belongs to which variable.
-Returns a dictionary of UnitRange for each key in the NamedTuple
-"""
-function ranges(nt::NamedTuple{T}) where {T}
-    d = Dict{Symbol,UnitRange{Int64}}()
-    iter = 1
-    for var_name in T
-        l = length(nt[var_name])
-        d[var_name] = iter:(iter+l-1)
-        iter = iter + l
-    end
-    return d
-end
-
-"""
-    ranges(nt)
-Helps to find which range of the raw state belongs to which variable.
-Returns a dictionary of UnitRange for each key in the NamedTuple
-"""
-ranges(s::Sample) = ranges(state(s))
 
 """
     add!(a, b)
@@ -169,40 +84,66 @@ function add!(a::Sample{T}, b::Sample{T}) where {T}
 end
 
 """
-    +(a, b)
-Add a raw state `θ` to the raw state (unconstrained domain) of the sample `s`.
+    map_intersect(f, a, b)
+Maps the function `f` over the intersection of the keys of `a` and `b`.
+Returns a NamedTuple with the same keys as `a` which makes it type-stable.
 """
-Base.:+(a::Sample, b::Sample) = add!(deepcopy(a), b)
-
-"""
-    +(a, b)
-Add the raw states (unconstrained domain) of two samples.
-Optimized case for two samples of the same type.
-"""
-Base.:+(a::Sample{T}, b::Sample{T}) where {T} = @set a.θ = a.θ + b.θ
-
-"""
-    +(a, b)
-Add a NamedTuple `b` interpreted as raw state to the raw state of two `a``.
-Modifies `a`.
-"""
-function add!(a::Sample, b::NamedTuple)
-    a_ranges = ranges(a)
-    b_ranges = ranges(b)
-    b_values = flatten(b)
-    for var_name in keys(a_ranges)
-        if var_name in keys(b)
-            a.θ[a_ranges[var_name]] = a.θ[a_ranges[var_name]] + b_values[b_ranges[var_name]]
+function map_intersect(f, a::NamedTuple{T}, b::NamedTuple) where T
+    vars = map(keys(a)) do k
+        if k in keys(b)
+            f(a[k], b[k])
+        else
+            a[k]
         end
     end
-    a
+    NamedTuple{T}(vars)
+end
+
+# TODO this implies, that all necessary variables are expected to be present in the sample. Thus, proposals need to include internal variables like the expected depth. Filter out irrelevant variables when returning the state in the sampler.
+"""
+    map_models(f, models, vars; default)
+Map the function `f(model, variable, variables)` over each `model` and `variable`.
+All other required `variables` are passed into `f` as context.
+If no intersection exists, the `default` value is used.
+For log-densities the reasonable default is 0.0 (summation).
+Non-logarithmic densities should use 1.0 as default (product).
+"""
+map_models(f, models::NamedTuple, variables::NamedTuple; default::T=0.0) where T = map(keys(models)) do k
+        if k in keys(variables)
+            f(models[k], variables[k], variables) |> T
+        else
+            default
+        end
+    end
+
+"""
+    map_models(f, models, sample; default)
+Map the function `f(model, variable, variables)` over each `model` and variable in `sample`.
+All other required `variables` are passed into `f` as context.
+If no intersection exists, the `default` value is used.
+For log-densities the reasonable default is 0.0 (summation).
+Non-logarithmic densities should use 1.0 as default (product).
+"""
+map_models(f, models::NamedTuple, sample::Sample; default=0.0) = map_models(f, models, vars(sample), default)
+
+"""
+    +(a, b)
+Add the sample `b` to the sample `a`.
+The returned sample is of the same type as `a`.
+"""
+function Base.:+(a::Sample, b::Sample)
+    sum_nt = map_intersect(+, vars(a), vars(b))
+    @set a.vars = sum_nt
 end
 
 """
     +(a, b)
-Add a NamedTuple `b` interpreted as raw state to the raw state of two `a``.
+Add a NamedTuple `b` to the sample `a`.
 """
-Base.:+(a::Sample, b::NamedTuple) = add!(deepcopy(a), b)
+function Base.:+(a::Sample, b::NamedTuple)
+    sum_nt = map_intersect(+, vars(a), b)
+    @set a.vars = sum_nt
+end
 
 """
     -(a, b)
@@ -210,21 +151,28 @@ Subtract the raw states (unconstrained domain) of two samples.
 Only same type is supported to prevent surprises in the return type.
 """
 function Base.:-(a::Sample, b::Sample)
-    negative_b = @set b.θ = -b.θ
-    a + negative_b
+    sum_nt = map_intersect(-, vars(a), vars(b))
+    @set a.vars = sum_nt
 end
 
+"""
+    -(a, b)
+Subtract a NamedTuple `b` from the sample `a`.
+"""
+function Base.:-(a::Sample, b::NamedTuple)
+    sum_nt = map_intersect(-, vars(a), b)
+    @set a.vars = sum_nt
+end
 
 """
     merge(a, b...)
 Left-to-Right merges the samples as with bs.
-This means the the rightmost state is used.
-The original transformation rule of as is kept to ensure compatibility with the original sample.
+This means the the rightmost variables are kept.
 Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
 """
 function Base.merge(a::Sample, b::Sample...)
-    merged_state = merge(state(a), map(x -> state(x), b)...)
-    Sample(merged_state, -Inf, a.t)
+    merged_vars = merge(vars(a), map(vars, b)...)
+    Sample(merged_vars, -Inf)
 end
 
 """
@@ -240,9 +188,10 @@ function AbstractMCMC.bundle_samples(
     ::AbstractMCMC.AbstractSampler,
     ::Any,
     ::Type{TupleVector};
-    start = 1,
-    step = 1
+    start=1,
+    step=1
 )
-    states = map(state, samples)
-    TupleVector(states[start:step:end])
+    # TODO make sure only to use relevant variables, for example only the ones specified by the variable names of the NamedTuple of models.
+    vars = map(vars, samples)
+    TupleVector(vars[start:step:end])
 end
