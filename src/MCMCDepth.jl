@@ -7,10 +7,10 @@ module MCMCDepth
 # lib includes
 include("Variables.jl")
 include("Samples.jl")
-include("MeasureTheoryAdapter.jl")
 include("Proposals.jl")
 include("Parameters.jl")
 include("FunctionManipulation.jl")
+include("PriorModel.jl")
 include("Models.jl")
 include("MetropolisHastings.jl")
 include("Gibbs.jl")
@@ -19,6 +19,7 @@ include("Visualization.jl")
 include("TransformVariablesExtensions.jl")
 include("MeasureTheoryExtensions.jl")
 include("GpuMeasures.jl")
+include("MeasureTheoryAdapter.jl")
 # Inference
 include("Main.jl")
 
@@ -51,6 +52,9 @@ export transition_probability
 export DepthImageParameters
 export PriorParameters
 export RandomWalkParameters
+
+# PriorModel
+export IndependentPrior
 
 # Models
 export DepthExponential

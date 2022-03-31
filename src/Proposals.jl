@@ -77,6 +77,8 @@ Support for Gibbs: applies the previous state to the args of the model.
 # Dependent samples are sampled in the unconstrained domain -> raw state for conditional
 transition_probability(q::AbstractProposal, s::Sample, s_cond::Sample) = logdensity(model(q)(state(s_cond)), raw_state(s - s_cond))
 
+# SymmetricProposal
+
 
 """
     SymmetricProposal
@@ -107,6 +109,7 @@ For symmetric proposals, the forward and backward transition probability cancels
 """
 transition_probability(q::SymmetricProposal, ::Sample, ::Sample) = 0.0
 
+# IndependentProposal
 
 """
     IndependentProposal
@@ -137,7 +140,10 @@ Support for Gibbs: applies the current state to the args of the model.
 # IndependentProposal: logdensity in constrained domain -> transformation via state
 transition_probability(q::IndependentProposal, s::Sample, s_cond::Sample) = logdensity(model(q)(state(s_cond)), state(s))
 
+# GibbsProposal
 
+
+# TODO  Do not depend on Soss anymore. Either all Models must support conditioning like applying args to a Soss model or we need a random(rng, model, sample) function. logdensity(model, sample) should work out of the box.
 """
     GibbsProposal
 Propose only a subset of the variables.
@@ -181,6 +187,7 @@ Forwards it to the transition probability model of the intern proposal distribut
 """
 transition_probability(q::GibbsProposal, s::Sample, s_cond::Sample) = transition_probability(q.internal_proposal, s, s_cond)
 
+# AnalyticProposal
 
 """
     AnalyticProposal
