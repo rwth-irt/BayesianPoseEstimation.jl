@@ -14,9 +14,26 @@ using TransformVariables
 Interface: Implement `gpu_measure(cpu_measure)` & `cpu_measure(gpu_measure)`.
 """
 abstract type AbstractGpuMeasure <: AbstractMeasure end
+
+"""
+    rand!(d, M)
+Mutate `M` with random samples from the measure `d` using the CUDA default RNG.
+"""
 Random.rand!(d::AbstractGpuMeasure, M::CuArray) = rand!(CUDA.RNG(), d, M)
+"""
+    rand(rng, T, d, dim, dims...)
+Return a CUDA array of type `T` with `dim` dimensions and `dims` dimensions sampled from the measure `d`.
+"""
 Base.rand(rng::AbstractRNG, ::Type{T}, d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) where {T} = rand!(rng, d, CuArray{T}(undef, dim, dims...))
+"""
+    rand(T, d, dim, dims...)
+Return a CUDA array of type `T` with `dim` dimensions and `dims` dimensions sampled from the measure `d` using the CUDA default RNG.
+"""
 Base.rand(::Type{T}, d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) where {T} = rand(CUDA.RNG(), T, d, dim, dims...)
+"""
+    rand(T, d, dim, dims...)
+Return a CUDA array of type `Float32` with `dim` dimensions and `dims` dimensions sampled from the measure `d` using the CUDA default RNG.
+"""
 Base.rand(d::AbstractGpuMeasure, dim::Integer=1, dims::Integer...) = rand(Float32, d, dim, dims...)
 
 # GpuNormal
@@ -35,15 +52,15 @@ cpu_measure(d::GpuNormal) = Normal(d.μ, d.σ)
 
 Base.show(io::IO, d::GpuNormal) = print(io, "GpuNormal, μ: $(d.μ), σ: $(d.σ)")
 
-function MeasureTheory.logdensity(d::GpuNormal, x::T) where {T}
+function MeasureTheory.logdensity(d::GpuNormal, x::T) where {T<:Real}
     μ = d.μ
     σ² = d.σ^2
     -T(0.5) * ((x - μ)^2 / σ²)
 end
 
-MeasureTheory.logpdf(d::GpuNormal, x::T) where {T} = logdensity(d, x) - log(d.σ) - log(sqrt(T(2π)))
+MeasureTheory.logpdf(d::GpuNormal, x::T) where {T<:Real} = logdensity(d, x) - log(d.σ) - log(sqrt(T(2π)))
 
-scale_shift_normal(x, μ, σ) = σ * x + μ
+scale_shift_normal(x::Real, μ::Real, σ::Real) = σ * x + μ
 
 function Random.rand!(rng::AbstractRNG, d::GpuNormal, M::CuArray)
     randn!(rng, M)
@@ -68,10 +85,10 @@ cpu_measure(d::GpuExponential) = Exponential{(:λ,)}(d.λ)
 
 Base.show(io::IO, d::GpuExponential) = print(io, "GpuExponential, λ: $(d.λ)")
 
-MeasureTheory.logdensity(d::GpuExponential, x) = -d.λ * x
-MeasureTheory.logpdf(d::GpuExponential, x) = logdensity(d, x) + log(d.λ)
+MeasureTheory.logdensity(d::GpuExponential, x::Real) = -d.λ * x
+MeasureTheory.logpdf(d::GpuExponential, x::Real) = logdensity(d, x) + log(d.λ)
 
-uniform_to_exp(x, λ) = log(x) / (-λ)
+uniform_to_exp(x::Real, λ::Real) = log(x) / (-λ)
 
 function Random.rand!(rng::AbstractRNG, d::GpuExponential, M::CuArray)
     rand!(rng, M)
@@ -97,8 +114,8 @@ cpu_measure(d::GpuUniformInterval) = UniformInterval(d.a, d.b)
 
 Base.show(io::IO, d::GpuUniformInterval) = print(io, "GpuUniformInterval, a: $(d.a), b: $(d.b)")
 
-MeasureTheory.logdensity(d::GpuUniformInterval, x::T) where {T} = d.a <= x <= d.b ? zero(T) : -typemax(T)
-MeasureTheory.logpdf(d::GpuUniformInterval, x) = logdensity(d, x) - log(d.b - d.a)
+MeasureTheory.logdensity(d::GpuUniformInterval, x::T) where {T<:Real} = d.a <= x <= d.b ? zero(T) : -typemax(T)
+MeasureTheory.logpdf(d::GpuUniformInterval, x::Real) = logdensity(d, x) - log(d.b - d.a)
 
 scale_uniform(x, a, b) = x * (b - a) + a
 
@@ -119,8 +136,8 @@ gpu_measure(::CircularUniform) = GpuCircularUniform()
 cpu_measure(::GpuCircularUniform) = CircularUniform()
 
 Base.show(io::IO, ::GpuCircularUniform) = print(io, "GpuCircularUniform")
-MeasureTheory.logdensity(::GpuCircularUniform, x) = logdensity(GpuUniformInterval(0, 2π), x)
-MeasureTheory.logpdf(d::GpuCircularUniform, x) = logdensity(d, x) - log(2π)
+MeasureTheory.logdensity(::GpuCircularUniform, x::Real) = logdensity(GpuUniformInterval(0, 2π), x)
+MeasureTheory.logpdf(d::GpuCircularUniform, x::Real) = logdensity(d, x) - log(2π)
 
 Random.rand!(rng::AbstractRNG, ::GpuCircularUniform, M::CuArray) = rand!(rng, GpuUniformInterval(0, 2π), M)
 
@@ -142,8 +159,8 @@ cpu_measure(d::GpuBinaryMixture) = BinaryMixture(cpu_measure(d.c1), cpu_measure(
 
 Base.show(io::IO, d::GpuBinaryMixture) = print(io, "GpuBinaryMixture\n  components: $(d.c1), $(d.c2) \n  log weights: $(d.log_w1), $(d.log_w2)")
 
-MeasureTheory.logdensity(d::GpuBinaryMixture, x) = logaddexp(d.log_w1 + logpdf(d.c1, x), d.log_w2 + logpdf(d.c2, x))
-MeasureTheory.logpdf(d::GpuBinaryMixture, x) = logdensity(d, x)
+MeasureTheory.logdensity(d::GpuBinaryMixture, x::Real) = logaddexp(d.log_w1 + logpdf(d.c1, x), d.log_w2 + logpdf(d.c2, x))
+MeasureTheory.logpdf(d::GpuBinaryMixture, x::Real) = logdensity(d, x)
 
 function Random.rand!(rng::AbstractRNG, d::GpuBinaryMixture, M::CuArray{T}) where {T}
     rand!(rng, M)
@@ -173,12 +190,11 @@ Base.show(io::IO, d::GpuProductMeasure) = print(io, "GpuProductMeasure\n  intern
 
 Base.size(d::GpuProductMeasure) = d.size
 
-# TODO Interface: all other GpuMeasures require broadcasting, here it is done internally. Is this expected? Will Tensors always be wrapped?
-function MeasureTheory.logdensity(d::GpuProductMeasure, x)
+function MeasureTheory.logdensity(d::GpuProductMeasure, x::CuArray)
     ℓ = logdensity.((d.internal,), x)
     sum(ℓ)
 end
-function MeasureTheory.logpdf(d::GpuProductMeasure, x)
+function MeasureTheory.logpdf(d::GpuProductMeasure, x::CuArray)
     ℓ = logpdf.((d.internal,), x)
     sum(ℓ)
 end
@@ -216,12 +232,11 @@ Base.show(io::IO, d::GpuVectorizedMeasure) = print(io, "GpuVectorizedMeasure\n  
 
 Base.size(d::GpuVectorizedMeasure) = d.size
 
-# TODO Interface: all other GpuMeasures require broadcasting, here it is done internally. Is this expected? Will Tensors always be wrapped?
-function MeasureTheory.logdensity(d::GpuVectorizedMeasure, x)
+function MeasureTheory.logdensity(d::GpuVectorizedMeasure, x::CuArray)
     ℓ = logdensity.((d.internal,), x)
     reduce_to_last_dim(+, ℓ)
 end
-function MeasureTheory.logpdf(d::GpuVectorizedMeasure, x)
+function MeasureTheory.logpdf(d::GpuVectorizedMeasure, x::CuArray)
     ℓ = logpdf.((d.internal,), x)
     reduce_to_last_dim(+, ℓ)
 end
