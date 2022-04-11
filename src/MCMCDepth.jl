@@ -18,7 +18,7 @@ include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
 include("MeasureTheoryExtensions.jl")
-include("GpuMeasures.jl")
+include("KernelMeasures.jl")
 include("MeasureTheoryAdapter.jl")
 include("Tiles.jl")
 # Inference
