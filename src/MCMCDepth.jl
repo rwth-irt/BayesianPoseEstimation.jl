@@ -20,6 +20,7 @@ include("TransformVariablesExtensions.jl")
 include("MeasureTheoryExtensions.jl")
 include("GpuMeasures.jl")
 include("MeasureTheoryAdapter.jl")
+include("Tiles.jl")
 # Inference
 include("Main.jl")
 
@@ -97,17 +98,17 @@ export BinaryMixture
 export CircularUniform
 export MixtureMeasure
 export UniformInterval
-export VectorizedMeasure
 
-export AbstractGpuMeasure
-export cpu_measure, gpu_measure
-export GpuBinaryMixture
-export GpuCircularUniform
-export GpuExponential
-export GpuNormal
-export GpuUniformInterval
-export GpuProductMeasure
-export GpuVectorizedMeasure
+export AbstractKernelMeasure
+export measure_theory, kernel_measure
+export KernelBinaryMixture
+export KernelCircularUniform
+export KernelExponential
+export KernelNormal
+export KernelUniform
+export KernelProduct
+export VectorizedMeasure
+export to_cpu, to_gpu
 
 # Main script
 export destroy_render_context
