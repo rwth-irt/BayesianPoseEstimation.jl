@@ -62,7 +62,9 @@ Return a CUDA array of type `T` with `dim` dimensions and `dims` dimensions samp
 """
 Base.rand(::Union{CUDA.RNG,CURAND.RNG}, d::AbstractKernelMeasure{T}, dim::Integer=1, dims::Integer...) where {T} = rand!(Random.GLOBAL_RNG, d, CuArray{T}(undef, dim, dims...))
 
-# Orthogonal rand / rand! are implemented by MeasureBase using GLOBAL_RNG 🙂
+# Orthogonal methods
+
+Base.rand(d::AbstractKernelMeasure) = rand(Random.GLOBAL_RNG, d)
 
 # KernelNormal
 
@@ -229,16 +231,29 @@ function maybe_to_gpu(d::AbstractVectorizedMeasure, M)
     end
 end
 
-# Let the broadcasting magic do its work on the internal measures
+"""
+    rand!(rng, d, M)
+Mutates `M` by sampling from the vectorized measure.
+Handles GPU transfer and broadcasting.
+"""
 function Random.rand!(rng::AbstractRNG, d::AbstractVectorizedMeasure, M::AbstractArray)
     d = maybe_to_gpu(d, M)
+    # Let the broadcasting magic do its work on the internal measures
     rand!(rng, marginals(d), M)
 end
 
-# Automatically choose correct size for the measure
-Base.rand(rng::AbstractRNG, d::AbstractVectorizedMeasure) = rand(rng, d, size(marginals(d))...)
-# Resolve ambiguity for specific RNG
-Base.rand(rng::Union{CUDA.RNG,CURAND.RNG}, d::AbstractVectorizedMeasure) = rand(rng, d, size(marginals(d))...)
+"""
+    rand!(rng, d, dim, dims)
+Generates random samples from the vectorized measure by appending (dim, dims...) dimensions.
+"""
+Base.rand(rng::AbstractRNG, d::AbstractVectorizedMeasure{T}, dim::Integer=1, dims::Integer...) where {T} = rand!(rng, d, Array{T}(undef, size(marginals(d))..., dim, dims...))
+
+"""
+    rand!(rng, d, dim, dims)
+Generates random samples from the vectorized measure by appending (dim, dims...) dimensions.
+Resolves ambiguity for CUDA RNGs.
+"""
+Base.rand(::Union{CUDA.RNG,CURAND.RNG}, d::AbstractVectorizedMeasure{T}, dim::Integer=1, dims::Integer...) where {T} = rand!(Random.GLOBAL_RNG, d, CuArray{T}(undef, size(marginals(d))..., dim, dims...))
 
 """
     broadcast_logdensity(d, M)
@@ -246,7 +261,6 @@ Broadcasts the logdensity function, takes care of transferring the measure to th
 """
 function broadcast_logdensity(d::AbstractVectorizedMeasure, M)
     d = maybe_to_gpu(d, M)
-    # TODO lazy broadcasted?
     logdensity.(marginals(d), M)
 end
 
@@ -322,21 +336,21 @@ Base.show(io::IO, d::VectorizedMeasure{T}) where {T} = print(io, "GpuVectorizedM
 
 Base.size(d::VectorizedMeasure) = d.size
 
-# TODO find a better place
 """
-    reduce_to_last_dim(op, M)
-Reduces all dimensions but the last one.
+    reduce_vectorized(op, d, M)
+Reduces the first `ndims(d)` dimensions of the Matrix `M` using the operator `op`. 
 """
-function reduce_to_last_dim(op, M::AbstractArray{<:Any,N}) where {N}
-    R = reduce(op, M; dims=(1:N-1...,))
-    dropdims(R; dims=(1:N-1...,))
+function reduce_vectorized(op, d::VectorizedMeasure, M::AbstractArray)
+    n_red = ndims(marginals(d))
+    R = reduce(op, M; dims=(1:n_red...,))
+    dropdims(R; dims=(1:n_red...,))
 end
 
 function MeasureTheory.logdensity(d::VectorizedMeasure, x)
     ℓ = broadcast_logdensity(d, x)
-    reduce_to_last_dim(+, ℓ)
+    reduce_vectorized(+, d, ℓ)
 end
 function MeasureTheory.logpdf(d::VectorizedMeasure, x)
     ℓ = broadcast_logpdf(d, x)
-    reduce_to_last_dim(+, ℓ)
+    reduce_vectorized(+, d, ℓ)
 end

@@ -145,7 +145,7 @@ logpdf(gpm, M)
 @test logdensity(gpm, M) ≈ logdensity(measure_theory(gpm), Array(M))
 
 # VectorizedMeasure
-pm = For(10, 10, 100) do i, j, k
+pm = For(10, 10) do i, j
     Normal(i, j)
 end
 gvm = VectorizedMeasure(pm)
@@ -178,20 +178,16 @@ logpdf(gvm, M)
 @test logdensity(gvm, M) |> sum ≈ logdensity(pm, Array(M))
 
 # Broadcasting AbstractVectorizedMeasure
-
 pm = For(10, 10) do i, j
     Normal(i, j)
 end
 gpm = KernelProduct(pm) |> to_gpu
 gvm = VectorizedMeasure(pm) |> to_gpu
-large_pm = For(10, 10, 100) do i, j, k
-    Normal(i, j)
-end
-large_gpm = KernelProduct(large_pm)
-M = rand(CUDA.default_rng(), large_gpm);
+
+M = rand(CUDA.default_rng(), gvm, 100, 5);
 @test logdensity(gpm, M) isa Real
-@test logdensity(gvm, M) |> length == 100
+@test logdensity(gvm, M) |> size == (100, 5)
 @test logdensity(gpm, M) ≈ logdensity(gvm, M) |> sum
 @test logpdf(gpm, M) isa Real
-@test logpdf(gvm, M) |> length == 100
+@test logpdf(gvm, M) |> size == (100, 5)
 @test logpdf(gpm, M) ≈ logpdf(gvm, M) |> sum
