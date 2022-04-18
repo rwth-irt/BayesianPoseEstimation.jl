@@ -13,7 +13,7 @@ Consists of the unconstrained state `vars` and the corrected posterior probabili
 Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
 """
 struct Sample{T,V<:Tuple{Vararg{AbstractVariable}}}
-    vars::NamedTuple{T, V}
+    vars::NamedTuple{T,V}
     logp::Float64
 end
 
@@ -23,7 +23,7 @@ Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logp(s))\
     names(Sample)
 Returns a tuple of the variable names.
 """
-names(::Sample{T}) where T = T
+names(::Sample{T}) where {T} = T
 
 """
     vars(Sample)
@@ -88,7 +88,7 @@ end
 Maps the function `f` over the intersection of the keys of `a` and `b`.
 Returns a NamedTuple with the same keys as `a` which makes it type-stable.
 """
-function map_intersect(f, a::NamedTuple{T}, b::NamedTuple) where T
+function map_intersect(f, a::NamedTuple{T}, b::NamedTuple) where {T}
     vars = map(keys(a)) do k
         if k in keys(b)
             f(a[k], b[k])
@@ -108,9 +108,10 @@ If no intersection exists, the `default` value is used.
 For log-densities the reasonable default is 0.0 (summation).
 Non-logarithmic densities should use 1.0 as default (product).
 """
-map_models(f, models::NamedTuple, variables::NamedTuple; default::T=0.0) where T = map(keys(models)) do k
+map_models(f, models::NamedTuple, variables::NamedTuple; default=0.0) =
+    map(keys(models)) do k
         if k in keys(variables)
-            f(models[k], variables[k], variables) |> T
+            f(models[k], variables[k], variables)
         else
             default
         end
@@ -192,6 +193,7 @@ function AbstractMCMC.bundle_samples(
     step=1
 )
     # TODO make sure only to use relevant variables, for example only the ones specified by the variable names of the NamedTuple of models.
+    # TODO make sure to copy CuArrays to the CPU or we will run out of memory soon
     vars = map(vars, samples)
     TupleVector(vars[start:step:end])
 end
