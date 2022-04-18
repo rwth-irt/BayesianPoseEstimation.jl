@@ -22,7 +22,7 @@ end
 tiles = Tiles(2, 2, 6, 2, 3)
 M = rand(size(tiles)...)
 fn(x) = exp(x) + x
-models = fill(dist_nt.fn, tile_size(tiles))
+models = fill(fn, tile_size(tiles))
 res_cpu = mapreduce(models, +, M, tiles)
 res_gpu = mapreduce(CuArray(models), +, CuArray(M), tiles)
 @assert res_cpu ≈ Array(res_gpu)
