@@ -11,8 +11,7 @@ using MeasureTheory
 
 a_model = KernelProduct([KernelExponential(2.0f0), KernelExponential(1.0f0), KernelExponential(0.5f0)])
 rand(a_model)
-# WARN scalars need to be wrapped in VectorizedMeasure
-b_model = VectorizedMeasure([KernelExponential(2.0)])
+b_model = KernelExponential(2.0)
 rand(b_model)
 c_model = VectorizedMeasure(fill(KernelExponential(2.0), 3, 3))
 rand(c_model, 2)
@@ -22,5 +21,5 @@ s = rand(prior_model)
 prior_model = IndependentPrior((; a=a_model, b=b_model, c=c_model))
 s = rand(prior_model)
 logdensity(prior_model, s)
-# WARN granularity for CPU / GPU of different components? Use mutating version!
-rand(CUDA.default_rng(), vector_model)
+# WARN granularity for CPU / GPU of different components? Use mutating version in performance critical code.
+s_gpu = rand(CUDA.default_rng(), prior_model)
