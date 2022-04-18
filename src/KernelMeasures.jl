@@ -59,9 +59,7 @@ end
 The primitive random numbers are transformed by broadcasting `transform_rand` for the measures `D` over `A` to mutate `A`
 """
 function broadcast_transform_rand!(D::AbstractArray{<:AbstractKernelMeasure}, A::AbstractArray, B::AbstractArray...)
-    println(typeof(A), typeof(D))
     M = maybe_cuda(A, D)
-    println(typeof(A), typeof(M))
     A .= transform_rand.(M, A, B...)
 end
 
