@@ -2,6 +2,7 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
+using DensityInterface
 using LogExpFunctions
 using MeasureTheory
 using KeywordCalls
@@ -87,7 +88,7 @@ MeasureTheory.insupport(d::MixtureMeasure, x) = reduce(&, d.components)
 
 Base.show(io::IO, d::MixtureMeasure) = print(io, "MixtureMeasure\n  components: [$(d.components)]\n  weights: $(d.weights))")
 
-MeasureTheory.logdensity_def(μ::MixtureMeasure, x)::Float64 = logsumexp(log(w) + MeasureTheory.logdensityof(m, x) for (w, m) in zip(μ.weights, μ.components))
+MeasureTheory.logdensity_def(μ::MixtureMeasure, x)::Float64 = logsumexp(log(w) + logdensityof(m, x) for (w, m) in zip(μ.weights, μ.components))
 MeasureTheory.basemeasure(::MixtureMeasure) = Lebesgue(ℝ)
 
 Base.rand(rng::AbstractRNG, T::Type, μ::MixtureMeasure) = rand(rng, T, μ.components[sample(rng, μ.weights)])
@@ -111,7 +112,7 @@ MeasureTheory.insupport(d::BinaryMixture, x) = insupport(d.c1, x) && insupport(d
 
 Base.show(io::IO, d::BinaryMixture) = print(io, "BinaryMixture\ncomponents: $(d.c1), $(d.c2) \n  log weights: $(d.log_w1), $(d.log_w2)")
 
-MeasureTheory.logdensity_def(μ::BinaryMixture, x)::Float64 = logaddexp(μ.log_w1 + MeasureTheory.logdensityof(μ.c1, x), μ.log_w2 + MeasureTheory.logdensityof(μ.c2, x))
+MeasureTheory.logdensity_def(μ::BinaryMixture, x)::Float64 = logaddexp(μ.log_w1 + logdensityof(μ.c1, x), μ.log_w2 + logdensityof(μ.c2, x))
 MeasureTheory.basemeasure(::BinaryMixture) = Lebesgue(ℝ)
 
 function Base.rand(rng::AbstractRNG, T::Type, μ::BinaryMixture)

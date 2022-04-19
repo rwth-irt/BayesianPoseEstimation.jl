@@ -4,7 +4,6 @@
 
 using CUDA
 using DensityInterface
-using MeasureTheory
 using MCMCDepth
 using LogExpFunctions
 using Logging
@@ -37,6 +36,7 @@ Most of the time Float64 precision is not required, especially for GPU computati
 Thus, we default to Float32, mostly for memory capacity reasons.
 """
 abstract type AbstractKernelDistribution{T} end
+
 const KernelOrKernelArray{T} = Union{AbstractKernelDistribution{T},AbstractArray{<:AbstractKernelDistribution{T}}}
 
 # DensityInterface
@@ -49,22 +49,24 @@ Uses broadcasting for arrays.
 """
 DensityInterface.logdensityof(d::AbstractKernelDistribution, x) = _logdensity_of(d, x)
 
-# Avoid ambiguities by not specializing x for logdensityof
+# Specialization would cause ambiguities: DensityInterface.logdensityof(d::AbstractKernelDistribution, x::AbstractArray)
+
 _logdensity_of(d::AbstractKernelDistribution, x) = logpdf(d, x)
 _logdensity_of(d::AbstractKernelDistribution, x::AbstractArray) = logpdf.((d,), x)
+
 function _logdensityof(D::AbstractArray{<:AbstractKernelDistribution}, x)
     D = maybe_cuda(x, D)
     logpdf.(D, x)
 end
 
 # Random interface
-# Quite elaborate to use CUDA.RNG inside the kernel
 
 """
     rand!(rng, d, A)
 Mutate the array A by sampling from the distribution `d`.
 """
 Random.rand!(rng::AbstractRNG, d::KernelOrKernelArray, A::AbstractArray) = _rand!(rng, d, A)
+
 """
     rand(rng, m, dims)
 Sample an Array from the distribution `d` of size `dims`.
@@ -85,23 +87,28 @@ Random.rand!(d::AbstractKernelDistribution, A::AbstractArray) = rand!(Random.GLO
 Base.rand(d::AbstractKernelDistribution, dims::Integer...) = rand(Random.GLOBAL_RNG, d, dims...)
 Base.rand(d::AbstractKernelDistribution) = rand(Random.GLOBAL_RNG, d)
 
-
 # CPU implementation
 
-_rand!(rng::AbstractRNG, d, A::Array) = cpu_rand!(rng, d, A)
-function cpu_rand!(rng::AbstractRNG, d::AbstractKernelDistribution, A::Array)
+# _rand!(rng::AbstractRNG, d, A::Array) = cpu_rand!(rng, d, A)
+
+function _rand!(rng::AbstractRNG, d::AbstractKernelDistribution, A::Array)
     A .= rand.((rng,), (d,))
 end
-function cpu_rand!(rng::AbstractRNG, D::AbstractArray{<:AbstractKernelDistribution}, A::Array)
+
+function _rand!(rng::AbstractRNG, D::AbstractArray{<:AbstractKernelDistribution}, A::Array)
     A .= rand.((rng,), D)
 end
 
 # GPU implementation
 
+function _rand!(rng::AbstractRNG, D::KernelOrKernelArray, A::CuArray{T}) where {T}
+    @warn "Using unsupported RNG of type $(typeof(rng)) on CuArray. Falling back to SLOW sampling on CPU and copying it to the GPU."
+    copyto!(A, rand!(rng, D, Array{T}(undef, size(A)...)))
+end
+
 function _rand!(rng::CUDA.RNG, d::KernelOrKernelArray, A::CuArray)
-    # WARN any RNG other than CUDA.RNG must run on the CPU and copy the data to the GPU → SLOW
     d = maybe_cuda(A, d)
-    gpu_rand!(d, A, rng.seed, rng.counter)
+    rand_barrier(d, A, rng.seed, rng.counter)
     new_counter = Int64(rng.counter) + length(A)
     overflow, remainder = fldmod(new_counter, typemax(UInt32))
     rng.seed += overflow
@@ -109,13 +116,14 @@ function _rand!(rng::CUDA.RNG, d::KernelOrKernelArray, A::CuArray)
     return A
 end
 
-# Function barrier for CUDA.RNG.seed / counter
+# Function barrier for CUDA.RNG which is not isbits.
 # Wrapping rng in Tuple for broadcasting does not work → anonymous function is the workaround 
 # Thanks vchuravy https://github.com/JuliaGPU/CUDA.jl/issues/1480#issuecomment-1102245813
-function gpu_rand!(d::AbstractKernelDistribution, A::CuArray, seed, counter)
+function rand_barrier(d::AbstractKernelDistribution, A::CuArray, seed, counter)
     A .= (x -> rand(device_rng(seed, counter), x)).((d,))
 end
-function gpu_rand!(D::CuArray{<:AbstractKernelDistribution}, A::CuArray, seed, counter)
+
+function rand_barrier(D::CuArray{<:AbstractKernelDistribution}, A::CuArray, seed, counter)
     A .= (x -> rand(device_rng(seed, counter), x)).(D)
 end
 
@@ -128,8 +136,8 @@ CuArray for CUD
 """
 array_for_rng(::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = Array{T}(undef, dims...)
 array_for_rng(::CUDA.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
-# TODO not supported in device_rng yet
-# array_for_rng(::CURAND.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
+# TODO not supported on GPU yet
+array_for_rng(::CURAND.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
 
 """
     maybe_cuda
@@ -272,152 +280,4 @@ function Base.rand(rng::AbstractRNG, d::KernelBinaryMixture{T}) where {T}
     else
         rand(rng, d.c2)
     end
-end
-
-# TODO move to separate file.
-# AbstractVectorizedKernel
-
-"""
-Vectorization support by storing multiple measures in an array for broadcasting.
-
-Implement:
-- MeasureTheory.marginals(): Return the internal array of measures
-- DensityInterface.logdensityof(d::AbstractVectorizedKernel, x)
-
-You can use:
-- as
-- rand & rand!
-- to_cpu(d)
-- to_gpu(d)
-"""
-abstract type AbstractVectorizedKernel{T} <: AbstractKernelDistribution{T} end
-
-"""
-    to_cpu(d)
-Transfer the internal distributions to the CPU.
-"""
-to_cpu(d::T) where {T<:AbstractVectorizedKernel} = T.name.wrapper(Array(marginals(d)))
-
-"""
-    to_gpu(d)
-Transfer the internal distributions to the GPU.
-"""
-to_gpu(d::T) where {T<:AbstractVectorizedKernel} = T.name.wrapper(CuArray(marginals(d)))
-
-"""
-    rand(rng, m, dims)
-Mutate the array `A` by sampling from the distribution `d`.
-"""
-Random.rand!(rng::AbstractRNG, d::AbstractVectorizedKernel, A::AbstractArray) = rand!(rng, marginals(d), A)
-
-"""
-    rand(rng, m, dims)
-Sample an array from the distribution `d` of size `dims`.
-"""
-Base.rand(rng::AbstractRNG, d::AbstractVectorizedKernel, dims::Integer...) = rand(rng, marginals(d), size(marginals(d))..., dims...)
-
-"""
-    rand(rng, m, dims)
-Sample an array from the distribution `d` of size 1.
-"""
-Base.rand(rng::AbstractRNG, d::AbstractVectorizedKernel) = rand(rng, marginals(d), size(marginals(d))..., 1)
-
-"""
-    as(d)
-Scalar transform variable for the marginals
-"""
-TransformVariables.as(d::AbstractVectorizedKernel) = marginals(d) |> first |> as
-
-"""
-    measure_theory(d)
-Converts the vectorized kernel distribution to a product measure.
-"""
-measure_theory(d::AbstractVectorizedKernel) = MeasureBase.productmeasure(marginals(d) |> Array .|> measure_theory)
-
-# KernelProduct
-
-"""
-    KernelProduct
-Assumes independent marginals, whose logdensity is the sum of each individual logdensity (like the MeasureTheory Product measure).
-"""
-struct KernelProduct{T<:Real,U<:AbstractKernelDistribution{T},V<:AbstractArray{U}} <: AbstractVectorizedKernel{T}
-    # WARN CUDA kernels only work for the same Measure with different parametrization
-    marginals::V
-end
-
-"""
-    KernelProduct(d,T)
-Convert a MeasureTheory AbstractProductMeasure to a KernelProduct.
-Warning: The marginals of the measure must be of the same type to transfer them to an CuArray.
-"""
-KernelProduct(d::AbstractProductMeasure, T::Type=Float32) = kernel_distribution.(marginals(d), (T,)) |> KernelProduct
-
-"""
-    KernelProduct(d)
-Convert an AbstractVectorizedKernel to a KernelVectorized.
-"""
-KernelProduct(d::AbstractVectorizedKernel) = KernelProduct(marginals(d))
-
-MeasureTheory.marginals(d::KernelProduct) = d.marginals
-
-Base.show(io::IO, d::KernelProduct{T}) where {T} = print(io, "KernelProduct{$(T)}\n  marginals: $(typeof(d.marginals))\n  size: $(size(d.marginals))")
-
-function DensityInterface.logdensityof(d::KernelProduct, x)
-    ℓ = _logdensityof(d.marginals, x)
-    sum(ℓ)
-end
-
-# KernelVectorized
-
-"""
-    KernelVectorized
-Behaves similar to the ProductKernel but assumes a vectorization of the data over last dimension.
-"""
-struct KernelVectorized{T<:Real,U<:AbstractKernelDistribution{T},V<:AbstractArray{U}} <: AbstractVectorizedKernel{T}
-    marginals::V
-end
-
-"""
-    KernelVectorized(d)
-Convert an AbstractVectorizedKernel to a KernelVectorized.
-"""
-KernelVectorized(d::AbstractVectorizedKernel) = KernelVectorized(marginals(d))
-
-"""
-    KernelVectorized(d)
-Convert a KernelProduct to a KernelVectorized.
-"""
-KernelVectorized(d::KernelProduct, T::Type=Float32) = kernel_distribution.(marginals(d), (T,)) |> KernelVectorized
-
-"""
-    KernelVectorized(d)
-Convert a AbstractProductMeasure to a KernelVectorized.
-"""
-KernelVectorized(d::AbstractProductMeasure, T::Type=Float32) = kernel_distribution.(marginals(d), (T,)) |> KernelVectorized
-
-"""
-    kernel_distribution(d, T)
-Default is a KernelVectorized which reduces to KernelProduct in case the size of the marginals and the data matches.
-"""
-kernel_distribution(d::AbstractProductMeasure, T::Type=Float32) = KernelVectorized(d, T)
-
-MeasureTheory.marginals(d::KernelVectorized) = d.marginals
-
-Base.show(io::IO, d::KernelVectorized{T}) where {T} = print(io, "KernelVectorized{$(T)}\n  marginals: $(eltype(d.marginals)) \n  size: $(size(d.marginals))")
-
-Base.size(d::KernelVectorized) = d.size
-
-"""
-    reduce_vectorized(op, d, A)
-Reduces the first `ndims(d)` dimensions of the Matrix `A` using the operator `op`. 
-"""
-function reduce_vectorized(op, d::KernelVectorized, A::AbstractArray)
-    n_red = ndims(marginals(d))
-    R = reduce(op, A; dims=(1:n_red...,))
-    dropdims(R; dims=(1:n_red...,))
-end
-
-function DensityInterface.logdensityof(d::KernelVectorized, x)
-    ℓ = _logdensityof(d.marginals, x)
-    reduce_vectorized(+, d, ℓ)
 end

@@ -11,15 +11,18 @@ include("Proposals.jl")
 include("Parameters.jl")
 include("FunctionManipulation.jl")
 include("PriorModel.jl")
-include("Models.jl")
+# TODO re-add or split?
+# include("Models.jl")
 include("MetropolisHastings.jl")
 include("Gibbs.jl")
 include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
 include("MeasureTheoryExtensions.jl")
-include("KernelMeasures.jl")
 include("MeasureTheoryAdapter.jl")
+include("KernelMeasures.jl")
+include("VectorizedDistributions.jl")
+include("KernelMeasureAdapter.jl")
 include("Tiles.jl")
 # Inference
 include("Main.jl")
@@ -93,21 +96,29 @@ export polar_histogram_variable
 export scatter_position
 
 # Extensions
+
+# TODO Re-export
+# import DensityInterface: logdensityof
+# export logdensityof
+export as, rand!
+
 export as○, as_circular
 export BinaryMixture
 export CircularUniform
 export MixtureMeasure
 export UniformInterval
 
-export AbstractKernelMeasure
-export measure_theory, kernel_measure
+export AbstractKernelDistribution
+export measure_theory, kernel_distribution
 export KernelBinaryMixture
 export KernelCircularUniform
 export KernelExponential
 export KernelNormal
 export KernelUniform
-export KernelProduct
-export VectorizedMeasure
+
+# Vectorized distributions
+export ProductDistribution
+export VectorizedDistribution
 export to_cpu, to_gpu
 
 # Main script
