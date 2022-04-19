@@ -6,6 +6,9 @@ using Plots
 using Random
 using Test
 
+const PLOT = false
+maybe_histogram(x...) = PLOT ? histogram(x...) : nothing
+
 gn = Normal(10.0, 2.0) |> kernel_distribution
 # Yup 42 is bad style, like this emoji 🤣
 curng = CUDA.RNG(42)
@@ -14,12 +17,22 @@ M = rand(curng, gn, 100, 100)
 M = rand(curng, CUDA.fill(gn, 10), 10, 100)
 M = rand(curng, fill(gn, 10), 10, 100)
 
-# Correct device
-@test rand(curng, KernelNormal(), 100, 100) isa CuArray
-@test rand(rng, KernelNormal(), 100, 100) isa Array
-# @test rand(CURAND.default_rng(), KernelNormal(), 100, 100) isa CuArray
+# Correct device for RNG
+@test rand(CUDA.RNG(), KernelNormal(), 100, 100) isa CuArray
+@test rand(CURAND.RNG(), KernelNormal(), 100, 100) isa CuArray
+@test rand(Random.default_rng(), KernelNormal(), 100, 100) isa Array
+@test rand(MersenneTwister(), KernelNormal(), 100, 100) isa Array
 
-# TODO more @inferred
+@test rand!(CUDA.RNG(), KernelNormal(), Array{Float16}(undef, 100, 100)) isa Array{Float16}
+@test rand!(CURAND.RNG(), KernelNormal(), Array{Float16}(undef, 100, 100)) isa Array{Float16}
+@test rand!(Random.default_rng(), KernelNormal(), Array{Float16}(undef, 100, 100)) isa Array{Float16}
+@test rand!(MersenneTwister(), KernelNormal(), Array{Float16}(undef, 100, 100)) isa Array{Float16}
+
+@test rand!(CUDA.RNG(), KernelNormal(), CuArray{Float16}(undef, 100, 100)) isa CuArray{Float16}
+@test rand!(CURAND.RNG(), KernelNormal(), CuArray{Float16}(undef, 100, 100)) isa CuArray{Float16}
+@test rand!(Random.default_rng(), KernelNormal(), CuArray{Float16}(undef, 100, 100)) isa CuArray{Float16}
+@test rand!(MersenneTwister(), KernelNormal(), CuArray{Float16}(undef, 100, 100)) isa CuArray{Float16}
+
 # KernelNormal
 M = @inferred rand(curng, KernelNormal(Float64), 100, 100)
 @test eltype(M) == Float64
@@ -32,8 +45,8 @@ M = @inferred rand(curng, KernelNormal(Float16), 100, 100)
 
 gn = Normal(10.0, 2.0) |> kernel_distribution
 M = rand(curng, gn, 100, 100)
-histogram(flatten(M))
-histogram([rand(measure_theory(gn)) for _ in 1:100*100])
+maybe_histogram(flatten(M))
+maybe_histogram([rand(measure_theory(gn)) for _ in 1:100*100])
 @inferred logdensityof(gn, M)
 @test logdensityof(gn, 1.0) ≈ logdensityof(measure_theory(gn), 1.0)
 
@@ -109,29 +122,29 @@ histogram([rand(measure_theory(gbm)) for _ in 1:100*100])
 @test logdensityof(gbm, 1.0) ≈ logdensityof(measure_theory(gbm), 1.0)
 
 # WARN Different measure types not supported only different parametrization of the same type
-# KernelProduct
+# ProductDistribution
 pm = For(100, 100) do i, j
     BinaryMixture(Exponential(2.0), Normal(10.0, 2), 3, 1)
 end;
-gpm = KernelProduct(pm)
+gpm = ProductDistribution(pm)
 M = @inferred rand(rng, gpm)
 M = @inferred rand(curng, gpm)
 gpm = to_gpu(gpm)
 M = @inferred rand(curng, gpm)
-gpm = KernelProduct(pm, Float64) |> to_gpu
+gpm = ProductDistribution(pm, Float64) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float64
-gpm = KernelProduct(pm, Float32) |> to_gpu
+gpm = ProductDistribution(pm, Float32) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float32
-gpm = KernelProduct(pm) |> to_gpu
+gpm = ProductDistribution(pm) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float32
-gpm = KernelProduct(pm, Float16) |> to_gpu
+gpm = ProductDistribution(pm, Float16) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float16
 
-gpm = KernelProduct(pm) |> to_gpu
+gpm = ProductDistribution(pm) |> to_gpu
 M = rand(curng, gpm);
 histogram(flatten(M))
 rand(measure_theory(gpm)) |> flatten |> histogram
@@ -139,31 +152,31 @@ rand(curng, gpm, 10) |> flatten |> histogram
 @inferred logdensityof(gpm, M)
 @test logdensityof(gpm, M) ≈ logdensityof(measure_theory(gpm), Array(M))
 
-# KernelVectorized
+# VectorizedDistribution
 pm = For(100, 100) do i, j
     Normal(i, j)
 end;
-gvm = KernelVectorized(pm)
-@test kernel_distribution(pm) isa KernelVectorized
+gvm = VectorizedDistribution(pm)
+@test kernel_distribution(pm) isa VectorizedDistribution
 
 M = @inferred rand(rng, gvm)
 M = @inferred rand(curng, gvm)
 gvm = to_gpu(gvm)
 M = @inferred rand(curng, gvm)
-gvm = KernelVectorized(pm, Float64) |> to_gpu
+gvm = VectorizedDistribution(pm, Float64) |> to_gpu
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float64
-gvm = KernelVectorized(pm, Float32) |> to_gpu
+gvm = VectorizedDistribution(pm, Float32) |> to_gpu
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float32
-gvm = KernelVectorized(pm) |> to_gpu
+gvm = VectorizedDistribution(pm) |> to_gpu
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float32
-gvm = KernelVectorized(pm, Float16) |> to_gpu
+gvm = VectorizedDistribution(pm, Float16) |> to_gpu
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float16
 
-gvm = KernelVectorized(pm, Float32) |> to_gpu
+gvm = VectorizedDistribution(pm, Float32) |> to_gpu
 M = rand(curng, gvm)
 histogram(flatten(M))
 rand(measure_theory(gvm)) |> flatten |> histogram
@@ -174,9 +187,9 @@ rand(curng, gvm, 10) |> flatten |> histogram
 # Broadcasting AbstractVectorizedKernel
 pm = For(10, 10) do i, j
     Normal(i, j)
-end
-gpm = KernelProduct(pm) |> to_gpu
-gvm = KernelVectorized(pm) |> to_gpu
+end;
+gpm = ProductDistribution(pm) |> to_gpu
+gvm = VectorizedDistribution(pm) |> to_gpu
 
 M = @inferred rand(curng, gvm, 100, 5);
 @inferred logdensityof(gpm, M)
