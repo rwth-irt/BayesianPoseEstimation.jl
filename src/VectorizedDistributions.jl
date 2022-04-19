@@ -12,7 +12,7 @@ Vectorization support by storing multiple measures in an array for broadcasting.
 
 Implement:
 - MeasureTheory.marginals(): Return the internal array of measures
-- DensityInterface.logdensityof(d::AbstractVectorizedKernel, x)
+- DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x)
 
 You can use:
 - TransformVariables.as
@@ -20,7 +20,7 @@ You can use:
 - to_cpu(d)
 - to_gpu(d)
 """
-abstract type AbstractVectorizedDistribution{T} <: AbstractKernelDistribution{T} end
+abstract type AbstractVectorizedDistribution{T} end
 
 """
     to_cpu(d)
@@ -78,7 +78,7 @@ MeasureBase.marginals(d::VectorizedDistribution) = d.marginals
 
 """
     VectorizedDistribution(d)
-Convert an AbstractVectorizedKernel to a VectorizedDistribution.
+Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
 """
 VectorizedDistribution(d::AbstractVectorizedDistribution) = VectorizedDistribution(marginals(d))
 
@@ -133,7 +133,7 @@ ProductDistribution(d::AbstractProductMeasure, T::Type=Float32) = kernel_distrib
 
 """
     ProductDistribution(d)
-Convert an AbstractVectorizedKernel to a VectorizedDistribution.
+Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
 """
 ProductDistribution(d::AbstractVectorizedDistribution) = ProductDistribution(marginals(d))
 
