@@ -18,8 +18,6 @@ include("Gibbs.jl")
 include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
-include("MeasureTheoryExtensions.jl")
-include("MeasureTheoryAdapter.jl")
 include("KernelDistributions.jl")
 include("VectorizedDistributions.jl")
 include("KernelMeasureAdapter.jl")
@@ -95,19 +93,7 @@ export polar_density_variable
 export polar_histogram_variable
 export scatter_position
 
-# Extensions
-
-# TODO Re-export
-# import DensityInterface: logdensityof
-# export logdensityof
-export as, rand!
-
-export as○, as_circular
-export BinaryMixture
-export CircularUniform
-export MixtureMeasure
-export UniformInterval
-
+# Kernel distributions
 export AbstractKernelDistribution
 export measure_theory, kernel_distribution
 export KernelBinaryMixture
@@ -120,6 +106,14 @@ export KernelUniform
 export ProductDistribution
 export VectorizedDistribution
 export to_cpu, to_gpu
+
+# Extensions
+using Reexport
+
+@reexport import DensityInterface: logdensityof
+@reexport import TransformVariables: as
+export as○, as_circular
+@reexport import Random: rand!
 
 # Main script
 export destroy_render_context

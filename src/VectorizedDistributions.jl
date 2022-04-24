@@ -4,15 +4,14 @@
 
 using CUDA
 using DensityInterface
-using MeasureBase
 using TransformVariables
 
 """
-Vectorization support by storing multiple measures in an array for broadcasting.
+Vectorization support by storing multiple distributions in an array for broadcasting.
 
 Implement:
-- MeasureTheory.marginals(): Return the internal array of measures
-- DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x)
+- marginals(): Return the internal array of distributions
+- DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x) - use logdensityof for arrays of KernelDistributions
 
 You can use:
 - TransformVariables.as
@@ -58,12 +57,6 @@ Scalar transform variable for the marginals
 """
 TransformVariables.as(d::AbstractVectorizedDistribution) = marginals(d) |> first |> as
 
-"""
-    measure_theory(d)
-Converts the vectorized kernel distribution to a product measure.
-"""
-measure_theory(d::AbstractVectorizedDistribution) = MeasureBase.productmeasure(marginals(d) |> Array .|> measure_theory)
-
 # VectorizedDistribution
 
 """
@@ -74,25 +67,13 @@ struct VectorizedDistribution{T<:Real,U<:AbstractKernelDistribution{T},V<:Abstra
     marginals::V
 end
 
-MeasureBase.marginals(d::VectorizedDistribution) = d.marginals
+marginals(d::VectorizedDistribution) = d.marginals
 
 """
     VectorizedDistribution(d)
 Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
 """
 VectorizedDistribution(d::AbstractVectorizedDistribution) = VectorizedDistribution(marginals(d))
-
-"""
-    VectorizedDistribution(d)
-Convert a AbstractProductMeasure to a VectorizedDistribution.
-"""
-VectorizedDistribution(d::AbstractProductMeasure, T::Type=Float32) = kernel_distribution.(marginals(d), (T,)) |> VectorizedDistribution
-
-"""
-    kernel_distribution(d, T)
-Default is a VectorizedDistribution which reduces to ProductDistribution in case the size of the marginals and the data matches.
-"""
-kernel_distribution(d::AbstractProductMeasure, T::Type=Float32) = VectorizedDistribution(d, T)
 
 Base.show(io::IO, d::VectorizedDistribution{T}) where {T} = print(io, "VectorizedDistribution{$(T)}\n  marginals: $(eltype(d.marginals)) \n  size: $(size(d.marginals))")
 
@@ -109,7 +90,7 @@ function reduce_vectorized(op, d::VectorizedDistribution, A::AbstractArray)
 end
 
 function DensityInterface.logdensityof(d::VectorizedDistribution, x)
-    ℓ = _logdensityof(d.marginals, x)
+    ℓ = logdensityof(d.marginals, x)
     reduce_vectorized(+, d, ℓ)
 end
 
@@ -120,16 +101,9 @@ end
 Assumes independent marginals, whose logdensity is the sum of each individual logdensity (like the MeasureTheory Product measure).
 """
 struct ProductDistribution{T<:Real,U<:AbstractKernelDistribution{T},V<:AbstractArray{U}} <: AbstractVectorizedDistribution{T}
-    # WARN CUDA kernels only work for the same Measure with different parametrization
+    # WARN CUDA kernels only work for the same distribution with different parametrization
     marginals::V
 end
-
-"""
-    ProductDistribution(d,T)
-Convert a MeasureTheory AbstractProductMeasure to a ProductDistribution.
-Warning: The marginals of the measure must be of the same type to transfer them to an CuArray.
-"""
-ProductDistribution(d::AbstractProductMeasure, T::Type=Float32) = kernel_distribution.(marginals(d), (T,)) |> ProductDistribution
 
 """
     ProductDistribution(d)
@@ -137,11 +111,11 @@ Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
 """
 ProductDistribution(d::AbstractVectorizedDistribution) = ProductDistribution(marginals(d))
 
-MeasureBase.marginals(d::ProductDistribution) = d.marginals
+marginals(d::ProductDistribution) = d.marginals
 
 Base.show(io::IO, d::ProductDistribution{T}) where {T} = print(io, "ProductDistribution{$(T)}\n  marginals: $(typeof(d.marginals))\n  size: $(size(d.marginals))")
 
 function DensityInterface.logdensityof(d::ProductDistribution, x)
-    ℓ = _logdensityof(d.marginals, x)
+    ℓ = logdensityof(d.marginals, x)
     sum(ℓ)
 end
