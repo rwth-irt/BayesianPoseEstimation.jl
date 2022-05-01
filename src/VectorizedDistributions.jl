@@ -11,15 +11,18 @@ Vectorization support by storing multiple distributions in an array for broadcas
 
 Implement:
 - marginals(): Return the internal array of distributions
-- DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x) - use logdensityof for arrays of KernelDistributions
+- reduce_vectorized(op, d::AbstractVectorizedDistribution, A::AbstractArray) - individual reduction strategy, used in logdensityof
 
 You can use:
+- DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x) - use logdensityof for arrays of KernelDistributions
 - TransformVariables.as
 - rand & rand!
 - to_cpu(d)
 - to_gpu(d)
 """
 abstract type AbstractVectorizedDistribution{T} end
+
+DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x) = reduce_vectorized(+, d, logdensityof(marginals(d), x))
 
 """
     to_cpu(d)
@@ -89,11 +92,6 @@ function reduce_vectorized(op, d::VectorizedDistribution, A::AbstractArray)
     dropdims(R; dims=(1:n_red...,))
 end
 
-function DensityInterface.logdensityof(d::VectorizedDistribution, x)
-    ℓ = logdensityof(d.marginals, x)
-    reduce_vectorized(+, d, ℓ)
-end
-
 # ProductDistribution
 
 """
@@ -115,7 +113,8 @@ marginals(d::ProductDistribution) = d.marginals
 
 Base.show(io::IO, d::ProductDistribution{T}) where {T} = print(io, "ProductDistribution{$(T)}\n  marginals: $(typeof(d.marginals))\n  size: $(size(d.marginals))")
 
-function DensityInterface.logdensityof(d::ProductDistribution, x)
-    ℓ = logdensityof(d.marginals, x)
-    sum(ℓ)
-end
+"""
+    reduce_vectorized(op, d, A)
+Reduces all dimensions of the Matrix `A` using the operator `op`. 
+"""
+reduce_vectorized(op, ::ProductDistribution, A::AbstractArray) = reduce(op, A)

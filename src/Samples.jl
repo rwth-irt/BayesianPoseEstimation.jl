@@ -99,7 +99,7 @@ function map_intersect(f, a::NamedTuple{T}, b::NamedTuple) where {T}
     NamedTuple{T}(vars)
 end
 
-# TODO this implies, that all necessary variables are expected to be present in the sample. Thus, proposals need to include internal variables like the expected depth. Filter out irrelevant variables when returning the state in the sampler.
+# TODO this implies, that all necessary variables are expected to be present in the sample. Thus, proposals need to include internal variables like the expected depth. Filter out irrelevant variables when returning the state in the sampler. Alternatively only calculate internal variables in the likelihood function.
 """
     map_models(f, models, vars; default)
 Map the function `f(model, variable, variables)` over each `model` and `variable`.

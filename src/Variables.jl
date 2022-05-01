@@ -4,12 +4,36 @@
 
 using Accessors
 using CUDA
+# using SciGL
 using TransformVariables
 
 """
 Implement model_value and raw_value for the constrained model domain and the unconstrained sampling domain.
 """
 abstract type AbstractVariable end
+
+"""
+    model_value_and_logjac(v::AbstractVariable)
+A wrapper around transform_and_logjac which allows us to only broadcast when necessary.
+"""
+model_value_and_logjac(v::AbstractVariable) = model_value_and_logjac(transformation(v), raw_value(v))
+
+"""
+    model_value_and_logjac(tr, raw_value)
+A wrapper around transform_and_logjac which allows us to only broadcast when necessary.
+"""
+model_value_and_logjac(tr::TransformVariables.ScalarTransform, raw_value) = transform_and_logjac(tr, raw_value)
+
+"""
+    model_value_and_logjac(tr, raw_value)
+A wrapper around transform_and_logjac which allows us to only broadcast when necessary.
+Returns two arrays `(model_values, logjacs)` instead of one array of tuples.
+"""
+function model_value_and_logjac(transformation::TransformVariables.ScalarTransform, raw_values::AbstractArray)
+    tuple = transform_and_logjac.((transformation,), raw_values)
+    first.(tuple), last.(tuple)
+end
+
 
 """
     SampleVariable(value, transformation)
@@ -27,7 +51,7 @@ SampleVariable(x::AbstractVariable) = SampleVariable(raw_value(x), transformatio
 Base.convert(::Type{SampleVariable}, x::AbstractVariable) = SampleVariable(x)
 
 """
-    state(s)
+    model_value(s)
 Value of the variable in the model domain.
 """
 model_value(s::SampleVariable) = transform.(s.transformation, s.value)
@@ -60,10 +84,17 @@ ModelVariable(x::AbstractVariable) = ModelVariable(model_value(x), transformatio
 Base.convert(::Type{ModelVariable}, x::AbstractVariable) = ModelVariable(x)
 
 """
-    state(s)
+    model_value(s)
 Value of the variable in the model domain.
 """
 model_value(s::ModelVariable) = s.value
+
+
+"""
+    model_value_and_logjac(v::AbstractVariable)
+When sampling in model space, we do not require any transformation or logjac correction.
+"""
+model_value_and_logjac(v::ModelVariable) = model_value(v), zero(model_value(v))
 
 """
     raw_value(s)
@@ -111,3 +142,29 @@ function Base.:-(a::AbstractVariable, b::AbstractVariable)
     pa, pb = Base._promote(a, b)
     @set pa.value = pa.value .- pb.value
 end
+
+# TODO does it make sense?
+# """
+#     RenderVariable(value, transformation)
+# Intended for intermediate values which are neither the state variables nor the observation.
+# The value could be a Texture, CuArray or CPU Array, while tiles contains the viewports.
+
+# Addition and subtraction do not make sense and might not even be possible on a readonly texture.
+# Even though strictly speaking, depth images only cover ℝ₊ we assume support on ℝ, so the transformation is always the identity.
+# """
+# struct RenderVariable{V} <: AbstractVariable
+#     value::V
+#     tiles::Tiles
+# end
+
+# """
+#     model_value(s)
+# Value of the variable in the model domain.
+# """
+# model_value(s::RenderVariable) = s.value
+
+# """
+#     raw_value(s)
+# Value of the variable in the unconstrained domain.
+# """
+# raw_value(s::RenderVariable) = s.value

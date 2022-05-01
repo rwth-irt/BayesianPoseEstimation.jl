@@ -34,20 +34,26 @@ Thus, we default to Float32, mostly for memory capacity reasons.
 """
 abstract type AbstractKernelDistribution{T} end
 
-const KernelOrKernelArray{T} = Union{AbstractKernelDistribution{T},AbstractArray{<:AbstractKernelDistribution{T}}}
+# WARN parametric alias causes method ambiguities, since the parametric type is always present
+const KernelOrKernelArray = Union{AbstractKernelDistribution,AbstractArray{<:AbstractKernelDistribution}}
 
 # DensityInterface
 
 @inline DensityInterface.DensityKind(::AbstractKernelDistribution) = IsDensity()
+
+# KernelOrKernelArray should have the same behavior interface
 """
     logdensityof(d, x)
 Implement DensityInterface, by providing the normalized logdensity of the distribution.
 Uses broadcasting for arrays.
 """
-DensityInterface.logdensityof(d::AbstractKernelDistribution, x) = logpdf(d, x)
-DensityInterface.logdensityof(d::AbstractKernelDistribution, x::AbstractArray) = logpdf.((d,), x)
+DensityInterface.logdensityof(d::KernelOrKernelArray, x) = _logdensityof(d, x)
 
-function DensityInterface.logdensityof(D::AbstractArray{<:AbstractKernelDistribution}, x)
+# KernelOrKernelArray in KernelDistributionsVariables.jl would cause ambiguities
+_logdensityof(d::AbstractKernelDistribution, x) = logpdf(d, x)
+_logdensityof(d::AbstractKernelDistribution, x::AbstractArray) = logpdf.((d,), x)
+
+function _logdensityof(D::AbstractArray{<:AbstractKernelDistribution}, x)
     D = maybe_cuda(x, D)
     logpdf.(D, x)
 end
@@ -61,24 +67,42 @@ Mutate the array A by sampling from the distribution `d`.
 Random.rand!(rng::AbstractRNG, d::KernelOrKernelArray, A::AbstractArray) = _rand!(rng, d, A)
 
 """
-    rand(rng, m, dims)
+    rand(rng, d, dims)
 Sample an Array from the distribution `d` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, d::KernelOrKernelArray{T}, dims::Integer...) where {T}
+function Base.rand(rng::AbstractRNG, d::AbstractKernelDistribution{T}, dims::Integer...) where {T}
     A = array_for_rng(rng, T, dims...)
     rand!(rng, d, A)
 end
 
 """
-    rand(rng, m)
+    rand(rng, d, dims)
+Sample an Array from the distribution `d` of size `dims`.
+"""
+function Base.rand(rng::AbstractRNG, d::AbstractArray{<:AbstractKernelDistribution{T}}, dims::Integer...) where {T}
+    A = array_for_rng(rng, T, dims...)
+    rand!(rng, d, A)
+end
+
+"""
+    rand(rng, d)
 Sample an Array from the distribution `d` of size 1.
 """
 Base.rand(rng::AbstractRNG, d::AbstractKernelDistribution) = rand(rng, d, 1)[]
+
+"""
+    rand(rng, d)
+Sample an Array from the array of distributions `d` with the size of d.
+"""
+Base.rand(rng::AbstractRNG, d::AbstractArray{<:AbstractKernelDistribution{T}}) where {T} = rand(rng, d, size(d)...)
 
 # Orthogonal methods
 Random.rand!(d::AbstractKernelDistribution, A::AbstractArray) = rand!(Random.GLOBAL_RNG, d, A)
 Base.rand(d::AbstractKernelDistribution, dims::Integer...) = rand(Random.GLOBAL_RNG, d, dims...)
 Base.rand(d::AbstractKernelDistribution) = rand(Random.GLOBAL_RNG, d)
+
+# Transform variables for arrays
+TransformVariables.as(A::AbstractArray{<:AbstractKernelDistribution}) = as(first(A))
 
 # CPU implementation
 
