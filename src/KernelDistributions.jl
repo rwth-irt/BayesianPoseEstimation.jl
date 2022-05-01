@@ -10,6 +10,9 @@ using Logging
 using Random
 using TransformVariables
 
+# TODO At one point most of the distributions could be replaced with Distributions.jl. Mixtures could be problematic as well as the transition from TransformVariables.jl to Bijectors.jl
+# TODO should open a pull request to fix type of https://github.com/JuliaStats/Distributions.jl/blob/d19ac4526bab2584a84323eea4af92805f99f034/src/univariate/continuous/uniform.jl#L120
+
 """
 MeasureTheory.jl is what I have used because of the nicer interface until now, but all the type are not isbits and can not be used on the GPU.
 Distributions.jl is pretty close but not perfect for the execution on the GPU:

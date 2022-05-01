@@ -4,7 +4,6 @@
 
 using DensityInterface
 
-# TODO rename to KernelDistributionsVariables.jl
 """
     KernelDistributionsAdapter
 Use KernelDistributions.jl with Variables.jl.

@@ -19,16 +19,17 @@ include("Visualization.jl")
 # Extensions
 include("TransformVariablesExtensions.jl")
 include("KernelDistributions.jl")
+include("KernelDistributionsVariables.jl")
 include("VectorizedDistributions.jl")
-include("KernelMeasureAdapter.jl")
+include("VectorizedDistributionsVariables.jl")
 include("Tiles.jl")
 # Inference
 include("Main.jl")
 
-# SampleVariables
+# Variables
 export ModelVariable
 export SampleVariable
-export model_value
+export model_value, model_value_and_logjac
 export raw_value
 
 # Samples
