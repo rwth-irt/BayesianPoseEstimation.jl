@@ -6,8 +6,10 @@
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
+using Bijectors
 using CUDA
 using DensityInterface
+using Distributions
 using MCMCDepth
 using Random
 using Test
@@ -34,36 +36,58 @@ using Test
 a_model = KernelExponential{Float16}(2.0)
 
 a_mvar = ModelVariable(Random.default_rng(), a_model)
-@inferred DensityInterface.logdensityof(a_model, a_mvar)
-@test DensityInterface.logdensityof(a_model, a_mvar) isa Float16
+@inferred logdensityof(a_model, a_mvar)
+@test logdensityof(a_model, a_mvar) isa Float16
 
 a_svar = SampleVariable(Random.default_rng(), a_model)
-@inferred DensityInterface.logdensityof(a_model, a_svar)
-@test DensityInterface.logdensityof(a_model, a_svar) isa Float16
+@inferred logdensityof(a_model, a_svar)
+@test logdensityof(a_model, a_svar) isa Float16
+
+# Bijector
+a_dist = Exponential(Float16(1 / 2.0))
+@test SampleVariable(a_mvar).value == bijector(a_dist)(a_mvar.value)
+@test logdensityof(a_model, a_mvar) == logdensityof(a_dist, a_mvar.value)
+@test logdensityof(a_model, a_svar) == logdensityof(transformed(a_dist), a_svar.value)
 
 # Array
 a_mvar = ModelVariable(CUDA.default_rng(), a_model, 3)
-@inferred DensityInterface.logdensityof(a_model, a_mvar)
-@test DensityInterface.logdensityof(a_model, a_mvar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(a_model, a_mvar) |> size == (3,)
+@inferred logdensityof(a_model, a_mvar)
+@test logdensityof(a_model, a_mvar) isa AbstractVector{Float16}
+@test logdensityof(a_model, a_mvar) |> size == (3,)
 
 a_svar = SampleVariable(CUDA.default_rng(), a_model, 3)
-@inferred DensityInterface.logdensityof(a_model, a_svar)
-@test DensityInterface.logdensityof(a_model, a_svar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(a_model, a_svar) |> size == (3,)
+@inferred logdensityof(a_model, a_svar)
+@test logdensityof(a_model, a_svar) isa AbstractVector{Float16}
+@test logdensityof(a_model, a_svar) |> size == (3,)
 
 b_model = fill(KernelExponential{Float16}(2.0), 3)
-@inferred DensityInterface.logdensityof(b_model, a_mvar)
-@test DensityInterface.logdensityof(b_model, a_mvar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(b_model, a_mvar) |> size == (3,)
+
+@inferred logdensityof(b_model, a_mvar)
+@test logdensityof(b_model, a_mvar) isa AbstractVector{Float16}
+@test logdensityof(b_model, a_mvar) |> size == (3,)
+
+b_mvar = ModelVariable(CUDA.default_rng(), b_model)
+@inferred logdensityof(b_model, b_mvar)
+@test logdensityof(b_model, b_mvar) isa AbstractVector{Float16}
+@test logdensityof(b_model, b_mvar) |> size == (3,)
 
 b_svar = SampleVariable(CUDA.default_rng(), b_model, 3)
-@inferred DensityInterface.logdensityof(CuArray(b_model), b_svar)
-@test DensityInterface.logdensityof(b_model, b_svar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(b_model, b_svar) |> size == (3,)
+@inferred logdensityof(CuArray(b_model), b_svar)
+@test logdensityof(b_model, b_svar) isa AbstractVector{Float16}
+@test logdensityof(b_model, b_svar) |> size == (3,)
 
-@test DensityInterface.logdensityof(b_model, a_mvar) == DensityInterface.logdensityof(a_model, a_mvar)
-@test DensityInterface.logdensityof(b_model, b_svar) == DensityInterface.logdensityof(a_model, b_svar)
+@test logdensityof(b_model, a_mvar) == logdensityof(a_model, a_mvar)
+@test logdensityof(b_model, b_svar) == logdensityof(a_model, b_svar)
+
+# Bijector
+@test SampleVariable(a_mvar).value == bijector(a_dist)(a_mvar.value)
+@test logdensityof(a_model, a_mvar) == logdensityof.(a_dist, a_mvar.value)
+@test logdensityof(a_model, a_svar) == logdensityof.(transformed(a_dist), a_svar.value)
+
+b_dists = fill(Exponential(Float16(1 / 2.0)), 3)
+@test SampleVariable(b_mvar).value == bijector(first(b_dists))(b_mvar.value)
+@test logdensityof(b_model, b_mvar) == logdensityof.(b_dists, Array(b_mvar.value))
+@test logdensityof(b_model, b_svar) == logdensityof.(transformed.(b_dists), Array(b_svar.value))
 
 # VectorizedDistribution Random 
 
@@ -86,23 +110,33 @@ b_svar = SampleVariable(CUDA.default_rng(), b_model, 3)
 
 a_model = VectorizedDistribution(fill(KernelExponential{Float16}(2.0), 3, 3))
 a_mvar = ModelVariable(CUDA.default_rng(), a_model, 4)
-@inferred DensityInterface.logdensityof(a_model, a_mvar)
-@test DensityInterface.logdensityof(a_model, a_mvar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(a_model, a_mvar) |> size == (4,)
+@inferred logdensityof(a_model, a_mvar)
+@test logdensityof(a_model, a_mvar) isa AbstractVector{Float16}
+@test logdensityof(a_model, a_mvar) |> size == (4,)
 
 a_svar = SampleVariable(CUDA.default_rng(), a_model, 4)
-@inferred DensityInterface.logdensityof(a_model, a_svar)
-@test DensityInterface.logdensityof(a_model, a_svar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(a_model, a_svar) |> size == (4,)
+@inferred logdensityof(a_model, a_svar)
+@test logdensityof(a_model, a_svar) isa AbstractVector{Float16}
+@test logdensityof(a_model, a_svar) |> size == (4,)
 
 b_model = ProductDistribution(fill(KernelExponential{Float16}(2.0), 3, 3))
-a_mvar = ModelVariable(CUDA.default_rng(), b_model, 4)
-@inferred DensityInterface.logdensityof(b_model, a_mvar)
-@test DensityInterface.logdensityof(b_model, a_mvar) isa Float16
+b_mvar = ModelVariable(CUDA.default_rng(), b_model, 4)
+@inferred logdensityof(b_model, b_mvar)
+@test logdensityof(b_model, b_mvar) isa Float16
 
-a_svar = SampleVariable(CUDA.default_rng(), b_model, 4)
-@inferred DensityInterface.logdensityof(b_model, a_svar)
-@test DensityInterface.logdensityof(b_model, a_svar) isa Float16
+b_svar = SampleVariable(CUDA.default_rng(), b_model, 4)
+@inferred logdensityof(b_model, b_svar)
+@test logdensityof(b_model, b_svar) isa Float16
 
-@test DensityInterface.logdensityof(a_model, a_mvar) |> sum == DensityInterface.logdensityof(b_model, a_mvar)
-@test DensityInterface.logdensityof(a_model, a_svar) |> sum ≈ DensityInterface.logdensityof(b_model, a_svar)
+@test logdensityof(a_model, a_mvar) |> sum ≈ logdensityof(b_model, a_mvar)
+@test logdensityof(a_model, a_svar) |> sum == logdensityof(b_model, a_svar)
+
+# Bijector
+a_dist = Exponential(Float16(1 / 2.0))
+b_dist = Exponential(Float16(1 / 2.0))
+
+@test logdensityof(a_model, a_mvar) == dropdims(sum(logdensityof.(a_dist, a_mvar.value), dims=(1, 2)); dims=(1, 2))
+@test logdensityof(a_model, a_svar) == dropdims(sum(logdensityof.(transformed(a_dist), a_svar.value), dims=(1, 2)); dims=(1, 2))
+
+@test logdensityof(b_model, b_mvar) == sum(logdensityof.(b_dist, b_mvar.value))
+@test logdensityof(b_model, b_svar) == sum(logdensityof.(transformed(b_dist), b_svar.value))

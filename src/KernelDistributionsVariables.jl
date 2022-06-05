@@ -18,8 +18,6 @@ Create a `ModelVariable` by sampling from a `KernelDistribution`.
 """
 ModelVariable(rng::AbstractRNG, dist::KernelOrKernelArray, dims...) = ModelVariable(rand(rng, dist, dims...), bijector(dist))
 ModelVariable(dist::KernelOrKernelArray, dims...) = ModelVariable(Random.GLOBAL_RNG, dist, dims...)
-# TODO test
-ModelVariable(rng::AbstractRNG, dist::KernelOrKernelArray, ::Sample, dims...) = ModelVariable(rng, dist, dims...)
 
 """
     SampleVariable(rng, dist)
@@ -27,8 +25,6 @@ Create a `SampleVariable` by sampling from a `KernelDistribution`.
 """
 SampleVariable(rng::AbstractRNG, dist::KernelOrKernelArray, dims...) = ModelVariable(rng, dist, dims...) |> SampleVariable
 SampleVariable(dist::KernelOrKernelArray, dims...) = SampleVariable(Random.GLOBAL_RNG, dist, dims...)
-# TODO test
-SampleVariable(rng::AbstractRNG, dist::KernelOrKernelArray, ::Sample, dims...) = SampleVariable(rng, dist, dims...)
 
 """
     logjac_corrected_logdensityof(dist, unconstrained_value, bijector)
@@ -41,21 +37,21 @@ function logjac_corrected_logdensityof(dist, unconstrained_value, bijector::Bije
     logdensityof(dist, model_value) + jac
 end
 
-# TODO test
-"""
-    logdensityof(dist, variable)
-Evaluate the logjac corrected logdensity of the distribution `dist` and `variable` in the model domain.
-"""
-function DensityInterface.logdensityof(dist::AbstractArray{<:AbstractKernelDistribution}, variable::SampleVariable)
-    unconstrained_value = raw_value(variable)
-    dist = maybe_cuda(unconstrained_value, dist)
-    logjac_corrected_logdensityof.(dist, unconstrained_value, (bijector(variable),))
-end
 """
     logdensityof(dist, variable)
 Evaluate the logjac corrected logdensity of the distribution `dist` and `variable` in the model domain.
 """
 DensityInterface.logdensityof(dist::AbstractKernelDistribution, variable::SampleVariable) = logjac_corrected_logdensityof.((dist,), raw_value(variable), (bijector(variable),))
+
+"""
+    logdensityof(dists, variable)
+Evaluate the logjac corrected logdensity of the distribution `dist` and `variable` in the model domain.
+"""
+function DensityInterface.logdensityof(dists::AbstractArray{<:AbstractKernelDistribution}, variable::SampleVariable)
+    unconstrained_value = raw_value(variable)
+    dist = maybe_cuda(unconstrained_value, dists)
+    logjac_corrected_logdensityof.(dist, unconstrained_value, (bijector(variable),))
+end
 
 """
     logdensityof(dist, variable)
