@@ -109,7 +109,7 @@ end
 BinaryMixture(c1, c2, w1::Number, w2::Number) = BinaryMixture(c1, c2, Float64(w1), Float64(w2))
 
 # Support of a mixture is the union.
-MeasureTheory.insupport(d::BinaryMixture, x) = insupport(d.c1, x) || insupport(d.c2, x)
+MeasureTheory.insupport(d::BinaryMixture, x) = MeasureTheory.insupport(d.c1, x) || MeasureTheory.insupport(d.c2, x)
 
 Base.show(io::IO, d::BinaryMixture) = print(io, "BinaryMixture\ncomponents: $(d.c1), $(d.c2) \n  log weights: $(d.log_w1), $(d.log_w2)")
 
@@ -128,4 +128,4 @@ end
     as(d::MvNormal)
 Support xform for multivariate normal distributions
 """
-TransformVariables.as(d::MvNormal) = d |> MeasureTheory.proxy |> as
+TransformVariables.as(d::MeasureTheory.MvNormal) = d |> MeasureTheory.proxy |> as

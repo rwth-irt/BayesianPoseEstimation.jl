@@ -10,6 +10,7 @@ include("Samples.jl")
 include("Proposals.jl")
 include("Parameters.jl")
 include("FunctionManipulation.jl")
+include("ModelInterface.jl")
 include("PriorModel.jl")
 # TODO re-add or split?
 # include("Models.jl")
@@ -17,7 +18,7 @@ include("MetropolisHastings.jl")
 include("Gibbs.jl")
 include("Visualization.jl")
 # Extensions
-include("TransformVariablesExtensions.jl")
+include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("KernelDistributionsVariables.jl")
 include("VectorizedDistributions.jl")
@@ -29,7 +30,7 @@ include("Main.jl")
 # Variables
 export ModelVariable
 export SampleVariable
-export model_value, model_value_and_logjac
+export model_value, model_value_with_logjac
 export raw_value
 
 # Samples
@@ -40,6 +41,9 @@ export logp
 export merge
 export unconstrained_state
 export vars
+
+# ModelInterface
+export NamedTupleModel
 
 # Proposals
 export AnalyticProposal
@@ -106,15 +110,19 @@ export KernelUniform
 # Vectorized distributions
 export ProductDistribution
 export VectorizedDistribution
-export to_cpu, to_gpu
+export to_cpu
 
-# Extensions
+# Extensions and Reexports
 using Reexport
+# TODO should I fing another method name in SciGL or MCMCDepth?
+@reexport import SciGL: to_gpu
 
 @reexport import DensityInterface: logdensityof
-@reexport import TransformVariables: as
-export as○, as_circular
 @reexport import Random: rand!
+
+# Bijectors
+@reexport import Bijectors: bijector, with_logabsdet_jacobian
+export Circular
 
 # Main script
 export destroy_render_context

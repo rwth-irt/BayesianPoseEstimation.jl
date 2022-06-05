@@ -1,7 +1,13 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
+
+# WARN Do not run this if you want Revise to work
+include("../src/MCMCDepth.jl")
+using .MCMCDepth
+
 using MCMCDepth
+using Bijectors
 using CUDA, MeasureTheory
 include("MeasureTheoryExtensions.jl")
 using Plots
@@ -44,7 +50,7 @@ M = @inferred rand(curng, KernelNormal(), 100, 100)
 M = @inferred rand(curng, KernelNormal(Float16), 100, 100)
 @test eltype(M) == Float16
 
-normal = Normal(10.0, 2.0)
+normal = MeasureTheory.Normal(10.0, 2.0)
 gn = KernelNormal(10.0, 2.0)
 
 @test maximum(KernelNormal(Float16)) == Inf16
@@ -52,7 +58,7 @@ gn = KernelNormal(10.0, 2.0)
 @test MCMCDepth.insupport(KernelNormal(Float16), 0)
 @test MCMCDepth.insupport(KernelNormal(Float16), Inf)
 @test MCMCDepth.insupport(KernelNormal(Float16), -Inf)
-@test as(KernelNormal()) == asℝ
+@test bijector(KernelNormal()) == bijector(Dists.Normal())
 
 M = rand(rng, gn, 100, 100)
 maybe_histogram(flatten(M))
@@ -71,7 +77,7 @@ M = @inferred rand(curng, KernelExponential(Float16), 100, 100)
 @test eltype(M) == Float16
 
 # WARN MeasureTheory uses β=1/λ by default
-exponential = Exponential(λ=0.1)
+exponential = MeasureTheory.Exponential(λ=0.1)
 ge = KernelExponential(0.1)
 
 @test maximum(KernelExponential(Float16)) == Inf16
@@ -79,7 +85,7 @@ ge = KernelExponential(0.1)
 @test MCMCDepth.insupport(KernelExponential(Float16), 0)
 @test MCMCDepth.insupport(KernelExponential(Float16), Inf)
 @test !MCMCDepth.insupport(KernelExponential(Float16), -eps(Float16))
-@test as(KernelExponential()) == asℝ₊
+@test bijector(KernelExponential()) == bijector(Dists.Exponential())
 
 M = rand(rng, ge, 100, 100)
 maybe_histogram(flatten(M))
@@ -108,9 +114,9 @@ uniform = UniformInterval(5.0, 10.0)
 @test MCMCDepth.insupport(KernelUniform{Float16}(1, 10), 10)
 @test !MCMCDepth.insupport(KernelUniform{Float32}(1, 10), 10.001)
 @test !MCMCDepth.insupport(KernelUniform{Float32}(1, 10), 0.999)
-@test as(KernelUniform(Int64)) == as𝕀
-@test as(KernelUniform(Float64)) == as(Real, 0.0, 1.0)
-@test as(KernelUniform(1.0, 10.0)) == as(Real, 1.0, 10.0)
+@test bijector(KernelUniform(Int64)) == bijector(Dists.Uniform())
+@test bijector(KernelUniform(Float64)) == bijector(Dists.Uniform())
+@test bijector(KernelUniform(1.0, 10.0)) == bijector(Dists.Uniform(1.0, 10.0))
 
 M = rand(rng, gu, 100, 100)
 maybe_histogram(flatten(M))
@@ -138,7 +144,7 @@ circular_uniform = CircularUniform()
 @test MCMCDepth.insupport(KernelCircularUniform{Float16}(), 0)
 @test !MCMCDepth.insupport(KernelCircularUniform{Float32}(), -0001)
 @test !MCMCDepth.insupport(KernelCircularUniform{Float32}(), 2π + 0.001)
-@test as(KernelCircularUniform(Int64)) == as○
+@test bijector(KernelCircularUniform(Int64)) == Circular{0}()
 
 M = rand(rng, gcu, 100, 100)
 maybe_histogram(flatten(M))
@@ -149,7 +155,7 @@ maybe_histogram([rand(circular_uniform) for _ in 1:100*100])
 
 # KernelBinaryMixture
 gbm = KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(2.0, 10.0), 3, 1)
-bm = BinaryMixture(Exponential(λ=2.0), UniformInterval(2.0, 10.0), 3, 1)
+bm = BinaryMixture(MeasureTheory.Exponential(λ=2.0), UniformInterval(2.0, 10.0), 3, 1)
 
 M = @inferred rand(curng, KernelBinaryMixture(KernelExponential(2.0), KernelNormal{Float64}(10.0, 2), 3, 1), 100, 100)
 @test eltype(M) == Float64
@@ -166,8 +172,12 @@ M = @inferred rand(curng, KernelBinaryMixture(KernelExponential{Float16}(2.0), K
 @test MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 3.0)
 @test !MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 0.99999)
 @test !MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 3.0001)
-@test as(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == as(Real, 1.0, 3.0)
-@test as(KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == as(Real, 0.0, ∞)
+@test bijector(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(1.0, 3.0)
+@test bijector(KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(-1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(-1.0, Inf)
+@test bijector(KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(0.0, Inf)
+@test bijector(KernelBinaryMixture(KernelUniform{Float64}(-Inf, 1.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(-Inf, 2.0)
+@test bijector(KernelBinaryMixture(KernelUniform{Float64}(-Inf, 1.0), KernelUniform{Float64}(1.0, Inf), 3, 1)) == Bijectors.TruncatedBijector(-Inf, Inf)
+
 
 M = rand(rng, gbm, 100, 100);
 maybe_histogram(flatten(M))
@@ -185,7 +195,7 @@ maybe_histogram([rand(bm) for _ in 1:100*100])
 # WARN Different measure types not supported only different parametrization of the same type
 # ProductDistribution
 pm = For(100, 100) do i, j
-    BinaryMixture(Exponential(λ=2.0), Normal(10.0, 2), 3, 1)
+    BinaryMixture(MeasureTheory.Exponential(λ=2.0), MeasureTheory.Normal(10.0, 2), 3, 1)
 end;
 gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 100))
 M = @inferred rand(rng, gpm)
@@ -210,11 +220,11 @@ rand(rng, gpm) |> flatten |> maybe_histogram
 @inferred logdensityof(gpm, M)
 # TODO product measure broken for BinaryMixture?
 # @test logdensityof(gpm, M) ≈ logdensityof(pm, M)
-@test logdensityof(gpm, M) ≈ logdensityof.((BinaryMixture(Exponential(λ=2.0), Normal(10.0, 2), 3, 1),), M) |> sum
+@test logdensityof(gpm, M) ≈ logdensityof.((BinaryMixture(MeasureTheory.Exponential(λ=2.0), MeasureTheory.Normal(10.0, 2), 3, 1),), M) |> sum
 
 # VectorizedDistribution
 pm = For(100, 100) do i, j
-    Normal(i, j)
+    MeasureTheory.Normal(i, j)
 end;
 gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:100])
 
@@ -256,6 +266,3 @@ M = @inferred rand(curng, gvm, 100, 5);
 @inferred logdensityof(KernelExponential(Float64), [100, 1])
 @inferred logdensityof([KernelExponential(Float64), KernelExponential(Float64)], [100, 1])
 @inferred logdensityof([KernelExponential(Float64), KernelExponential(Float64)], 100)
-
-# TODO move
-v = SampleVariable(KernelExponential(Float64))

@@ -2,7 +2,10 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# WARN Do not run this if you want Revise to work
 include("../src/MCMCDepth.jl")
+using .MCMCDepth
+
 using CUDA
 using DensityInterface
 using MCMCDepth
@@ -27,7 +30,18 @@ using Test
 
 # KernelDistribution DensityInterface
 
+# Scalar (CUDA only supports Arrays)
 a_model = KernelExponential{Float16}(2.0)
+
+a_mvar = ModelVariable(Random.default_rng(), a_model)
+@inferred DensityInterface.logdensityof(a_model, a_mvar)
+@test DensityInterface.logdensityof(a_model, a_mvar) isa Float16
+
+a_svar = SampleVariable(Random.default_rng(), a_model)
+@inferred DensityInterface.logdensityof(a_model, a_svar)
+@test DensityInterface.logdensityof(a_model, a_svar) isa Float16
+
+# Array
 a_mvar = ModelVariable(CUDA.default_rng(), a_model, 3)
 @inferred DensityInterface.logdensityof(a_model, a_mvar)
 @test DensityInterface.logdensityof(a_model, a_mvar) isa AbstractVector{Float16}
@@ -43,13 +57,13 @@ b_model = fill(KernelExponential{Float16}(2.0), 3)
 @test DensityInterface.logdensityof(b_model, a_mvar) isa AbstractVector{Float16}
 @test DensityInterface.logdensityof(b_model, a_mvar) |> size == (3,)
 
-a_svar = SampleVariable(CUDA.default_rng(), b_model, 3)
-@inferred DensityInterface.logdensityof(b_model, a_svar)
-@test DensityInterface.logdensityof(b_model, a_svar) isa AbstractVector{Float16}
-@test DensityInterface.logdensityof(b_model, a_svar) |> size == (3,)
+b_svar = SampleVariable(CUDA.default_rng(), b_model, 3)
+@inferred DensityInterface.logdensityof(CuArray(b_model), b_svar)
+@test DensityInterface.logdensityof(b_model, b_svar) isa AbstractVector{Float16}
+@test DensityInterface.logdensityof(b_model, b_svar) |> size == (3,)
 
 @test DensityInterface.logdensityof(b_model, a_mvar) == DensityInterface.logdensityof(a_model, a_mvar)
-@test DensityInterface.logdensityof(b_model, a_svar) == DensityInterface.logdensityof(a_model, a_svar)
+@test DensityInterface.logdensityof(b_model, b_svar) == DensityInterface.logdensityof(a_model, b_svar)
 
 # VectorizedDistribution Random 
 
@@ -68,7 +82,7 @@ a_svar = SampleVariable(CUDA.default_rng(), b_model, 3)
 @inferred ModelVariable(CUDA.default_rng(), VectorizedDistribution(fill(KernelExponential(), 3, 3)), 2)
 @inferred SampleVariable(CUDA.default_rng(), VectorizedDistribution(fill(KernelExponential(), 3, 3)), 2)
 
-# KernelDistribution DensityInterface
+# VectorizedDistribution DensityInterface
 
 a_model = VectorizedDistribution(fill(KernelExponential{Float16}(2.0), 3, 3))
 a_mvar = ModelVariable(CUDA.default_rng(), a_model, 4)

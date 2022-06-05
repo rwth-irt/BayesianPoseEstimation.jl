@@ -11,40 +11,37 @@ Provides constructors for ModelVariable and SampleVariable as well as the Densit
 """
 
 """
-    ModelVariable(rng, d)
+    ModelVariable(rng, dist)
 Create a model variable by sampling from a kernel distribution.
 """
-ModelVariable(rng::AbstractRNG, d::AbstractVectorizedDistribution, dims...) = ModelVariable(rand(rng, d, dims...), as(d))
-ModelVariable(d::AbstractVectorizedDistribution, dims...) = ModelVariable(Random.GLOBAL_RNG, d, dims...)
+ModelVariable(rng::AbstractRNG, dist::AbstractVectorizedDistribution, dims...) = ModelVariable(rand(rng, dist, dims...), bijector(dist))
+ModelVariable(dist::AbstractVectorizedDistribution, dims...) = ModelVariable(Random.GLOBAL_RNG, dist, dims...)
+# TODO test
+ModelVariable(rng::AbstractRNG, dist::AbstractVectorizedDistribution, ::Sample, dims...) = ModelVariable(rng, dist, dims...)
+
 
 """
-    SampleVariable(rng, d)
+    SampleVariable(rng, dist)
 Create a sample variable by sampling from a kernel distribution.
 """
-SampleVariable(rng::AbstractRNG, d::AbstractVectorizedDistribution, dims...) = ModelVariable(rng, d, dims...) |> SampleVariable
+SampleVariable(rng::AbstractRNG, dist::AbstractVectorizedDistribution, dims...) = ModelVariable(rng, dist, dims...) |> SampleVariable
 SampleVariable(d::AbstractVectorizedDistribution, dims...) = SampleVariable(Random.GLOBAL_RNG, d, dims...)
+# TODO test
+SampleVariable(rng::AbstractRNG, d::AbstractVectorizedDistribution, ::Sample, dims...) = SampleVariable(rng, d, dims...)
 
-# TODO Distributions do not encode any information about variable names, thus logdensityof(measure, x::AbstractVariable, s::Sample) should not be required. Thus, encode it in the ModelInterface: logdensityof(::Model, ::Sample)
-
-"""
-    logdensity(d, c)
-Evaluate the logjac corrected logdensity of the variable in the model domain.
-"""
-function DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x::AbstractVariable)
-    model_values, logjacs = model_value_and_logjac(x)
-    # logdensityof vectorized distributions uses different reduction strategies
-    # TODO this is copy pasted, can I create a better interface which allows me to inject the logjacs?
-    log_densities = logdensityof(marginals(d), model_values)
-    reduce_vectorized(+, d, logjacs + log_densities)
-end
-
-
-# TODO reduction should be moved to VectorizedDistributionsVariables.jl
-# sum(log_density) + sum(logjac)
-
-# # TODO move to KernelMeasureAdapter?
+# TODO should be dispatched correctly in VectorizedDistributions.jl
+# TODO test
 # """
-#     accumulate_log_density(measure, log_densities, log_jacs)
-# Specialization for vectorized measures: accumulates the log_jacs to the last dimension of the measure size and adds them component wise to the log_densities.
+#     logdensity(d, c)
+# Evaluate the logjac corrected logdensity of the variable in the model domain.
 # """
-# accumulate_log_density(d::KernelVectorized, log_densities, log_jacs) = log_densities .+ reduce_vectorized(+, d, log_jacs)
+# function DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x::AbstractVariable)
+#     model_values, logjacs = model_value_and_logjac(x)
+#     # logdensityof vectorized distributions uses different reduction strategies
+#     # TODO this is copy pasted, can I create a better interface which allows me to inject the logjacs?
+#     # logjac corrected from KernelDistributionsVariables.jl
+#     reduce_vectorized(+, d, logdensityof(marginals(d), x))
+# end
+
+# TODO where do I need this? Proposals?
+# DensityInterface.logdensityof(d::AbstractVectorizedDistribution, x::AbstractVariable, ::Sample) = logdensityof(d, x)

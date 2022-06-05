@@ -5,12 +5,11 @@
 # bundle_samples for the Sample type
 using AbstractMCMC, TupleVectors
 using Accessors
-using TransformVariables
 
 """
     Sample(vars, logp)
 Consists of the unconstrained state `vars` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
-Samples are generically typed by `T` for the variable names and `U` to specify their respective domain transformation.
+Samples are typed by `T,V` as the internal named tuple for the variable names types.
 """
 struct Sample{T,V<:Tuple{Vararg{AbstractVariable}}}
     vars::NamedTuple{T,V}
@@ -98,34 +97,6 @@ function map_intersect(f, a::NamedTuple{T}, b::NamedTuple) where {T}
     end
     NamedTuple{T}(vars)
 end
-
-# TODO this implies, that all necessary variables are expected to be present in the sample. Thus, proposals need to include internal variables like the expected depth. Filter out irrelevant variables when returning the state in the sampler. Alternatively only calculate internal variables in the likelihood function.
-"""
-    map_models(f, models, vars; default)
-Map the function `f(model, variable, variables)` over each `model` and `variable`.
-All other required `variables` are passed into `f` as context.
-If no intersection exists, the `default` value is used.
-For log-densities the reasonable default is 0.0 (summation).
-Non-logarithmic densities should use 1.0 as default (product).
-"""
-map_models(f, models::NamedTuple, variables::NamedTuple; default=0.0) =
-    map(keys(models)) do k
-        if k in keys(variables)
-            f(models[k], variables[k], variables)
-        else
-            default
-        end
-    end
-
-"""
-    map_models(f, models, sample; default)
-Map the function `f(model, variable, variables)` over each `model` and variable in `sample`.
-All other required `variables` are passed into `f` as context.
-If no intersection exists, the `default` value is used.
-For log-densities the reasonable default is 0.0 (summation).
-Non-logarithmic densities should use 1.0 as default (product).
-"""
-map_models(f, models::NamedTuple, sample::Sample; default=0.0) = map_models(f, models, vars(sample), default)
 
 """
     +(a, b)

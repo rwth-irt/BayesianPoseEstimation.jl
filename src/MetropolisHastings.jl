@@ -5,7 +5,6 @@
 using AbstractMCMC
 using Accessors
 using Random
-using TransformVariables
 
 """
     MetropolisHastings
