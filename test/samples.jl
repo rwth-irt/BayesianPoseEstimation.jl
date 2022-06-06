@@ -2,19 +2,19 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using Bijectors
 using MCMCDepth
 using Test
-using TransformVariables
 
 # Create and convert ModelVariables
-amv = ModelVariable([0.5, 0.9], as𝕀)
+amv = ModelVariable([0.5, 0.9], bijector(Uniform()))
 @test model_value(amv)[1] == 0.5
 # logit(0.5) = 0.0
 @test raw_value(amv)[1] == 0.0
 asv = convert(SampleVariable, amv)
 @test model_value(asv)[1] == 0.5
 @test raw_value(asv)[1] == 0.0
-bsv = SampleVariable(1, asℝ₊)
+bsv = SampleVariable(1, bijector(Exponential()))
 bmv = ModelVariable(bsv)
 
 # Model Variables add in model domain
@@ -31,10 +31,10 @@ bmv = ModelVariable(bsv)
 @test raw_value(bmv - bsv) == 0
 
 # TODO test
-a = asv + bsv
-b = bsv + asv
-c = amv + bmv
-d = amv + bsv
+a = @inferred asv + bsv
+b = @inferred bsv + asv
+c = @inferred amv + bmv
+d = @inferred amv + bsv
 @test raw_value(a) == raw_value(b)
 
 # Sample
@@ -42,7 +42,7 @@ nta = (; zip((:a, :b), fill(amv, 2))...)
 ntb = (; zip((:b, :c), fill(bsv, 2))...)
 sa = Sample(nta, 0.0)
 sb = Sample(ntb, 0.0)
-@test model_value(vars(sa+sb)[1]) == [0.5, 0.9]
-@test raw_value(vars(sa+sb)[2]) == [1.0, 3.1972245773362196]
-@test model_value(vars(sa-sb)[1]) == [0.5, 0.9]
-@test raw_value(vars(sa-sb)[2]) == [-1.0, 1.1972245773362196]
+@test model_value(vars(@inferred sa + sb)[1]) == [0.5, 0.9]
+@test raw_value(vars(@inferred sa + sb)[2]) == [1.0, 3.1972245773362196]
+@test model_value(vars(@inferred sa - sb)[1]) == [0.5, 0.9]
+@test raw_value(vars(@inferred sa - sb)[2]) == [-1.0, 1.1972245773362196]
