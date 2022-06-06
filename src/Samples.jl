@@ -26,7 +26,7 @@ names(::Sample{T}) where {T} = T
 
 """
     vars(Sample)
-Returns a named tuple of the vars.
+Returns a named tuple of the variables.
 """
 vars(s::Sample) = s.vars
 
@@ -82,21 +82,43 @@ function add!(a::Sample{T}, b::Sample{T}) where {T}
     end
 end
 
+
+
 """
     map_intersect(f, a, b)
 Maps the function `f` over the intersection of the keys of `a` and `b`.
+Uses the value of `default` if no matching key is found in `b`.
 Returns a NamedTuple with the same keys as `a` which makes it type-stable.
 """
-function map_intersect(f, a::NamedTuple{T}, b::NamedTuple) where {T}
-    vars = map(keys(a)) do k
-        if k in keys(b)
+map_intersect(f, a::NamedTuple{A}, b::NamedTuple, default) where {A} = NamedTuple{A}(map_intersect_(f, a, b, default))
+
+# Barrier for type stability
+map_intersect_(f, a::NamedTuple{A}, b::NamedTuple{B}, default) where {A,B} =
+    map(A) do k
+        if k in B
+            f(a[k], b[k])
+        else
+            default
+        end
+    end
+
+"""
+    map_intersect(f, a, b)
+Maps the function `f` over the intersection of the keys of `a` and `b`.
+Uses the value of `a` if no matching key is found in `b`.
+Returns a NamedTuple with the same keys as `a` which makes it type-stable.
+"""
+map_intersect(f, a::NamedTuple{A}, b::NamedTuple) where {A} = NamedTuple{A}(map_intersect_(f, a, b))
+
+# Barrier for type stability
+map_intersect_(f, a::NamedTuple{A}, b::NamedTuple{B}) where {A,B} =
+    map(A) do k
+        if k in B
             f(a[k], b[k])
         else
             a[k]
         end
     end
-    NamedTuple{T}(vars)
-end
 
 """
     +(a, b)
