@@ -90,6 +90,7 @@ Reduces the first `ndims(dist)` dimensions of the Matrix `A` using the `operator
 function reduce_vectorized(operator, dist::VectorizedDistribution, A::AbstractArray)
     n_red = ndims(marginals(dist))
     R = reduce(operator, A; dims=(1:n_red...,))
+    # Returns an array of size (1,) instead of a scalar. Conditional conversion to scalar would defeat type stability. 
     dropdims(R; dims=(1:n_red...,))
 end
 

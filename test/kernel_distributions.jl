@@ -221,6 +221,11 @@ rand(rng, gpm) |> flatten |> maybe_histogram
 # TODO product measure broken for BinaryMixture?
 # @test logdensityof(gpm, M) ≈ logdensityof(pm, M)
 @test logdensityof(gpm, M) ≈ logdensityof.((BinaryMixture(MeasureTheory.Exponential(λ=2.0), MeasureTheory.Normal(10.0, 2), 3, 1),), M) |> sum
+@test logdensityof(gpm, M) isa Float64
+
+M = rand(rng, gpm, 3);
+@inferred logdensityof(gpm, M)
+@test logdensityof(gpm, M) isa Float64
 
 # VectorizedDistribution
 pm = For(100, 100) do i, j
@@ -243,12 +248,19 @@ M = @inferred rand(curng, gvm);
 @test eltype(M) == Float16
 
 gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:100])
-M = rand(rng, gvm)
+M = rand(rng, gvm);
 histogram(flatten(M))
 rand(pm) |> flatten |> histogram
 rand(curng, gvm, 10) |> flatten |> histogram
 @inferred logdensityof(gvm, M)
 @test logdensityof(gvm, M)[] |> sum ≈ logdensityof(pm, Array(M))
+@test logdensityof(gvm, M) isa Vector{Float64}
+@test logdensityof(gvm, M) |> size == (1,)
+
+M = rand(rng, gvm, 3);
+@inferred logdensityof(gvm, M)
+@test logdensityof(gvm, M) isa Vector{Float64}
+@test logdensityof(gvm, M) |> size == (3,)
 
 # Broadcasting AbstractVectorizedKernel
 gpm = ProductDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:100]) |> to_gpu
