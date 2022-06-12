@@ -12,6 +12,7 @@ using Random
 using Test
 
 a_model = KernelExponential(2.0)
+# Float32
 b_model = ProductDistribution([KernelExponential(2.0f0), KernelExponential(1.0f0), KernelExponential(0.5f0)])
 c_model = VectorizedDistribution(fill(KernelExponential(2.0), 2))
 
@@ -21,13 +22,13 @@ bc_model = IndependentModel((; a=a_model, c=c_model))
 abc_model = IndependentModel((; a=a_model, b=b_model, c=c_model))
 
 s = @inferred rand(Random.default_rng(), abc_model)
-ℓ = @inferred logdensityof(ab_model, s)
-ℓ = @inferred logdensityof(ac_model, s)
-ℓ = @inferred logdensityof(bc_model, s)
-ℓ = @inferred logdensityof(abc_model, s)
-
+@inferred logdensityof(IndependentModel((; a=a_model)), s)
+@inferred logdensityof(ab_model, s)
+@inferred logdensityof(ac_model, s)
+@inferred logdensityof(bc_model, s)
+@inferred logdensityof(abc_model, s)
 s = @inferred rand(Random.default_rng(), abc_model, 3)
-ℓ = @inferred logdensityof(ab_model, s)
-ℓ = @inferred logdensityof(ac_model, s)
-ℓ = @inferred logdensityof(bc_model, s)
-ℓ = @inferred logdensityof(abc_model, s)
+@inferred logdensityof(ab_model, s)
+@inferred logdensityof(ac_model, s)
+@inferred logdensityof(bc_model, s)
+@inferred logdensityof(abc_model, s)
