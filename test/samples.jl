@@ -42,7 +42,7 @@ nta = (; zip((:a, :b), fill(amv, 2))...)
 ntb = (; zip((:b, :c), fill(bsv, 2))...)
 sa = Sample(nta, 0.0)
 sb = Sample(ntb, 0.0)
-@test model_value(vars(@inferred sa + sb)[1]) == [0.5, 0.9]
-@test raw_value(vars(@inferred sa + sb)[2]) == [1.0, 3.1972245773362196]
-@test model_value(vars(@inferred sa - sb)[1]) == [0.5, 0.9]
-@test raw_value(vars(@inferred sa - sb)[2]) == [-1.0, 1.1972245773362196]
+@test model_value(variables(@inferred sa + sb)[1]) == [0.5, 0.9]
+@test raw_value(variables(@inferred sa + sb)[2]) == [1.0, 3.1972245773362196]
+@test model_value(variables(@inferred sa - sb)[1]) == [0.5, 0.9]
+@test raw_value(variables(@inferred sa - sb)[2]) == [-1.0, 1.1972245773362196]

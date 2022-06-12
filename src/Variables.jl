@@ -14,6 +14,13 @@ Implement model_value and raw_value for the constrained model domain and the unc
 abstract type AbstractVariable end
 
 """
+    value(variable)
+Returns the internal value which might be in the model or the unconstrained domain.
+Only for internal use, e.g. zero(value(variable))
+"""
+value(variable::AbstractVariable) = variable.value
+
+"""
     SampleVariable(value, bijector)
 A single variable of a sample, which can have any `value` type depending on the algorithm (.e.g. scalar, cpu or gpu array).
 By convention, we sample `value` in the unconstrained domain ℝ which can be converted to the constrained domain (e.g ℝ₊) by the `bijector`.

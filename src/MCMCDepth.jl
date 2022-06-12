@@ -7,11 +7,10 @@ module MCMCDepth
 # lib includes
 include("Variables.jl")
 include("Samples.jl")
-include("Proposals.jl")
 include("Parameters.jl")
 include("FunctionManipulation.jl")
 include("ModelInterface.jl")
-include("PriorModel.jl")
+include("Proposals.jl")
 # TODO re-add or split?
 # include("Models.jl")
 include("MetropolisHastings.jl")
@@ -40,13 +39,12 @@ export flatten
 export logp
 export merge
 export unconstrained_state
-export vars
+export variables
 
 # ModelInterface
-export NamedTupleModel
+export IndependentModel
 
 # Proposals
-export AnalyticProposal
 export GibbsProposal
 export IndependentProposal
 export Proposal
@@ -59,9 +57,6 @@ export transition_probability
 export DepthImageParameters
 export PriorParameters
 export RandomWalkParameters
-
-# PriorModel
-export IndependentPrior
 
 # Models
 export DepthExponential
@@ -123,6 +118,7 @@ using Reexport
 # Bijectors
 @reexport import Bijectors: bijector, with_logabsdet_jacobian
 export Circular
+export is_identity
 
 # Main script
 export destroy_render_context
