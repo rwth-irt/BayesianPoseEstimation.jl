@@ -38,22 +38,22 @@ Transfer the internal distributions to the GPU.
 SciGL.to_gpu(dist::T) where {T<:AbstractVectorizedDistribution} = T.name.wrapper(CuArray(marginals(dist)))
 
 """
-    rand(rng, dist, dims)
+    rand(rng, dist, [dims...])
 Mutate the array `A` by sampling from `dist`.
 """
 Random.rand!(rng::AbstractRNG, dist::AbstractVectorizedDistribution, A::AbstractArray) = rand!(rng, marginals(dist), A)
 
 """
-    rand(rng, dist, dims)
+    rand(rng, dist, [dims...])
 Sample an array from `dist` of size `dims`.
 """
 Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution, dims::Integer...) = rand(rng, marginals(dist), size(marginals(dist))..., dims...)
 
 """
-    rand(rng, dist, dims)
-Sample an array from `dist` of size 1.
+    rand(rng, dist, [dims...])
+Sample an array from `dist` of size `dims`.
 """
-Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution) = rand(rng, marginals(dist), size(marginals(dist))..., 1)
+Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution) = rand(rng, marginals(dist), size(marginals(dist))...)
 
 """
     bijector(dist)

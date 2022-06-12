@@ -71,7 +71,7 @@ Mutate the array A by sampling from `dist`.
 Random.rand!(rng::AbstractRNG, dist::KernelOrKernelArray, A::AbstractArray) = _rand!(rng, dist, A)
 
 """
-    rand(rng, dist, dims)
+    rand(rng, dist, [dims...])
 Sample an Array from `dist` of size `dims`.
 """
 function Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution{T}, dims::Integer...) where {T}
@@ -80,30 +80,27 @@ function Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution{T}, dims::
 end
 
 """
-    rand(rng, dist, dims)
-Sample an Array from `dist` of size `dims`.
+    rand(rng, dist, [dims...])
+Sample an Array from `dists` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, dist::AbstractArray{<:AbstractKernelDistribution{T}}, dims::Integer...) where {T}
+function Base.rand(rng::AbstractRNG, dists::AbstractArray{<:AbstractKernelDistribution{T}}, dims::Integer...) where {T}
     A = array_for_rng(rng, T, dims...)
-    rand!(rng, dist, A)
+    rand!(rng, dists, A)
 end
 
 """
-    rand(rng, dist)
+    rand(rng, dist, [dims...])
 Sample an Array from `dist` of size 1.
 """
 Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution) = rand(rng, dist, 1)[]
 
 """
-    rand(rng, dists)
-Sample an Array from `dists` with the size of d.
+    rand(rng, dists, [dims...])
+Sample an Array from `dists` with the size of `dists`.
 """
 Base.rand(rng::AbstractRNG, dists::AbstractArray{<:AbstractKernelDistribution{T}}) where {T} = rand(rng, dists, size(dists)...)
 
-# Orthogonal methods
-Random.rand!(dist::AbstractKernelDistribution, A::AbstractArray) = rand!(Random.GLOBAL_RNG, dist, A)
-Base.rand(dist::AbstractKernelDistribution, dims::Integer...) = rand(Random.GLOBAL_RNG, dist, dims...)
-Base.rand(dist::AbstractKernelDistribution) = rand(Random.GLOBAL_RNG, dist)
+# TODO test removed GLOBAL_RNG methods
 
 # Bijector for arrays
 Bijectors.bijector(dists::AbstractArray{<:AbstractKernelDistribution}) = bijector(first(dists))
