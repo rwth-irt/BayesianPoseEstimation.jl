@@ -59,8 +59,6 @@ propose(rng::AbstractRNG, proposal::SymmetricProposal, sample::Sample, dims...) 
 For symmetric proposals, the forward and backward transition probability cancels out
 """
 transition_probability(proposal::SymmetricProposal, new_sample::Sample, ::Sample) = 0.0
-# TODO correct dimensionality? VectorizedDistribution does make it harder to find an efficient implementation. Should I just return 0.0 instead and catch it in the multiple try mcmc? I would say so, since I broadcast the result anyways which should handle the scalar just fine
-# zero(logdensityof(model(proposal), new_sample))
 
 # IndependentProposal
 
@@ -95,10 +93,11 @@ transition_probability(proposal::IndependentProposal, new_sample::Sample, ::Samp
 
 """
     GibbsProposal
-Has a function `f(sample::Sample)` which analytically samples from a distribution conditioned on `sample`.
+Has a function `fn(sample::Sample)` which analytically samples from a distribution conditioned on `sample`.
 """
 struct GibbsProposal{T} <: AbstractProposal
-    f::T
+    # TODO Do I want a named tuple of functions, or leave the logic to the function
+    fn::T
 end
 
 """
@@ -108,7 +107,7 @@ A subset of the variables is proposed by the internal proposal model and merged 
 Since sampling is analytic, `dims` solely depends on the previous sample and the `rng` is not used.
 """
 function propose(::AbstractRNG, proposal::GibbsProposal{Q}, sample::Sample, dims...) where {Q}
-    gibbs_sample = proposal.f(sample)
+    gibbs_sample = proposal.fn(sample)
     merge(sample, gibbs_sample)
 end
 
