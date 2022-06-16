@@ -254,8 +254,8 @@ rand(pm) |> flatten |> histogram
 rand(curng, gvm, 10) |> flatten |> histogram
 @inferred logdensityof(gvm, M)
 @test logdensityof(gvm, M)[] |> sum ≈ logdensityof(pm, Array(M))
-@test logdensityof(gvm, M) isa Vector{Float64}
-@test logdensityof(gvm, M) |> size == (1,)
+@test logdensityof(gvm, M) isa Array{Float64,0}
+@test logdensityof(gvm, M) |> size == ()
 
 M = rand(rng, gvm, 3);
 @inferred logdensityof(gvm, M)
