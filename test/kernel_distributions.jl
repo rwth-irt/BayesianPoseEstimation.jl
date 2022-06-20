@@ -21,6 +21,15 @@ maybe_histogram(x...) = PLOT ? histogram(x...) : nothing
 curng = CUDA.RNG(42)
 rng = Random.default_rng(42)
 
+# Correct size
+@test rand(rng, KernelNormal(), 100, 100) |> size == (100, 100)
+@test rand(rng, KernelNormal()) |> size == ()
+@test rand(rng, KernelNormal(Float16)) isa Float16
+# Size for arrays of distributions
+@test rand(rng, fill(KernelNormal(), 100), 100, 100) |> size == (100, 100, 100)
+@test rand(rng, fill(KernelNormal(), 100, 100), 100) |> size == (100, 100, 100)
+@test rand(rng, fill(KernelNormal(), 100, 100)) |> size == (100, 100)
+
 # Correct device for RNG
 @test rand(CUDA.RNG(), KernelNormal(), 100, 100) isa CuArray
 @test rand(CUDA.RNG(), fill(KernelNormal(), 100), 100, 100) isa CuArray
@@ -63,7 +72,8 @@ gn = KernelNormal(10.0, 2.0)
 M = rand(rng, gn, 100, 100)
 maybe_histogram(flatten(M))
 maybe_histogram([rand(normal) for _ in 1:100*100])
-@inferred logdensityof(gn, M)
+logdensity_gn_M(gn, M) = logdensityof.(gn, M)
+@inferred logdensity_gn_M(gn, M)
 @test logdensityof(gn, 1.0) == logdensityof(normal, 1.0)
 
 # KernelExponential
@@ -90,7 +100,8 @@ ge = KernelExponential(0.1)
 M = rand(rng, ge, 100, 100)
 maybe_histogram(flatten(M))
 maybe_histogram([rand(exponential) for _ in 1:100*100])
-@inferred logdensityof(ge, M)
+logdensity_ge_M(ge, M) = logdensityof.(ge, M)
+@inferred logdensity_ge_M(ge, M)
 @test logdensityof(ge, 1.0) == logdensityof(exponential, 1.0)
 @test logdensityof(ge, 0.0) == logdensityof(exponential, 0.0)
 @test logdensityof(ge, -1.0) == logdensityof(exponential, -1.0)
@@ -121,7 +132,8 @@ uniform = UniformInterval(5.0, 10.0)
 M = rand(rng, gu, 100, 100)
 maybe_histogram(flatten(M))
 maybe_histogram([rand(uniform) for _ in 1:100*100])
-@inferred logdensityof(gu, M)
+logdensity_gu_M(gu, M) = logdensityof.(gu, M)
+@inferred logdensity_gu_M(gu, M)
 @test logdensityof(gu, 0.5) == logdensityof(uniform, 0.5)
 @test logdensityof(gu, 1.5) == logdensityof(uniform, 1.5)
 
@@ -149,7 +161,8 @@ circular_uniform = CircularUniform()
 M = rand(rng, gcu, 100, 100)
 maybe_histogram(flatten(M))
 maybe_histogram([rand(circular_uniform) for _ in 1:100*100])
-@inferred logdensityof(gcu, M)
+logdensity_gcu_M(gcu, M) = logdensityof.(gcu, M)
+@inferred logdensity_gcu_M(gcu, M)
 @test logdensityof(gcu, 0.5) == logdensityof(circular_uniform, 0.5)
 @test logdensityof(gcu, 1.5) == logdensityof(circular_uniform, 1.5)
 
@@ -182,7 +195,8 @@ M = @inferred rand(curng, KernelBinaryMixture(KernelExponential{Float16}(2.0), K
 M = rand(rng, gbm, 100, 100);
 maybe_histogram(flatten(M))
 maybe_histogram([rand(bm) for _ in 1:100*100])
-@inferred logdensityof(gbm, M)
+logdensity_gbm_M(gbm, M) = logdensityof.(gbm, M)
+@inferred logdensity_gbm_M(gbm, M)
 @inferred logdensityof(gbm, 1.0)
 @test logdensityof(gbm, 1.0) ≈ logdensityof(bm, 1.0)
 @test logdensityof(gbm, 10.0) ≈ logdensityof(bm, 10.0)
@@ -194,21 +208,27 @@ maybe_histogram([rand(bm) for _ in 1:100*100])
 # TODO move
 # WARN Different measure types not supported only different parametrization of the same type
 # ProductDistribution
-pm = For(100, 100) do i, j
+pm = For(100, 10) do i, j
     BinaryMixture(MeasureTheory.Exponential(λ=2.0), MeasureTheory.Normal(10.0, 2), 3, 1)
 end;
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 100))
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 10))
+
+# Correct size
+@test rand(rng, gpm, 3) |> size == (100, 10, 3)
+@test rand(rng, gpm) |> size == (100, 10)
+
+# Type stability
 M = @inferred rand(rng, gpm)
 M = @inferred rand(curng, gpm)
 gpm = to_gpu(gpm)
 M = @inferred rand(curng, gpm)
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 100)) |> to_gpu
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 10)) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float64
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float32}(2.0), KernelNormal{Float32}(10.0, 2.0), 3, 1), 100, 100)) |> to_gpu
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float32}(2.0), KernelNormal{Float32}(10.0, 2.0), 3, 1), 100, 10)) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float32
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float16}(2.0), KernelNormal{Float16}(10.0, 2.0), 3, 1), 100, 100)) |> to_gpu
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float16}(2.0), KernelNormal{Float16}(10.0, 2.0), 3, 1), 100, 10)) |> to_gpu
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float16
 
@@ -228,30 +248,35 @@ M = rand(rng, gpm, 3);
 @test logdensityof(gpm, M) isa Float64
 
 # VectorizedDistribution
-pm = For(100, 100) do i, j
+pm = For(100, 10) do i, j
     MeasureTheory.Normal(i, j)
 end;
-gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:100])
+gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:10])
 
+# Correct size
+@test rand(rng, gvm, 3) |> size == (100, 10, 3)
+@test rand(rng, gvm) |> size == (100, 10)
+
+# Type stability
 M = @inferred rand(rng, gvm)
 M = @inferred rand(curng, gvm)
 gvm = to_gpu(gvm)
 M = @inferred rand(curng, gvm)
-gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:100])
+gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:10])
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float64
-gvm = VectorizedDistribution([KernelNormal{Float32}(i, j) for i = 1:100, j = 1:100])
+gvm = VectorizedDistribution([KernelNormal{Float32}(i, j) for i = 1:100, j = 1:10])
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float32
-gvm = VectorizedDistribution([KernelNormal{Float16}(i, j) for i = 1:100, j = 1:100])
+gvm = VectorizedDistribution([KernelNormal{Float16}(i, j) for i = 1:100, j = 1:10])
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float16
 
-gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:100])
+gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:10])
 M = rand(rng, gvm);
 histogram(flatten(M))
 rand(pm) |> flatten |> histogram
-rand(curng, gvm, 10) |> flatten |> histogram
+rand(curng, gvm, 2) |> flatten |> histogram
 @inferred logdensityof(gvm, M)
 @test logdensityof(gvm, M)[] |> sum ≈ logdensityof(pm, Array(M))
 @test logdensityof(gvm, M) isa Array{Float64,0}
@@ -275,6 +300,9 @@ M = @inferred rand(curng, gvm, 100, 5);
 
 # Method ambiguities
 @inferred logdensityof(KernelExponential(Float64), 100)
-@inferred logdensityof(KernelExponential(Float64), [100, 1])
-@inferred logdensityof([KernelExponential(Float64), KernelExponential(Float64)], [100, 1])
-@inferred logdensityof([KernelExponential(Float64), KernelExponential(Float64)], 100)
+logdensityof_single_dist_array_data() = logdensityof.(KernelExponential(Float64), [100, 1])
+@inferred logdensityof_single_dist_array_data()
+logdensityof_array_dist_array_data() = logdensityof.([KernelExponential(Float64), KernelExponential(Float64)], [100, 1])
+@inferred logdensityof_array_dist_array_data()
+logdensityof_array_dist_single_data() = logdensityof.([KernelExponential(Float64), KernelExponential(Float64)], 100)
+@inferred logdensityof_array_dist_single_data()

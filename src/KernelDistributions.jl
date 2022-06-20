@@ -31,7 +31,8 @@ KernelDistributions offer the following interface functions:
 The Interface requires the following to be implemented:
 - Bijectors.bijector(d): Bijector
 - `Base.rand(rng, dist::MyKernelDistribution{T})::T` generate a single random number from the distribution
-- `logpdf(dist::MyKernelDistribution{T}, x)::T` evaluate the normalized logdensity
+TODO
+- `DensityInterface.logdensityof(dist::MyKernelDistribution{T}, x)::T` evaluate the normalized logdensity
 
 Most of the time Float64 precision is not required, especially for GPU computations.
 Thus, we default to Float32, mostly for memory capacity reasons.
@@ -40,27 +41,12 @@ abstract type AbstractKernelDistribution{T} end
 
 # WARN parametric alias causes method ambiguities, since the parametric type is always present
 const KernelOrKernelArray = Union{AbstractKernelDistribution,AbstractArray{<:AbstractKernelDistribution}}
-
 # DensityInterface
 
 @inline DensityInterface.DensityKind(::AbstractKernelDistribution) = IsDensity()
 
-# KernelOrKernelArray should have the same behavior interface
-"""
-    logdensityof(dist, x)
-Implement DensityInterface, by providing the normalized logdensity of the distribution.
-Uses broadcasting for arrays.
-"""
-DensityInterface.logdensityof(dist::KernelOrKernelArray, x) = _logdensityof(dist, x)
-
-# KernelOrKernelArray in KernelDistributionsVariables.jl would cause ambiguities
-_logdensityof(dist::AbstractKernelDistribution, x) = logpdf(dist, x)
-_logdensityof(dist::AbstractKernelDistribution, x::AbstractArray) = logpdf.((dist,), x)
-
-function _logdensityof(dists::AbstractArray{<:AbstractKernelDistribution}, x)
-    D = maybe_cuda(x, dists)
-    logpdf.(D, x)
-end
+# A single distribution should behave similar to a 0 dimensional array
+Base.broadcastable(x::AbstractKernelDistribution) = Ref(x)
 
 # Random interface
 
@@ -84,35 +70,20 @@ end
 Sample an Array from `dists` of size `dims`.
 """
 function Base.rand(rng::AbstractRNG, dists::AbstractArray{<:AbstractKernelDistribution{T}}, dims::Integer...) where {T}
-    A = array_for_rng(rng, T, dims...)
+    A = array_for_rng(rng, T, size(dists)..., dims...)
     rand!(rng, dists, A)
 end
 
-"""
-    rand(rng, dist, [dims...])
-Sample an Array from `dist` of size 1.
-"""
-Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution) = rand(rng, dist, 1)[]
-
-"""
-    rand(rng, dists, [dims...])
-Sample an Array from `dists` with the size of `dists`.
-"""
-Base.rand(rng::AbstractRNG, dists::AbstractArray{<:AbstractKernelDistribution{T}}) where {T} = rand(rng, dists, size(dists)...)
-
-# TODO test removed GLOBAL_RNG methods
+# TEST removed GLOBAL_RNG methods
 
 # Bijector for arrays
 Bijectors.bijector(dists::AbstractArray{<:AbstractKernelDistribution}) = bijector(first(dists))
 
 # CPU implementation
 
-function _rand!(rng::AbstractRNG, dist::AbstractKernelDistribution, A::Array)
-    A .= rand.((rng,), (dist,))
-end
-
-function _rand!(rng::AbstractRNG, dists::AbstractArray{<:AbstractKernelDistribution}, A::Array)
-    A .= rand.((rng,), dists)
+# TEST
+function _rand!(rng::AbstractRNG, dist::KernelOrKernelArray, A::Array)
+    A .= rand.(rng, dist)
 end
 
 # GPU implementation
@@ -191,7 +162,7 @@ KernelNormal(::Type{T}=Float32) where {T} = KernelNormal{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelNormal{T}) where {T} = print(io, "KernelNormal{$(T)}, μ: $(dist.μ), σ: $(dist.σ)")
 
-function logpdf(dist::KernelNormal{T}, x) where {T}
+function DensityInterface.logdensityof(dist::KernelNormal{T}, x) where {T}
     μ = dist.μ
     σ² = dist.σ^2
     # Unnormalized like MeasureTheroy logdensity_def
@@ -215,7 +186,7 @@ KernelExponential(::Type{T}=Float32) where {T} = KernelExponential{T}(1.0)
 
 Base.show(io::IO, dist::KernelExponential{T}) where {T} = print(io, "KernelExponential{$(T)}, λ: $(dist.λ)")
 
-logpdf(dist::KernelExponential{T}, x) where {T} = insupport(dist, x) ? -dist.λ * T(x) + log(dist.λ) : -typemax(T)
+DensityInterface.logdensityof(dist::KernelExponential{T}, x) where {T} = insupport(dist, x) ? -dist.λ * T(x) + log(dist.λ) : -typemax(T)
 
 Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = randexp(rng, T) / dist.λ
 
@@ -234,7 +205,7 @@ KernelUniform(::Type{T}=Float32) where {T} = KernelUniform{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelUniform{T}) where {T} = print(io, "KernelUniform{$(T)}, a: $(dist.min), b: $(dist.max)")
 
-logpdf(dist::KernelUniform{T}, x) where {T<:Real} = insupport(dist, x) ? -log(dist.max - dist.min) : -typemax(T)
+DensityInterface.logdensityof(dist::KernelUniform{T}, x) where {T<:Real} = insupport(dist, x) ? -log(dist.max - dist.min) : -typemax(T)
 
 Base.rand(rng::AbstractRNG, dist::KernelUniform{T}) where {T} = (dist.max - dist.min) * rand(rng, T) + dist.min
 
@@ -251,7 +222,7 @@ KernelCircularUniform(::Type{T}=Float32) where {T} = KernelCircularUniform{T}()
 
 Base.show(io::IO, ::KernelCircularUniform{T}) where {T} = print(io, "KernelCircularUniform{$(T)}")
 
-logpdf(dist::KernelCircularUniform{T}, x) where {T} = insupport(dist, x) ? -log(T(2π)) : -typemax(T)
+DensityInterface.logdensityof(dist::KernelCircularUniform{T}, x) where {T} = insupport(dist, x) ? -log(T(2π)) : -typemax(T)
 
 Base.rand(rng::AbstractRNG, ::KernelCircularUniform{T}) where {T} = T(2π) * rand(rng, T)
 
@@ -273,7 +244,7 @@ end
 
 Base.show(io::IO, dist::KernelBinaryMixture{T}) where {T} = print(io, "KernelBinaryMixture{$(T)}\n  components: $(dist.dist_1), $(dist.dist_2) \n  log weights: $(dist.log_weight_1), $(dist.log_weight_2)")
 
-logpdf(dist::KernelBinaryMixture{T}, x) where {T} = insupport(dist, x) ? logaddexp(dist.log_weight_1 + logpdf(dist.dist_1, x), dist.log_weight_2 + logpdf(dist.dist_2, x)) : -typemax(T)
+DensityInterface.logdensityof(dist::KernelBinaryMixture{T}, x) where {T} = insupport(dist, x) ? logaddexp(dist.log_weight_1 + logdensityof(dist.dist_1, x), dist.log_weight_2 + logdensityof(dist.dist_2, x)) : -typemax(T)
 
 function Base.rand(rng::AbstractRNG, dist::KernelBinaryMixture{T}) where {T}
     log_u = log(rand(rng, T))

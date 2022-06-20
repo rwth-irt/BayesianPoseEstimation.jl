@@ -13,19 +13,15 @@ Vectorization support by storing multiple distributions in an array for broadcas
 
 Implement:
 - marginals(): Return the internal array of distributions
-# TODO only used in logdensityof -> drop it and directly implement logdensityof
-- reduce_vectorized(operator, dist::AbstractVectorizedDistribution, A::AbstractArray) - individual reduction strategy, used in logdensityof
+- DensityInterface.logdensityof(dist::AbstractVectorizedDistribution, y) - individual reduction strategy for the array of KernelDistributions
 
 You can use:
-- DensityInterface.logdensityof(dist::AbstractVectorizedDistribution, x) - use logdensityof for arrays of KernelDistributions
 - Bijectors.bictor(dist)
 - rand & rand!
 - to_cpu(dist)
 - to_gpu(dist)
 """
 abstract type AbstractVectorizedDistribution end
-
-DensityInterface.logdensityof(dist::AbstractVectorizedDistribution, x) = reduce_vectorized(+, dist, logdensityof(marginals(dist), x))
 
 """
     to_cpu(dist)
@@ -49,13 +45,13 @@ Random.rand!(rng::AbstractRNG, dist::AbstractVectorizedDistribution, A::Abstract
     rand(rng, dist, [dims...])
 Sample an array from `dist` of size `dims`.
 """
-Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution, dims::Integer...) = rand(rng, marginals(dist), size(marginals(dist))..., dims...)
+Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution, dims::Integer...) = rand(rng, marginals(dist), dims...)
 
 """
     rand(rng, dist, [dims...])
 Sample an array from `dist` of size `dims`.
 """
-Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution) = rand(rng, marginals(dist), size(marginals(dist))...)
+Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution) = rand(rng, marginals(dist))
 
 """
     bijector(dist)
@@ -75,6 +71,15 @@ end
 
 marginals(dist::VectorizedDistribution) = dist.marginals
 
+function DensityInterface.logdensityof(dist::VectorizedDistribution, x)
+    n_red = ndims(marginals(dist))
+    # TODO is the intended design to be automatically broadcasted or should / can I leave it up to the user?
+    R = sum(logdensityof.(marginals(dist), x); dims=1:n_red)
+    # Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
+    # Does only support Tuple for dims
+    dropdims(R; dims=(1:n_red...,))
+end
+
 """
     VectorizedDistribution(dist)
 Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
@@ -83,17 +88,6 @@ VectorizedDistribution(dist::AbstractVectorizedDistribution) = VectorizedDistrib
 
 Base.show(io::IO, dist::VectorizedDistribution{T}) where {T} = print(io, "VectorizedDistribution{$(T)}\n  marginals: $(eltype(dist.marginals)) \n  size: $(size(dist.marginals))")
 
-
-"""
-    reduce_vectorized(operator, dist, A)
-Reduces the first `ndims(dist)` dimensions of the Matrix `A` using the `operator`. 
-"""
-function reduce_vectorized(operator, dist::VectorizedDistribution, A::AbstractArray)
-    n_red = ndims(marginals(dist))
-    R = reduce(operator, A; dims=(1:n_red...,))
-    # Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
-    dropdims(R; dims=(1:n_red...,))
-end
 
 # ProductDistribution
 
@@ -116,18 +110,12 @@ marginals(dist::ProductDistribution) = dist.marginals
 
 Base.show(io::IO, dist::ProductDistribution{T}) where {T} = print(io, "ProductDistribution{$(T)}\n  marginals: $(typeof(dist.marginals))\n  size: $(size(dist.marginals))")
 
-"""
-    reduce_vectorized(operatpr, dist, A)
-Reduces all dimensions of the Matrix `A` using the `operator`. 
-"""
-reduce_vectorized(operator, ::ProductDistribution, A::AbstractArray) = reduce(operator, A)
-
+DensityInterface.logdensityof(dist::ProductDistribution, x) = sum(logdensityof.(marginals(dist), x))
 
 # TODO is this what the Vectorized distribution should have been? 
-# TEST: to_gpu should not be required anymore since it should automatigacally operate on the correct device?
+# TEST: to_gpu should not be required anymore since it should automatically operate on the correct device?
 struct BroadcastedDistribution{T<:Broadcasted,N} <: AbstractVectorizedDistribution
     marginals::T
-    # TODO does it make sense to store the params as tuple?
     size::Dims{N}
 end
 
@@ -140,16 +128,34 @@ BroadcastedDistribution(T::Type, params...) = BroadcastedDistribution(T, (), par
 # TODO should the rng be based on the location of the params?
 marginals(dist::BroadcastedDistribution) = materialize(dist.marginals)
 
-# function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution, dims::Integer...)
-# Would need to know the type of the internal distribution
-#     array_for_rng(rng, Dist_T, dist.dims..., dims...))
-#     rand(rng, marginals(dist), size(marginals(dist))..., dims...)
-# end
-
-# TEST benachmark vs VectorizedDistribution
+# TEST benchmark vs VectorizedDistribution
 function DensityInterface.logdensityof(dist::BroadcastedDistribution, x)
-    logdensities = broadcasted(logdensityof, dist.marginals, x)
-    # TODO dims required as tuple or is range okay?
-    R = reduce(+, logdensities, dims=1:length(dist.size))
+    # WARN Efficient reduction of Broadcasted only works without dims. 
+    # logdensities = broadcasted(logdensityof, dist.marginals, x)
+    # TODO is this the same implementation as VectorizedDistribution?
+    R = sum(logdensityof.(dist.marginals, x), dims=1:length(dist.size))
+    # Does not support range, only tuple for dims
     dropdims(R; dims=(1:length(dist.size)...,))
 end
+
+# TODO might enable more efficient random number generation
+# struct BroadcastedTypedDistribution{T<:AbstractKernelDistribution,U,N} <: AbstractVectorizedDistribution
+#     dist_type::Type{T}
+#     params::U
+#     dims::Dims{N}
+# end
+
+# # function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution, dims::Integer...)
+# # Would need to know the type of the internal distribution
+# #     array_for_rng(rng, Dist_T, dist.dims..., dims...))
+# #     rand(rng, marginals(dist), size(marginals(dist))..., dims...)
+# # end
+
+# # TEST benachmark vs VectorizedDistribution
+# function DensityInterface.logdensityof(dist::BroadcastedTypedDistribution, x)
+#     # TODO single line is broadcasted lazily right?
+#     logdensities = broadcasted(logdensityof, dist.marginals, x)
+#     # TODO dims required as tuple or is range okay?
+#     R = reduce(+, logdensities, dims=1:length(dist.size))
+#     dropdims(R; dims=(1:length(dist.size)...,))
+# end
