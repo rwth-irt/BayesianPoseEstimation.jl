@@ -105,6 +105,7 @@ export KernelUniform
 # Vectorized distributions
 export ProductDistribution
 export VectorizedDistribution
+export sum_and_dropdims
 export to_cpu
 
 # Extensions and Reexports

@@ -63,31 +63,49 @@ Bijectors.bijector(dist::AbstractVectorizedDistribution) = marginals(dist) |> fi
 
 """
     VectorizedDistribution
-Behaves similar to the ProductKernel but assumes a vectorization of the data over last dimension.
+Broadcasts the marginals over the data for the evaluation of the logdensity.
+Specify the dimensions `dims` of a single data point to sum over these for the reduction.
+
+Special cases:
+* `dims = size(x)`: behaves like ProductDistribution
+* `dims = ()`: behaves like logdensity.(marginals, x)
 """
-struct VectorizedDistribution{T<:AbstractArray{<:AbstractKernelDistribution}} <: AbstractVectorizedDistribution
+struct VectorizedDistribution{T<:AbstractArray{<:AbstractKernelDistribution},N} <: AbstractVectorizedDistribution
     marginals::T
+    # TEST reduction for dims = size(marginals), or less
+    dims::Dims{N}
 end
 
-marginals(dist::VectorizedDistribution) = dist.marginals
+"""
+    VectorizedDistribution(dists)
+Specify custom reduction dimensions which differ from `dists` dimensions.
+"""
+VectorizedDistribution(dists::AbstractArray{<:AbstractKernelDistribution}, dims) = VectorizedDistribution(dists, Dims(dims))
 
-function DensityInterface.logdensityof(dist::VectorizedDistribution, x)
-    n_red = ndims(marginals(dist))
-    # TODO is the intended design to be automatically broadcasted or should / can I leave it up to the user?
-    R = sum(logdensityof.(marginals(dist), x); dims=1:n_red)
-    # Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
-    # Does only support Tuple for dims
-    dropdims(R; dims=(1:n_red...,))
-end
+"""
+    VectorizedDistribution(dists)
+Defaults the reduction dimensions to the first `ndims(dists)` dimensions.
+"""
+VectorizedDistribution(dists::AbstractArray{<:AbstractKernelDistribution}) = VectorizedDistribution(dists, 1:ndims(dists))
 
 """
     VectorizedDistribution(dist)
 Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
 """
-VectorizedDistribution(dist::AbstractVectorizedDistribution) = VectorizedDistribution(marginals(dist))
+VectorizedDistribution(dist::AbstractVectorizedDistribution) = VectorizedDistribution(marginals(dist), size(marginals(dist)))
 
-Base.show(io::IO, dist::VectorizedDistribution{T}) where {T} = print(io, "VectorizedDistribution{$(T)}\n  marginals: $(eltype(dist.marginals)) \n  size: $(size(dist.marginals))")
+Base.show(io::IO, dist::VectorizedDistribution{T}) where {T} = print(io, "VectorizedDistribution{$(T)}\n  marginals: $(eltype(dist.marginals)) of size: $(size(dist.marginals)) \n  dims: $(dist.dims)")
 
+marginals(dist::VectorizedDistribution) = dist.marginals
+
+"""
+    sum_and_dropdims(A; dims)
+Sum the matrix A over the given dimensions and drop the very same dimensions afterwards.
+Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
+"""
+sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
+
+DensityInterface.logdensityof(dist::VectorizedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
 
 # ProductDistribution
 
@@ -95,24 +113,29 @@ Base.show(io::IO, dist::VectorizedDistribution{T}) where {T} = print(io, "Vector
     ProductDistribution
 Assumes independent marginals, whose logdensity is the sum of each individual logdensity (like the MeasureTheory Product measure).
 """
-struct ProductDistribution{T<:AbstractArray{<:AbstractKernelDistribution}} <: AbstractVectorizedDistribution
+struct ProductDistribution{T,N} <: AbstractVectorizedDistribution
     # WARN CUDA kernels only work for the same distribution with different parametrization
     marginals::T
+
+    ProductDistribution(dists::T) where {N,T<:AbstractArray{<:AbstractKernelDistribution,N}} = new{T,N}(dists)
 end
 
 """
     ProductDistribution(dist)
-Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
+Convert an AbstractVectorizedDistribution to a ProductDistribution.
 """
 ProductDistribution(dist::AbstractVectorizedDistribution) = ProductDistribution(marginals(dist))
 
-marginals(dist::ProductDistribution) = dist.marginals
-
 Base.show(io::IO, dist::ProductDistribution{T}) where {T} = print(io, "ProductDistribution{$(T)}\n  marginals: $(typeof(dist.marginals))\n  size: $(size(dist.marginals))")
+
+marginals(dist::ProductDistribution) = dist.marginals
 
 DensityInterface.logdensityof(dist::ProductDistribution, x) = sum(logdensityof.(marginals(dist), x))
 
+
 # TODO is this what the Vectorized distribution should have been? 
+# TODO remove?
+
 # TEST: to_gpu should not be required anymore since it should automatically operate on the correct device?
 struct BroadcastedDistribution{T<:Broadcasted,N} <: AbstractVectorizedDistribution
     marginals::T

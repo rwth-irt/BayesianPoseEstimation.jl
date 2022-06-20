@@ -282,6 +282,7 @@ rand(curng, gvm, 2) |> flatten |> histogram
 @test logdensityof(gvm, M) isa Array{Float64,0}
 @test logdensityof(gvm, M) |> size == ()
 
+# TODO test different dims for data and VectorizedDistribution reduction
 M = rand(rng, gvm, 3);
 @inferred logdensityof(gvm, M)
 @test logdensityof(gvm, M) isa Vector{Float64}
