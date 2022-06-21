@@ -72,7 +72,6 @@ Special cases:
 """
 struct VectorizedDistribution{T<:AbstractArray{<:AbstractKernelDistribution},N} <: AbstractVectorizedDistribution
     marginals::T
-    # TEST reduction for dims = size(marginals), or less
     dims::Dims{N}
 end
 
@@ -82,11 +81,13 @@ Specify custom reduction dimensions which differ from `dists` dimensions.
 """
 VectorizedDistribution(dists::AbstractArray{<:AbstractKernelDistribution}, dims) = VectorizedDistribution(dists, Dims(dims))
 
+VectorizedDistribution(dists::AbstractArray{<:AbstractKernelDistribution}, dim::Integer) = VectorizedDistribution(dists, (dim,))
+
 """
     VectorizedDistribution(dists)
 Defaults the reduction dimensions to the first `ndims(dists)` dimensions.
 """
-VectorizedDistribution(dists::AbstractArray{<:AbstractKernelDistribution}) = VectorizedDistribution(dists, 1:ndims(dists))
+VectorizedDistribution(dists::T) where {N,T<:AbstractArray{<:AbstractKernelDistribution,N}} = VectorizedDistribution{T,N}(dists, Dims(1:N))
 
 """
     VectorizedDistribution(dist)
@@ -96,7 +97,13 @@ VectorizedDistribution(dist::AbstractVectorizedDistribution) = VectorizedDistrib
 
 Base.show(io::IO, dist::VectorizedDistribution{T}) where {T} = print(io, "VectorizedDistribution{$(T)}\n  marginals: $(eltype(dist.marginals)) of size: $(size(dist.marginals)) \n  dims: $(dist.dims)")
 
+Base.ndims(dist::VectorizedDistribution{<:Any,N}) where {N} = N
+
 marginals(dist::VectorizedDistribution) = dist.marginals
+
+# Custom implementation since the abstract type does not consider the reduction dims
+to_cpu(dist::VectorizedDistribution) = VectorizedDistribution(Array(marginals(dist)), dist.dims)
+SciGL.to_gpu(dist::VectorizedDistribution) = VectorizedDistribution(CuArray(marginals(dist)), dist.dims)
 
 """
     sum_and_dropdims(A; dims)
