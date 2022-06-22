@@ -13,7 +13,7 @@ Vectorization support by storing multiple distributions in an array for broadcas
 
 Implement:
 - marginals(): Return the internal array of distributions
-- DensityInterface.logdensityof(dist::AbstractVectorizedDistribution, y) - individual reduction strategy for the array of KernelDistributions
+- Distributions.logpdf(dist::AbstractVectorizedDistribution, y) - individual reduction strategy for the array of KernelDistributions
 
 You can use:
 - Bijectors.bictor(dist)
@@ -34,6 +34,15 @@ to_cpu(dist::T) where {T<:AbstractVectorizedDistribution} = T.name.wrapper(Array
 Transfer the internal distributions to the GPU.
 """
 SciGL.to_gpu(dist::T) where {T<:AbstractVectorizedDistribution} = T.name.wrapper(CuArray(marginals(dist)))
+
+# DensityInterface
+
+@inline DensityInterface.DensityKind(::AbstractVectorizedDistribution) = IsDensity()
+
+# Avoid method ambiguities for AbstractVectorizedDistribution with a specialized x
+DensityInterface.logdensityof(dist::AbstractVectorizedDistribution, x) = logpdf(dist, x)
+
+# Random interface
 
 """
     rand(rng, dist, [dims...])
@@ -112,7 +121,7 @@ Returns an array of size () instead of a scalar. Conditional conversion to scala
 """
 sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
 
-DensityInterface.logdensityof(dist::VectorizedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+Distributions.logpdf(dist::VectorizedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
 
 # ProductDistribution
 
@@ -137,7 +146,7 @@ Base.show(io::IO, dist::ProductDistribution{T}) where {T} = print(io, "ProductDi
 
 marginals(dist::ProductDistribution) = dist.marginals
 
-DensityInterface.logdensityof(dist::ProductDistribution, x) = sum(logdensityof.(marginals(dist), x))
+Distributions.logpdf(dist::ProductDistribution, x) = sum(logdensityof.(marginals(dist), x))
 
 
 # TODO is this what the Vectorized distribution should have been? 
@@ -159,7 +168,7 @@ BroadcastedDistribution(T::Type, params...) = BroadcastedDistribution(T, (), par
 marginals(dist::BroadcastedDistribution) = materialize(dist.marginals)
 
 # TEST benchmark vs VectorizedDistribution
-function DensityInterface.logdensityof(dist::BroadcastedDistribution, x)
+function Distributions.logpdf(dist::BroadcastedDistribution, x)
     # WARN Efficient reduction of Broadcasted only works without dims. 
     # logdensities = broadcasted(logdensityof, dist.marginals, x)
     # TODO is this the same implementation as VectorizedDistribution?

@@ -8,37 +8,35 @@ using .MCMCDepth
 
 using MCMCDepth
 using Bijectors
-using CUDA, MeasureTheory
-include("MeasureTheoryExtensions.jl")
+using CUDA
+using Distributions
 using Plots
+using LinearAlgebra
 using Random
 using Test
 
 const PLOT = false
 maybe_histogram(x...) = PLOT ? histogram(x...) : nothing
 
-# Yup 42 is bad style, like this emoji 🤣
+# Yup 42 is bad style
 curng = CUDA.RNG(42)
 rng = Random.default_rng(42)
 
-# WARN Different measure types not supported only different parametrization of the same type
+# WARN Different distribution types not supported only different parametrization of the same type
 # ProductDistribution
-pm = For(100, 10) do i, j
-    BinaryMixture(MeasureTheory.Exponential(λ=2.0), MeasureTheory.Normal(10.0, 2), 3, 1)
-end;
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 10))
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 50, 10))
 
 # Correct size
-@test rand(rng, gpm, 3) |> size == (100, 10, 3)
-@test rand(rng, gpm) |> size == (100, 10)
+@test rand(rng, gpm, 3) |> size == (50, 10, 3)
+@test rand(rng, gpm) |> size == (50, 10)
 
 # Type stability
 M = @inferred rand(rng, gpm)
 M = @inferred rand(curng, gpm)
 gpm = to_gpu(gpm)
 M = @inferred rand(curng, gpm)
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 10)) |> to_gpu
 M = @inferred rand(curng, gpm);
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelNormal{Float64}(10.0, 2.0), 3, 1), 100, 10)) |> to_gpu
 @test eltype(M) == Float64
 gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float32}(2.0), KernelNormal{Float32}(10.0, 2.0), 3, 1), 100, 10)) |> to_gpu
 M = @inferred rand(curng, gpm);
@@ -47,13 +45,15 @@ gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential{Float16}(2.
 M = @inferred rand(curng, gpm);
 @test eltype(M) == Float16
 
-gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelNormal(10.0, 2.0), 3, 1), 100, 100))
+# Use Float64 again and only vector size to compare with Distribution.jl Product
+gpm = ProductDistribution(fill(KernelBinaryMixture(KernelExponential(2.0), KernelUniform(2.0, 10.0), 3, 1), 50))
+product = Product([MixtureModel([Exponential(inv(2.0)), Uniform(2.0, 10.0)], normalize([3, 1], 1)) for i = 1:50])
 M = rand(rng, gpm);
 maybe_histogram(flatten(M))
-rand(pm) |> flatten |> maybe_histogram
+rand(product) |> flatten |> maybe_histogram
 rand(rng, gpm) |> flatten |> maybe_histogram
 @inferred logdensityof(gpm, M)
-@test logdensityof(gpm, M) ≈ logdensityof.((BinaryMixture(MeasureTheory.Exponential(λ=2.0), MeasureTheory.Normal(10.0, 2), 3, 1),), M) |> sum
+@test logdensityof(gpm, M) ≈ logdensityof(product, M)
 @test logdensityof(gpm, M) isa Float64
 
 M = rand(rng, gpm, 3);
@@ -61,9 +61,6 @@ M = rand(rng, gpm, 3);
 @test logdensityof(gpm, M) isa Float64
 
 # VectorizedDistribution
-pm = For(100, 10) do i, j
-    MeasureTheory.Normal(i, j)
-end;
 gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:10])
 
 # Correct size
@@ -85,13 +82,14 @@ gvm = VectorizedDistribution([KernelNormal{Float16}(i, j) for i = 1:100, j = 1:1
 M = @inferred rand(curng, gvm);
 @test eltype(M) == Float16
 
-gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:10])
+gvm = VectorizedDistribution([KernelNormal{Float64}(i, 2.0) for i = 1:100])
+product = Product([Normal(i, 2.0) for i = 1:100])
 M = rand(rng, gvm);
-histogram(flatten(M))
-rand(pm) |> flatten |> histogram
-rand(curng, gvm, 2) |> flatten |> histogram
+maybe_histogram(flatten(M))
+rand(product) |> flatten |> maybe_histogram
+rand(rng, gvm, 2) |> flatten |> maybe_histogram
 @inferred logdensityof(gvm, M)
-@test logdensityof(gvm, M)[] |> sum ≈ logdensityof(pm, Array(M))
+@test logdensityof(gvm, M)[] |> sum ≈ logdensityof(product, Array(M))
 @test logdensityof(gvm, M) isa Array{Float64,0}
 @test logdensityof(gvm, M) |> size == ()
 

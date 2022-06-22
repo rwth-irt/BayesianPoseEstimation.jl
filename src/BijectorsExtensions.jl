@@ -40,19 +40,22 @@ is_identity(::Bijector) = false
 is_identity(::Bijectors.Identity) = true
 
 """
-    is_identity(b)
-Returns true if the bijector is the identity, i.e. maps ℝ → ℝ
+    is_identity(bijector)
+Returns true if the `bijector` is the identity, i.e. maps ℝ → ℝ
 """
-is_identity(b::Bijector...) = mapreduce(is_identity, &, b)
+is_identity(bijector::Bijector...) = mapreduce(is_identity, &, bijector)
 
 """
-    is_identity(v)
+    is_identity(variable)
 Returns true if the bijector the variable is the identity, i.e. map ℝ → ℝ
 """
-is_identity(v::AbstractVariable) = is_identity(bijector(v))
+is_identity(variable::AbstractVariable...) = is_identity(bijector.(variable)...)
 
 """
-    is_identity(v)
-Returns true if the bijectors the variables of `s` are the identity, i.e. map ℝ → ℝ
+    is_identity(sample)
+Returns true if the bijectors the variables of the `sample` are the identity, i.e. map ℝ → ℝ
 """
-is_identity(s::Sample) = is_identity(values(vars(s))...)
+is_identity(sample::Sample) = is_identity(values(variables(sample))...)
+# is_identity(values(variables(sample))...)
+
+is_identity(model::IndependentModel) = is_identity(bijector.(values(models(model)))...)

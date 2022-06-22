@@ -5,6 +5,7 @@
 using Bijectors
 using CUDA
 using DensityInterface
+using Distributions
 using MCMCDepth
 using LogExpFunctions
 using Logging
@@ -32,38 +33,44 @@ The Interface requires the following to be implemented:
 - Bijectors.bijector(d): Bijector
 - `Base.rand(rng, dist::MyKernelDistribution{T})::T` generate a single random number from the distribution
 TODO
-- `DensityInterface.logdensityof(dist::MyKernelDistribution{T}, x)::T` evaluate the normalized logdensity
+- `Distributions.logpdf(dist::MyKernelDistribution{T}, x)::T` evaluate the normalized logdensity
 
 Most of the time Float64 precision is not required, especially for GPU computations.
 Thus, we default to Float32, mostly for memory capacity reasons.
 """
-abstract type AbstractKernelDistribution{T} end
+
+# TODO Update docs: Distributions.logpdf
+abstract type AbstractKernelDistribution{T,S<:ValueSupport} <: UnivariateDistribution{S} end
 
 # WARN parametric alias causes method ambiguities, since the parametric type is always present
 const KernelOrKernelArray = Union{AbstractKernelDistribution,AbstractArray{<:AbstractKernelDistribution}}
 # DensityInterface
 
-@inline DensityInterface.DensityKind(::AbstractKernelDistribution) = IsDensity()
+# TODO Should be handled by UnivariateDistribution
+# @inline DensityInterface.DensityKind(::AbstractKernelDistribution) = IsDensity()
 
-# A single distribution should behave similar to a 0 dimensional array
-Base.broadcastable(x::AbstractKernelDistribution) = Ref(x)
+# TODO should be handled by UnivariateDistribution
+# # A single distribution should behave similar to a 0 dimensional array
+# Base.broadcastable(x::AbstractKernelDistribution) = Ref(x)
 
-# Random interface
-
-"""
-    rand!(rng, dist, A)
-Mutate the array A by sampling from `dist`.
-"""
-Random.rand!(rng::AbstractRNG, dist::KernelOrKernelArray, A::AbstractArray) = _rand!(rng, dist, A)
+# Random Interface
 
 """
     rand(rng, dist, [dims...])
 Sample an Array from `dist` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution{T}, dims::Integer...) where {T}
+function Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution{T}, dims::Int...) where {T}
     A = array_for_rng(rng, T, dims...)
-    rand!(rng, dist, A)
+    rand_kernel!(rng, dist, A)
 end
+
+# Arrays of KernelDistributions → sample from the distributions instead of selecting random elements of the array
+
+"""
+    rand!(rng, dist, A)
+Mutate the array A by sampling from `dist`.
+"""
+Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:AbstractKernelDistribution}, A::AbstractArray) = rand_kernel!(rng, dist, A)
 
 """
     rand(rng, dist, [dims...])
@@ -76,25 +83,24 @@ end
 
 # TEST removed GLOBAL_RNG methods
 
-# Bijector for arrays
-Bijectors.bijector(dists::AbstractArray{<:AbstractKernelDistribution}) = bijector(first(dists))
-
-# CPU implementation
+# CPU Kernel
 
 # TEST
-function _rand!(rng::AbstractRNG, dist::KernelOrKernelArray, A::Array)
+function rand_kernel!(rng::AbstractRNG, dist::KernelOrKernelArray, A::Array)
     A .= rand.(rng, dist)
 end
 
-# GPU implementation
+# GPU Kernel
+# TODO implement rand(::CUDA.RNG)
 
-# TODO Might want this to fail instead of fallback?
-function _rand!(rng::AbstractRNG, dist::KernelOrKernelArray, A::CuArray{T}) where {T}
+
+# TODO Might want this to fail instead of fallback? Might not even get called anymore?
+function rand_kernel!(rng::AbstractRNG, dist::KernelOrKernelArray, A::CuArray{T}) where {T}
     @warn "Using unsupported RNG of type $(typeof(rng)) on CuArray. Falling back to SLOW sampling on CPU and copying it to the GPU."
     copyto!(A, rand!(rng, dist, Array{T}(undef, size(A)...)))
 end
 
-function _rand!(rng::CUDA.RNG, dist::KernelOrKernelArray, A::CuArray)
+function rand_kernel!(rng::CUDA.RNG, dist::KernelOrKernelArray, A::CuArray)
     d = maybe_cuda(A, dist)
     rand_barrier(d, A, rng.seed, rng.counter)
     new_counter = Int64(rng.counter) + length(A)
@@ -107,12 +113,20 @@ end
 # Function barrier for CUDA.RNG which is not isbits.
 # Wrapping rng in Tuple for broadcasting does not work → anonymous function is the workaround 
 # Thanks vchuravy https://github.com/JuliaGPU/CUDA.jl/issues/1480#issuecomment-1102245813
-function rand_barrier(dist::AbstractKernelDistribution, A::CuArray, seed, counter)
-    A .= (x -> rand(device_rng(seed, counter), x)).((dist,))
+function rand_barrier(dist::Union{AbstractKernelDistribution,CuArray{<:AbstractKernelDistribution}}, A::CuArray, seed, counter)
+    A .= (x -> rand(device_rng(seed, counter), x)).(dist)
 end
 
-function rand_barrier(dists::CuArray{<:AbstractKernelDistribution}, A::CuArray, seed, counter)
-    A .= (x -> rand(device_rng(seed, counter), x)).(dists)
+"""
+    device_rng(seed, counter)
+Use it inside a kernel to generate a correctly seeded device RNG.
+"""
+function device_rng(seed, counter)
+    # Replaced during kernel compilation: https://github.com/JuliaGPU/CUDA.jl/blob/778f7fa21f3f73841a2dada57767e358f80e5997/src/device/random.jl#L37
+    rng = Random.default_rng()
+    # Same as in CUDA.jl: https://github.com/JuliaGPU/CUDA.jl/blob/778f7fa21f3f73841a2dada57767e358f80e5997/src/random.jl#L79
+    @inbounds Random.seed!(rng, seed, counter)
+    rng
 end
 
 # GPU transfer helpers
@@ -140,21 +154,12 @@ function maybe_cuda(::CuArray, A::AbstractArray)
     CuArray(A)
 end
 
-"""
-    device_rng(seed, counter)
-Use it inside a kernel to generate a correctly seeded device RNG.
-"""
-function device_rng(seed, counter)
-    # Replaced during kernel compilation: https://github.com/JuliaGPU/CUDA.jl/blob/778f7fa21f3f73841a2dada57767e358f80e5997/src/device/random.jl#L37
-    rng = Random.default_rng()
-    # Same as in CUDA.jl: https://github.com/JuliaGPU/CUDA.jl/blob/778f7fa21f3f73841a2dada57767e358f80e5997/src/random.jl#L79
-    @inbounds Random.seed!(rng, seed, counter)
-    rng
-end
+# Bijector for arrays
+Bijectors.bijector(dists::AbstractArray{<:AbstractKernelDistribution}) = bijector(first(dists))
 
 # KernelNormal
 
-struct KernelNormal{T<:Real} <: AbstractKernelDistribution{T}
+struct KernelNormal{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     μ::T
     σ::T
 end
@@ -162,7 +167,7 @@ KernelNormal(::Type{T}=Float32) where {T} = KernelNormal{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelNormal{T}) where {T} = print(io, "KernelNormal{$(T)}, μ: $(dist.μ), σ: $(dist.σ)")
 
-function DensityInterface.logdensityof(dist::KernelNormal{T}, x) where {T}
+function Distributions.logpdf(dist::KernelNormal{T}, x) where {T}
     μ = dist.μ
     σ² = dist.σ^2
     # Unnormalized like MeasureTheroy logdensity_def
@@ -179,14 +184,15 @@ Bijectors.bijector(::KernelNormal) = Bijectors.Identity{0}()
 
 # KernelExponential
 
-struct KernelExponential{T<:Real} <: AbstractKernelDistribution{T}
+struct KernelExponential{T<:Real} <: AbstractKernelDistribution{T,Continuous}
+    # WARN rate not scale (Distributions.jl)
     λ::T
 end
 KernelExponential(::Type{T}=Float32) where {T} = KernelExponential{T}(1.0)
 
 Base.show(io::IO, dist::KernelExponential{T}) where {T} = print(io, "KernelExponential{$(T)}, λ: $(dist.λ)")
 
-DensityInterface.logdensityof(dist::KernelExponential{T}, x) where {T} = insupport(dist, x) ? -dist.λ * T(x) + log(dist.λ) : -typemax(T)
+Distributions.logpdf(dist::KernelExponential{T}, x) where {T} = insupport(dist, x) ? -dist.λ * T(x) + log(dist.λ) : -typemax(T)
 
 Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = randexp(rng, T) / dist.λ
 
@@ -197,7 +203,7 @@ Bijectors.bijector(::KernelExponential) = Bijectors.Log{0}()
 
 # KernelUniform
 
-struct KernelUniform{T<:Real} <: AbstractKernelDistribution{T}
+struct KernelUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     min::T
     max::T
 end
@@ -205,7 +211,7 @@ KernelUniform(::Type{T}=Float32) where {T} = KernelUniform{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelUniform{T}) where {T} = print(io, "KernelUniform{$(T)}, a: $(dist.min), b: $(dist.max)")
 
-DensityInterface.logdensityof(dist::KernelUniform{T}, x) where {T<:Real} = insupport(dist, x) ? -log(dist.max - dist.min) : -typemax(T)
+Distributions.logpdf(dist::KernelUniform{T}, x) where {T<:Real} = insupport(dist, x) ? -log(dist.max - dist.min) : -typemax(T)
 
 Base.rand(rng::AbstractRNG, dist::KernelUniform{T}) where {T} = (dist.max - dist.min) * rand(rng, T) + dist.min
 
@@ -216,13 +222,13 @@ Bijectors.bijector(dist::KernelUniform) = Bijectors.TruncatedBijector{0}(minimum
 
 # KernelCircularUniform
 
-struct KernelCircularUniform{T<:Real} <: AbstractKernelDistribution{T} end
+struct KernelCircularUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous} end
 
 KernelCircularUniform(::Type{T}=Float32) where {T} = KernelCircularUniform{T}()
 
 Base.show(io::IO, ::KernelCircularUniform{T}) where {T} = print(io, "KernelCircularUniform{$(T)}")
 
-DensityInterface.logdensityof(dist::KernelCircularUniform{T}, x) where {T} = insupport(dist, x) ? -log(T(2π)) : -typemax(T)
+Distributions.logpdf(dist::KernelCircularUniform{T}, x) where {T} = insupport(dist, x) ? -log(T(2π)) : -typemax(T)
 
 Base.rand(rng::AbstractRNG, ::KernelCircularUniform{T}) where {T} = T(2π) * rand(rng, T)
 
@@ -233,18 +239,20 @@ Bijectors.bijector(::KernelCircularUniform) = Circular{0}()
 
 # KernelBinaryMixture
 
-struct KernelBinaryMixture{T<:Real,U<:AbstractKernelDistribution{T},V<:AbstractKernelDistribution{T}} <: AbstractKernelDistribution{T}
+# Value support makes only sense to be either Discrete or Continuous
+struct KernelBinaryMixture{T<:Real,S<:ValueSupport,U<:AbstractKernelDistribution{T,S},V<:AbstractKernelDistribution{T,S}} <: AbstractKernelDistribution{T,S}
     dist_1::U
     dist_2::V
     # Prefer log here, since the logdensity will be used more often than rand
     log_weight_1::T
     log_weight_2::T
-    KernelBinaryMixture(dist_1::U, dist_2::V, weight_1, weight_2) where {T,U<:AbstractKernelDistribution{T},V<:AbstractKernelDistribution{T}} = new{T,U,V}(dist_1, dist_2, Float32(log(weight_1 / (weight_1 + weight_2))), Float32(log(weight_2 / (weight_1 + weight_2))))
+    KernelBinaryMixture(dist_1::U, dist_2::V, weight_1, weight_2) where {T,S<:ValueSupport,U<:AbstractKernelDistribution{T,S},V<:AbstractKernelDistribution{T,S}} = new{T,S,U,V}(dist_1, dist_2, Float32(log(weight_1 / (weight_1 + weight_2))), Float32(log(weight_2 / (weight_1 + weight_2))))
 end
 
 Base.show(io::IO, dist::KernelBinaryMixture{T}) where {T} = print(io, "KernelBinaryMixture{$(T)}\n  components: $(dist.dist_1), $(dist.dist_2) \n  log weights: $(dist.log_weight_1), $(dist.log_weight_2)")
 
-DensityInterface.logdensityof(dist::KernelBinaryMixture{T}, x) where {T} = insupport(dist, x) ? logaddexp(dist.log_weight_1 + logdensityof(dist.dist_1, x), dist.log_weight_2 + logdensityof(dist.dist_2, x)) : -typemax(T)
+Distributions.logpdf(dist::KernelBinaryMixture{T}, x) where {T} = insupport(dist, x) ? logaddexp(dist.log_weight_1 + logdensityof(dist.dist_1, x), dist.log_weight_2 + logdensityof(dist.dist_2, x)) : -typemax(T)
+
 
 function Base.rand(rng::AbstractRNG, dist::KernelBinaryMixture{T}) where {T}
     log_u = log(rand(rng, T))

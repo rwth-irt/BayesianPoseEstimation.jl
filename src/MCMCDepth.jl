@@ -36,7 +36,6 @@ export raw_value
 export Sample
 
 export flatten
-export logp
 export merge
 export unconstrained_state
 export variables
@@ -117,7 +116,7 @@ using Reexport
 @reexport import Random: rand!
 
 # Bijectors
-@reexport import Bijectors: bijector, with_logabsdet_jacobian
+@reexport import Bijectors: bijector, link, invlink, with_logabsdet_jacobian, transformed
 export Circular
 export is_identity
 
