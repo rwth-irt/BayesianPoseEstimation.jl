@@ -176,6 +176,7 @@ gvm = VectorizedDistribution([KernelNormal{Float64}(i, j) for i = 1:100, j = 1:1
 M = @inferred rand(curng, gvm, 100, 5);
 @test logdensityof(gpm, M) == logdensityof(gvm, M)[]
 
+# TODO should not be required anymore if I do not use the variables
 # Method ambiguities
 @inferred logdensityof(KernelExponential(Float64), 100)
 logdensityof_single_dist_array_data() = logdensityof.(KernelExponential(Float64), [100, 1])

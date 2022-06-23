@@ -65,6 +65,9 @@ function Base.rand(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Int.
     _rand!(rng, dist, A)
 end
 
+# Avoid recursions of the above
+rand(rng::AbstractRNG, transformed_dist::UnivariateTransformed{<:AbstractKernelDistribution}) = transformed_dist.transform(rand(rng, transformed_dist.dist))
+
 # Arrays of KernelDistributions → sample from the distributions instead of selecting random elements of the array
 
 """
@@ -82,21 +85,14 @@ Mutate the array A by sampling from `dist`.
 """
 Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:KernelOrTransformedKernel}, A::AbstractArray) = _rand!(rng, dist, A)
 
-# TEST removed GLOBAL_RNG methods
-
-# CPU Kernel
-
-# TODO rethink naming and what is actually required
-_rand(rng::AbstractRNG, dist) = rand(rng, dist)
-
-_rand(rng::AbstractRNG, transformed_dist::UnivariateTransformed) = transformed_dist.transform(rand(rng, transformed_dist.dist))
+# CPU implementation
 
 function _rand!(rng::AbstractRNG, transformed_dist::KernelOrKernelArray, A::Array)
     # Avoid endless recursions for rand(rng, dist::KernelOrTransformedKernel)
-    @. A = _rand(rng, transformed_dist)
+    @. A = rand(rng, transformed_dist)
 end
 
-# GPU Kernel
+# GPU implementation
 
 # TODO Might want this to fail instead of fallback? Might not even get called anymore?
 function _rand!(rng::AbstractRNG, dist, A::CuArray{T}) where {T}
@@ -106,7 +102,7 @@ end
 
 function _rand!(rng::CUDA.RNG, dist, A::CuArray)
     d = maybe_cuda(A, dist)
-    rand_barrier(d, A, rng.seed, rng.counter)
+    _rand_cuda_rng(d, A, rng.seed, rng.counter)
     new_counter = Int64(rng.counter) + length(A)
     overflow, remainder = fldmod(new_counter, typemax(UInt32))
     rng.seed += overflow
@@ -117,8 +113,8 @@ end
 # Function barrier for CUDA.RNG which is not isbits.
 # Wrapping rng in Tuple for broadcasting does not work → anonymous function is the workaround 
 # Thanks vchuravy https://github.com/JuliaGPU/CUDA.jl/issues/1480#issuecomment-1102245813
-function rand_barrier(dist, A, seed, counter)
-    A .= (x -> _rand(device_rng(seed, counter), x)).(dist)
+function _rand_cuda_rng(dist, A, seed, counter)
+    A .= (x -> rand(device_rng(seed, counter), x)).(dist)
 end
 
 """
@@ -137,8 +133,8 @@ end
 
 """
     array_for_rng(rng, T, dims...)
-Generate the correct array to be used in rand! based on the rng provided.
-CuArray for CUD
+Generate the correct array to be used in rand! based on the random number generator provided.
+CuArray for CUDA.RNG and Array for all other RNGs.
 """
 array_for_rng(::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = Array{T}(undef, dims...)
 array_for_rng(::CUDA.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
