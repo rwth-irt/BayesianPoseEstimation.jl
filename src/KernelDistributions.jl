@@ -27,31 +27,32 @@ KernelDistributions offer the following interface functions:
 - `DensityInterface.logdensityof(dist::KernelDistribution, x)`
 - `Random.rand!(rng, dist::KernelDistribution, A)`
 - `Base.rand(rng, dist::KernelDistribution, dims...)`
-- maximum(d), minimum(d), insupport(d): Determine the support of the distribution
+- `Base.eltype(::Type{<:AbstractKernelDistribution})`: Number format of the distribution, e.g. Float16
 
 The Interface requires the following to be implemented:
 - Bijectors.bijector(d): Bijector
 - `Base.rand(rng, dist::MyKernelDistribution{T})::T` generate a single random number from the distribution
-TODO
 - `Distributions.logpdf(dist::MyKernelDistribution{T}, x)::T` evaluate the normalized logdensity
+- `Base.maximum(d), Base.minimum(d), Distributions.insupport(d)`: Determine the support of the distribution
 
 Most of the time Float64 precision is not required, especially for GPU computations.
 Thus, we default to Float32, mostly for memory capacity reasons.
 """
 
-# TODO Update docs: Distributions.logpdf
+# TODO Update docs: Distributions.logpdf, Distributions.insupport
 abstract type AbstractKernelDistribution{T,S<:ValueSupport} <: UnivariateDistribution{S} end
 
 # WARN parametric alias causes method ambiguities, since the parametric type is always present
-const KernelOrKernelArray = Union{AbstractKernelDistribution,AbstractArray{<:AbstractKernelDistribution}}
-# DensityInterface
+const KernelOrTransformedKernel = Union{AbstractKernelDistribution,UnivariateTransformed{<:AbstractKernelDistribution}}
 
-# TODO Should be handled by UnivariateDistribution
-# @inline DensityInterface.DensityKind(::AbstractKernelDistribution) = IsDensity()
+const KernelOrKernelArray = Union{KernelOrTransformedKernel,AbstractArray{<:KernelOrTransformedKernel}}
 
-# TODO should be handled by UnivariateDistribution
-# # A single distribution should behave similar to a 0 dimensional array
-# Base.broadcastable(x::AbstractKernelDistribution) = Ref(x)
+"""
+    eltype(kernel_distribution)
+Get the parameter type of the distribution, e.g. Float16
+"""
+Base.eltype(::Type{<:AbstractKernelDistribution{T}}) where {T} = T
+Base.eltype(::Type{<:UnivariateTransformed{T}}) where {T} = eltype(T)
 
 # Random Interface
 
@@ -59,48 +60,51 @@ const KernelOrKernelArray = Union{AbstractKernelDistribution,AbstractArray{<:Abs
     rand(rng, dist, [dims...])
 Sample an Array from `dist` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, dist::AbstractKernelDistribution{T}, dims::Int...) where {T}
-    A = array_for_rng(rng, T, dims...)
-    rand_kernel!(rng, dist, A)
+function Base.rand(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Int...)
+    A = array_for_rng(rng, eltype(dist), dims...)
+    _rand!(rng, dist, A)
 end
 
 # Arrays of KernelDistributions → sample from the distributions instead of selecting random elements of the array
 
 """
-    rand!(rng, dist, A)
-Mutate the array A by sampling from `dist`.
-"""
-Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:AbstractKernelDistribution}, A::AbstractArray) = rand_kernel!(rng, dist, A)
-
-"""
     rand(rng, dist, [dims...])
 Sample an Array from `dists` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, dists::AbstractArray{<:AbstractKernelDistribution{T}}, dims::Integer...) where {T}
-    A = array_for_rng(rng, T, size(dists)..., dims...)
-    rand!(rng, dists, A)
+function Base.rand(rng::AbstractRNG, dists::AbstractArray{T}, dims::Integer...) where {T<:KernelOrKernelArray}
+    A = array_for_rng(rng, eltype(T), size(dists)..., dims...)
+    _rand!(rng, dists, A)
 end
+
+"""
+    rand!(rng, dist, A)
+Mutate the array A by sampling from `dist`.
+"""
+Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:KernelOrTransformedKernel}, A::AbstractArray) = _rand!(rng, dist, A)
 
 # TEST removed GLOBAL_RNG methods
 
 # CPU Kernel
 
-# TEST
-function rand_kernel!(rng::AbstractRNG, dist::KernelOrKernelArray, A::Array)
-    A .= rand.(rng, dist)
+# TODO rethink naming and what is actually required
+_rand(rng::AbstractRNG, dist) = rand(rng, dist)
+
+_rand(rng::AbstractRNG, transformed_dist::UnivariateTransformed) = transformed_dist.transform(rand(rng, transformed_dist.dist))
+
+function _rand!(rng::AbstractRNG, transformed_dist::KernelOrKernelArray, A::Array)
+    # Avoid endless recursions for rand(rng, dist::KernelOrTransformedKernel)
+    @. A = _rand(rng, transformed_dist)
 end
 
 # GPU Kernel
-# TODO implement rand(::CUDA.RNG)
-
 
 # TODO Might want this to fail instead of fallback? Might not even get called anymore?
-function rand_kernel!(rng::AbstractRNG, dist::KernelOrKernelArray, A::CuArray{T}) where {T}
+function _rand!(rng::AbstractRNG, dist, A::CuArray{T}) where {T}
     @warn "Using unsupported RNG of type $(typeof(rng)) on CuArray. Falling back to SLOW sampling on CPU and copying it to the GPU."
     copyto!(A, rand!(rng, dist, Array{T}(undef, size(A)...)))
 end
 
-function rand_kernel!(rng::CUDA.RNG, dist::KernelOrKernelArray, A::CuArray)
+function _rand!(rng::CUDA.RNG, dist, A::CuArray)
     d = maybe_cuda(A, dist)
     rand_barrier(d, A, rng.seed, rng.counter)
     new_counter = Int64(rng.counter) + length(A)
@@ -113,8 +117,8 @@ end
 # Function barrier for CUDA.RNG which is not isbits.
 # Wrapping rng in Tuple for broadcasting does not work → anonymous function is the workaround 
 # Thanks vchuravy https://github.com/JuliaGPU/CUDA.jl/issues/1480#issuecomment-1102245813
-function rand_barrier(dist::Union{AbstractKernelDistribution,CuArray{<:AbstractKernelDistribution}}, A::CuArray, seed, counter)
-    A .= (x -> rand(device_rng(seed, counter), x)).(dist)
+function rand_barrier(dist, A, seed, counter)
+    A .= (x -> _rand(device_rng(seed, counter), x)).(dist)
 end
 
 """
@@ -155,7 +159,8 @@ function maybe_cuda(::CuArray, A::AbstractArray)
 end
 
 # Bijector for arrays
-Bijectors.bijector(dists::AbstractArray{<:AbstractKernelDistribution}) = bijector(first(dists))
+
+Bijectors.bijector(dists::AbstractArray{<:KernelOrTransformedKernel}) = bijector(first(dists))
 
 # KernelNormal
 
@@ -179,8 +184,8 @@ Base.rand(rng::AbstractRNG, dist::KernelNormal{T}) where {T} = dist.σ * randn(r
 
 Base.maximum(::KernelNormal{T}) where {T} = typemax(T)
 Base.minimum(::KernelNormal{T}) where {T} = typemin(T)
-insupport(::KernelNormal, ::Real) = true
 Bijectors.bijector(::KernelNormal) = Bijectors.Identity{0}()
+Distributions.insupport(::KernelNormal, ::Real) = true
 
 # KernelExponential
 
@@ -198,8 +203,8 @@ Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = randexp(rng,
 
 Base.maximum(::KernelExponential{T}) where {T} = typemax(T)
 Base.minimum(::KernelExponential{T}) where {T} = zero(T)
-insupport(dist::KernelExponential, x) = minimum(dist) <= x
 Bijectors.bijector(::KernelExponential) = Bijectors.Log{0}()
+Distributions.insupport(dist::KernelExponential, x::Real) = minimum(dist) <= x
 
 # KernelUniform
 
@@ -217,8 +222,8 @@ Base.rand(rng::AbstractRNG, dist::KernelUniform{T}) where {T} = (dist.max - dist
 
 Base.maximum(dist::KernelUniform) = dist.max
 Base.minimum(dist::KernelUniform) = dist.min
-insupport(dist::KernelUniform, x) = minimum(dist) <= x <= maximum(dist)
 Bijectors.bijector(dist::KernelUniform) = Bijectors.TruncatedBijector{0}(minimum(dist), maximum(dist))
+Distributions.insupport(dist::KernelUniform, x::Real) = minimum(dist) <= x <= maximum(dist)
 
 # KernelCircularUniform
 
@@ -234,8 +239,8 @@ Base.rand(rng::AbstractRNG, ::KernelCircularUniform{T}) where {T} = T(2π) * ran
 
 Base.maximum(::KernelCircularUniform{T}) where {T} = T(2π)
 Base.minimum(::KernelCircularUniform{T}) where {T} = zero(T)
-insupport(dist::KernelCircularUniform, x) = minimum(dist) <= x <= maximum(dist)
 Bijectors.bijector(::KernelCircularUniform) = Circular{0}()
+Distributions.insupport(dist::KernelCircularUniform, x::Real) = minimum(dist) <= x <= maximum(dist)
 
 # KernelBinaryMixture
 
@@ -266,5 +271,5 @@ end
 # The support of a mixture is the union of the support of its components
 Base.maximum(dist::KernelBinaryMixture) = max(maximum(dist.dist_1), maximum(dist.dist_2))
 Base.minimum(dist::KernelBinaryMixture) = min(minimum(dist.dist_1), minimum(dist.dist_2))
-insupport(dist::KernelBinaryMixture, x) = minimum(dist) <= x <= maximum(dist)
 Bijectors.bijector(dist::KernelBinaryMixture) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
+Distributions.insupport(dist::KernelBinaryMixture, x::Real) = minimum(dist) <= x <= maximum(dist)

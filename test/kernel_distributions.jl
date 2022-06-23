@@ -65,9 +65,9 @@ gn = KernelNormal(10.0, 2.0)
 
 @test maximum(KernelNormal(Float16)) == Inf16
 @test minimum(KernelNormal(Float16)) == -Inf16
-@test MCMCDepth.insupport(KernelNormal(Float16), 0)
-@test MCMCDepth.insupport(KernelNormal(Float16), Inf)
-@test MCMCDepth.insupport(KernelNormal(Float16), -Inf)
+@test insupport(KernelNormal(Float16), 0)
+@test insupport(KernelNormal(Float16), Inf)
+@test insupport(KernelNormal(Float16), -Inf)
 @test bijector(KernelNormal()) == bijector(Normal())
 
 M = rand(rng, gn, 100, 100)
@@ -93,9 +93,9 @@ ge = KernelExponential(0.1)
 
 @test maximum(KernelExponential(Float16)) == Inf16
 @test minimum(KernelExponential(Float16)) == 0
-@test MCMCDepth.insupport(KernelExponential(Float16), 0)
-@test MCMCDepth.insupport(KernelExponential(Float16), Inf)
-@test !MCMCDepth.insupport(KernelExponential(Float16), -eps(Float16))
+@test insupport(KernelExponential(Float16), 0)
+@test insupport(KernelExponential(Float16), Inf)
+@test !insupport(KernelExponential(Float16), -eps(Float16))
 @test bijector(KernelExponential()) == bijector(Exponential())
 
 M = rand(rng, ge, 100, 100)
@@ -122,10 +122,10 @@ uniform = Uniform(5.0, 10.0)
 
 @test maximum(KernelUniform{Float16}(1, 10)) == Float16(10)
 @test minimum(KernelUniform{Float16}(1, 10)) == Float16(1)
-@test MCMCDepth.insupport(KernelUniform{Float16}(1, 10), 1)
-@test MCMCDepth.insupport(KernelUniform{Float16}(1, 10), 10)
-@test !MCMCDepth.insupport(KernelUniform{Float32}(1, 10), 10.001)
-@test !MCMCDepth.insupport(KernelUniform{Float32}(1, 10), 0.999)
+@test insupport(KernelUniform{Float16}(1, 10), 1)
+@test insupport(KernelUniform{Float16}(1, 10), 10)
+@test !insupport(KernelUniform{Float32}(1, 10), 10.001)
+@test !insupport(KernelUniform{Float32}(1, 10), 0.999)
 @test bijector(KernelUniform(Int64)) == bijector(Uniform())
 @test bijector(KernelUniform(Float64)) == bijector(Uniform())
 @test bijector(KernelUniform(1.0, 10.0)) == bijector(Uniform(1.0, 10.0))
@@ -153,10 +153,10 @@ pseudo_circular = Uniform(0, 2π)
 
 @test maximum(KernelCircularUniform{Float16}()) == Float16(2π)
 @test minimum(KernelCircularUniform{Float16}()) == Float16(0)
-@test MCMCDepth.insupport(KernelCircularUniform{Float16}(), Float16(2π))
-@test MCMCDepth.insupport(KernelCircularUniform{Float16}(), 0)
-@test !MCMCDepth.insupport(KernelCircularUniform{Float32}(), -0001)
-@test !MCMCDepth.insupport(KernelCircularUniform{Float32}(), 2π + 0.001)
+@test insupport(KernelCircularUniform{Float16}(), Float16(2π))
+@test insupport(KernelCircularUniform{Float16}(), 0)
+@test !insupport(KernelCircularUniform{Float32}(), -0001)
+@test !insupport(KernelCircularUniform{Float32}(), 2π + 0.001)
 @test bijector(KernelCircularUniform(Int64)) == Circular{0}()
 
 M = rand(rng, gcu, 100, 100)
@@ -182,10 +182,10 @@ M = @inferred rand(curng, KernelBinaryMixture(KernelExponential{Float16}(2.0), K
 @test maximum(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == 3
 @test minimum(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == 1
 @test minimum(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelNormal{Float64}(1.0, 2.0), 3, 1)) == -Inf
-@test MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 1.0)
-@test MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 3.0)
-@test !MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 0.99999)
-@test !MCMCDepth.insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 3.0001)
+@test insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 1.0)
+@test insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 3.0)
+@test !insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 0.99999)
+@test !insupport(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1), 3.0001)
 @test bijector(KernelBinaryMixture(KernelUniform{Float64}(2.0, 3.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(1.0, 3.0)
 @test bijector(KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(-1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(-1.0, Inf)
 @test bijector(KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(1.0, 2.0), 3, 1)) == Bijectors.TruncatedBijector(0.0, Inf)
