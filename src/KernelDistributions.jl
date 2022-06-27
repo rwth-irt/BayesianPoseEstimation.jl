@@ -66,7 +66,7 @@ function Base.rand(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Int.
 end
 
 # Avoid recursions of the above
-rand(rng::AbstractRNG, transformed_dist::UnivariateTransformed{<:AbstractKernelDistribution}) = transformed_dist.transform(rand(rng, transformed_dist.dist))
+Base.rand(rng::AbstractRNG, transformed_dist::UnivariateTransformed{<:AbstractKernelDistribution}) = transformed_dist.transform(rand(rng, transformed_dist.dist))
 
 # Arrays of KernelDistributions → sample from the distributions instead of selecting random elements of the array
 
@@ -87,9 +87,14 @@ Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:KernelOrTransformedKernel},
 
 # CPU implementation
 
-function _rand!(rng::AbstractRNG, transformed_dist::KernelOrKernelArray, A::Array)
+"""
+    _rand!(rng, dist, A)
+Internal inplace random function which allows dispatching based on the RNG and output array.
+Keeping dist as Any  allows more flexibility, for example passing a Broadcasted to avoid allocations.
+"""
+function _rand!(rng::AbstractRNG, dist, A::Array)
     # Avoid endless recursions for rand(rng, dist::KernelOrTransformedKernel)
-    @. A = rand(rng, transformed_dist)
+    @. A = rand(rng, dist)
 end
 
 # GPU implementation
@@ -164,6 +169,8 @@ struct KernelNormal{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     μ::T
     σ::T
 end
+# TEST
+KernelNormal(μ, σ) = KernelNormal(promote(μ, σ)...)
 KernelNormal(::Type{T}=Float32) where {T} = KernelNormal{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelNormal{T}) where {T} = print(io, "KernelNormal{$(T)}, μ: $(dist.μ), σ: $(dist.σ)")
@@ -208,6 +215,8 @@ struct KernelUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     min::T
     max::T
 end
+# TEST
+KernelUniform(min, max) = KernelUniform(promote(min, max)...)
 KernelUniform(::Type{T}=Float32) where {T} = KernelUniform{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelUniform{T}) where {T} = print(io, "KernelUniform{$(T)}, a: $(dist.min), b: $(dist.max)")
