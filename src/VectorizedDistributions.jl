@@ -56,11 +56,12 @@ Sample an array from `dist` of size `dims`.
 """
 Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution, dims::Integer...) = rand(rng, marginals(dist), dims...)
 
-"""
-    rand(rng, dist, [dims...])
-Sample an array from `dist` of size `dims`.
-"""
-Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution) = rand(rng, marginals(dist))
+# TODO remove
+# """
+#     rand(rng, dist, [dims...])
+# Sample an array from `dist` of size `dims`.
+# """
+# Base.rand(rng::AbstractRNG, dist::AbstractVectorizedDistribution) = rand(rng, marginals(dist))
 
 """
     bijector(dist)
@@ -94,7 +95,7 @@ VectorizedDistribution(dists::AbstractArray{<:AbstractKernelDistribution}, dim::
 
 """
     VectorizedDistribution(dists)
-Defaults the reduction dimensions to the first `ndims(dists)` dimensions.
+Defaults the reduction dimensions of the first `ndims(dists)` dimensions.
 """
 VectorizedDistribution(dists::T) where {N,T<:AbstractArray{<:AbstractKernelDistribution,N}} = VectorizedDistribution{T,N}(dists, Dims(1:N))
 
@@ -102,11 +103,12 @@ VectorizedDistribution(dists::T) where {N,T<:AbstractArray{<:AbstractKernelDistr
     VectorizedDistribution(dist)
 Convert an AbstractVectorizedDistribution to a VectorizedDistribution.
 """
+# TODO is size correct?
 VectorizedDistribution(dist::AbstractVectorizedDistribution) = VectorizedDistribution(marginals(dist), size(marginals(dist)))
 
 Base.show(io::IO, dist::VectorizedDistribution{T}) where {T} = print(io, "VectorizedDistribution{$(T)}\n  marginals: $(eltype(dist.marginals)) of size: $(size(dist.marginals)) \n  dims: $(dist.dims)")
 
-Base.ndims(dist::VectorizedDistribution{<:Any,N}) where {N} = N
+Base.ndims(::VectorizedDistribution{<:Any,N}) where {N} = N
 
 marginals(dist::VectorizedDistribution) = dist.marginals
 
@@ -122,6 +124,39 @@ Returns an array of size () instead of a scalar. Conditional conversion to scala
 sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
 
 Distributions.logpdf(dist::VectorizedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+
+# TransformedVectorizedDistribution
+
+struct TransformedVectorizedDistribution{T,N} <: AbstractVectorizedDistribution
+    internal::VectorizedDistribution{T,N}
+end
+
+Bijectors.transformed(dist::VectorizedDistribution) = TransformedVectorizedDistribution(dist)
+
+Base.show(io::IO, dist::TransformedVectorizedDistribution{T,N}) where {T,N} = print(io, "TransformedVectorizedDistribution{$(T),$(N)}\n  internal: $(dist.internal)")
+
+Base.ndims(::TransformedVectorizedDistribution{<:Any,N}) where {N} = N
+
+marginals(dist::TransformedVectorizedDistribution) = dist.internal |> marginals .|> transformed
+
+# Custom implementation since the abstract type does not consider the reduction dims
+to_cpu(dist::TransformedVectorizedDistribution) = dist.internal |> to_cpu |> TransformedVectorizedDistribution
+SciGL.to_gpu(dist::TransformedVectorizedDistribution) = dist.internal |> to_gpu |> TransformedVectorizedDistribution
+
+# TODO maybe introduce AbstractTransformedVectorizedDistribution
+
+# Broadcastable implementations to avoid allocations for the transformations
+
+Random.rand!(rng::AbstractRNG, dist::TransformedVectorizedDistribution, A::AbstractArray) = _rand!(rng, broadcasted(transformed, marginals(dist.internal)), A)
+
+function Base.rand(rng::AbstractRNG, dist::TransformedVectorizedDistribution, dims::Integer...)
+    internal_marginals = marginals(dist.internal)
+    A = array_for_rng(rng, eltype(first(internal_marginals)), size(internal_marginals)..., dims...)
+    rand!(rng, dist, A)
+end
+
+Distributions.logpdf(dist::TransformedVectorizedDistribution, x) = sum_and_dropdims(logdensityof.(transformed.(marginals(dist.internal)), x); dims=ndims(dist.internal))
+
 
 # ProductDistribution
 
@@ -148,53 +183,108 @@ marginals(dist::ProductDistribution) = dist.marginals
 
 Distributions.logpdf(dist::ProductDistribution, x) = sum(logdensityof.(marginals(dist), x))
 
-
 # TODO is this what the Vectorized distribution should have been? 
 # TODO remove?
 
 # TEST: to_gpu should not be required anymore since it should automatically operate on the correct device?
-struct BroadcastedDistribution{T<:Broadcasted,N} <: AbstractVectorizedDistribution
-    marginals::T
-    size::Dims{N}
+struct BroadcastedDistribution{T,N,M} <: AbstractVectorizedDistribution where {T,N,M<:Broadcasted}
+    partype::Type{T}
+    # See VectorizedDistribution
+    dims::Dims{N}
+    marginals::M
 end
 
-# TODO is dims determined by the max size of params?
-BroadcastedDistribution(::Type{T}, dims::Dims, params...) where {T<:AbstractKernelDistribution} = BroadcastedDistribution(broadcasted(T, params...), dims)
+# TODO Design decision: either explicitly type the distribution
+# BroadcastedDistribution(dist_type::Type{<:AbstractKernelDistribution{T}}, dims::Dims, params...) where {T} = BroadcastedDistribution(T, dims, broadcasted(dist_type, params...))
+# BroadcastedDistribution(dist_type::Type{<:AbstractKernelDistribution}, params...) = BroadcastedDistribution(dist_type, (), params...)
 
-BroadcastedDistribution(T::Type, params...) = BroadcastedDistribution(T, (), params...)
+# TODO or infer from parameters, which I think is the idiomatic way
+params_eltype(params...) = promote_type(eltype.(params)...)
 
-# TODO simple but maybe not always efficient
-# TODO should the rng be based on the location of the params?
-marginals(dist::BroadcastedDistribution) = materialize(dist.marginals)
+BroadcastedDistribution(dist_type::Type, dims::Dims, params...) = BroadcastedDistribution(params_eltype(params...), dims, broadcasted(dist_type, params))
 
-# TEST benchmark vs VectorizedDistribution
-function Distributions.logpdf(dist::BroadcastedDistribution, x)
-    # WARN Efficient reduction of Broadcasted only works without dims. 
-    # logdensities = broadcasted(logdensityof, dist.marginals, x)
-    # TODO is this the same implementation as VectorizedDistribution?
-    R = sum(logdensityof.(dist.marginals, x), dims=1:length(dist.size))
-    # Does not support range, only tuple for dims
-    dropdims(R; dims=(1:length(dist.size)...,))
+"""
+    BroadcastedDistribution(dists)
+Defaults the reduction dimensions of the first `ndims(dists)` dimensions.
+"""
+function BroadcastedDistribution(dist_type::Type, params...)
+    # TODO broadcasted for multiple args? Partial application?
+    marginals = broadcasted(dist_type, params...)
+    dims = Dims(1:maximum(ndims.(params)))
+    BroadcastedDistribution(params_eltype(params...), dims, marginals)
 end
+
+marginals(dist::BroadcastedDistribution) = dist.marginals
+
+function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Integer...) where {T}
+    # TODO could probably be generalized by implementing Base.eltype(AbstractVectorizedDistribution) or array_for_rng(rng, ::AbstractVectorizedDistribution)
+    A = array_for_rng(rng, T, size(marginals(dist))..., dims...)
+    rand!(rng, dist, A)
+end
+
+Random.rand!(rng::AbstractRNG, dist::BroadcastedDistribution, A::AbstractArray) = _rand!(rng, marginals(dist), A)
+
+# TODO same as VectorizedDistribution but marginals are lazy 😄
+Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+
+# This makes it very natural without having to define a separate type
+Bijectors.transformed(dist::BroadcastedDistribution) = BroadcastedDistribution(dist.partype, dist.dims, broadcasted(transformed, dist.marginals))
+
+
+# TEST benchmark BroadcastedDistribution vs VectorizedDistribution
+# Result: Exactly the same number of allocations as VectorizedDistribution but without the need to materialize the distribution first. So we save one hidden allocation of the size of the parameters. The flexibility and less allocations of the broadcasted variant make it a winner. I do not even have to care about transferring the distributions to the gpu, because they are initialized based on the params type 😄
+
 
 # TODO might enable more efficient random number generation
-# struct BroadcastedTypedDistribution{T<:AbstractKernelDistribution,U,N} <: AbstractVectorizedDistribution
-#     dist_type::Type{T}
-#     params::U
-#     dims::Dims{N}
-# end
+struct BroadcastedTypedDistribution{T,U<:AbstractKernelDistribution{T},V,N} <: AbstractVectorizedDistribution
+    dist_type::Type{U}
+    params::V
+    dism::Dims{N}
+end
 
-# # function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution, dims::Integer...)
-# # Would need to know the type of the internal distribution
-# #     array_for_rng(rng, Dist_T, dist.dims..., dims...))
-# #     rand(rng, marginals(dist), size(marginals(dist))..., dims...)
-# # end
+function Base.rand(rng::AbstractRNG, dist::BroadcastedTypedDistribution{T}, dims::Integer...) where {T}
+    # Would need to know the type of the internal distribution
+    A = array_for_rng(rng, T, dist.size..., dims...)
+    # TODO this is different, the rest is the same for broadcasted distributions
+    dists = broadcasted(dist.type, dist.params)
+    _rand!(rng, dists, A)
+end
 
-# # TEST benachmark vs VectorizedDistribution
-# function DensityInterface.logdensityof(dist::BroadcastedTypedDistribution, x)
-#     # TODO single line is broadcasted lazily right?
-#     logdensities = broadcasted(logdensityof, dist.marginals, x)
-#     # TODO dims required as tuple or is range okay?
-#     R = reduce(+, logdensities, dims=1:length(dist.size))
-#     dropdims(R; dims=(1:length(dist.size)...,))
-# end
+function Distributions.logpdf(dist::BroadcastedTypedDistribution, x)
+    dists = broadcasted(dist.type, dist.params)
+    # TODO single line is broadcasted lazily right?
+    logdensities = logdensityof.(dists, x)
+    sum_and_dropdims(logdensities; dims=dist.dims)
+end
+
+struct BroadcastedTransformedDistribution{T,U<:AbstractKernelDistribution{T},V,N} <: AbstractVectorizedDistribution
+    type::Type{U}
+    params::V
+    dims::Dims{N}
+end
+
+BroadcastedTransformedDistribution(dist::BroadcastedTypedDistribution) = BroadcastedTransformedDistribution(dist.dist_type, dist.params, dist.size)
+
+Bijectors.transformed(dist::BroadcastedTransformedDistribution) = BroadcastedTransformedDistribution(dist)
+
+# TODO does it work?
+# Bijectors.transformed(dist::BroadcastedTransformedDistribution) = BroadcastedTypedDistribution(dist.type)
+
+# TODO reuse marginals for an AbstractBroadcastedDistribution
+# marginals(dist::BroadcastedTransformedDistribution) = broadcasted(transformed, broadcasted(dist.type, dist.params))
+
+function Base.rand(rng::AbstractRNG, dist::BroadcastedTransformedDistribution{T}, dims::Integer...) where {T}
+    # Would need to know the type of the internal distribution
+    A = array_for_rng(rng, T, dist.size..., dims...)
+    # TODO this is different, the rest is the same for broadcasted distributions
+    dists = broadcasted(transformed, broadcasted(dist.type, dist.params))
+    _rand!(rng, dists, A)
+end
+
+function Distributions.logpdf(dist::BroadcastedTransformedDistribution, x)
+    dists = broadcasted(transformed, broadcasted(dist.type, dist.params))
+    # TODO single line is broadcasted lazily right?
+    logdensities = logdensityof.(dists, x)
+    sum_and_dropdims(logdensities; dims=dist.dims)
+end
+
