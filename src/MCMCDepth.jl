@@ -20,6 +20,7 @@ include("Visualization.jl")
 include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("KernelDistributionsVariables.jl")
+include("BroadcastedDistribution.jl")
 include("VectorizedDistributions.jl")
 include("VectorizedDistributionsVariables.jl")
 include("Tiles.jl")
@@ -101,15 +102,18 @@ export KernelExponential
 export KernelNormal
 export KernelUniform
 
+# Broadcasted distribution
+export BroadcastedDistribution
+export sum_and_dropdims
+
 # Vectorized distributions
 export ProductDistribution
 export VectorizedDistribution
-export sum_and_dropdims
 export to_cpu
 
 # Extensions and Reexports
 using Reexport
-# TODO should I fing another method name in SciGL or MCMCDepth?
+# TODO Required anymore?
 @reexport import SciGL: to_gpu
 
 @reexport import DensityInterface: logdensityof
