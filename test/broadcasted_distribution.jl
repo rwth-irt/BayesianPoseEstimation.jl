@@ -33,6 +33,17 @@ dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 @test rand(rng, dist, 3) |> size == (50, 10, 3)
 @test rand(rng, dist) |> size == (50, 10)
 
+# By default, Distributions.jl disallows logdensitof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
+X = rand(rng, dist)
+@inferred logdensityof(dist, X)
+X = rand(rng, dist, 3)
+@inferred logdensityof(dist, X)
+X = rand(rng, dist, 3, 2)
+@inferred logdensityof(dist, X)
+X = rand(rng, dist, 3, 2, 1)
+@inferred logdensityof(dist, X)
+
 # Correct device
 dist = BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 X = @inferred rand(rng, dist)
@@ -64,7 +75,7 @@ X = @inferred rand(curng, dist);
 
 # Correct computation of logdensityof by comparing to Distributions.jl 
 # All calculations in Float64
-dist = BroadcastedDistribution(mixture_fn, fill(10.0, 500))
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 500))
 product = Product([MixtureModel([Exponential(inv(2.0)), Normal(10.0, 2.0)], normalize([3, 1], 1)) for i = 1:500])
 rand(product) |> flatten |> maybe_histogram
 rand(rng, dist) |> flatten |> maybe_histogram
@@ -87,7 +98,7 @@ dist = BroadcastedDistribution(mixture_fn, fill(10.0, 100, 10))
 
 # Test different sizes of the marginals and rand(..., dims)
 normal_fn(μ::T) where {T} = KernelNormal(μ, T(0.1))
-dist = @inferred BroadcastedDistribution(normal_fn, [x for x = 1:100])
+dist = @inferred BroadcastedDistribution(normal_fn, [Float32(x) for x = 1:100])
 
 dist = @inferred BroadcastedDistribution(normal_fn, Dims(1), [Float16(x) for x = 1:100])
 @test ndims(dist) == 1
@@ -150,7 +161,7 @@ M = @inferred rand(rng, dist, 3, 4);
 @test logdensityof(dist, M) |> size == (100, 3, 4)
 @test logdensityof(dist, M) isa Array{Float16,3}
 
-dist = @inferred BroadcastedDistribution(KernelNormal, (1,2), [Float16(i) for i = 1:100], [Float16(j) for i = 1:100, j = 1:10])
+dist = @inferred BroadcastedDistribution(KernelNormal, (1, 2), [Float16(i) for i = 1:100], [Float16(j) for i = 1:100, j = 1:10])
 @test ndims(dist) == 2
 M = @inferred rand(rng, dist);
 @inferred logdensityof(dist, M)
@@ -164,3 +175,31 @@ M = @inferred rand(rng, dist, 3, 4);
 @inferred logdensityof(dist, M)
 @test logdensityof(dist, M) |> size == (3, 4)
 @test logdensityof(dist, M) isa Array{Float16,2}
+
+# TransformedDistribution - correct calculation
+dist = @inferred BroadcastedDistribution(KernelExponential, [Float64(i) for i = 1:100])
+t_dist = transformed(dist)
+product = Product([Exponential(inv(i)) for i = 1:100])
+t_product = transformed(product)
+
+Y = @inferred rand(rng, t_dist, 3, 2, 2)
+@test logpdf(t_product, Y) ≈ logdensityof(t_dist, Y)
+
+# WARN for invlink, we need to keep the original distribution around. So use transformed(dist) inside the acceptance step
+@test minimum(Y) < 0
+X = @inferred invlink(dist, Y)
+@test link(dist, X) ≈ Y
+@test minimum(X) > 0
+
+# By default, Distributions.jl disallows logdensitof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
+dist = @inferred BroadcastedDistribution(KernelExponential, [Float64(i) for i = 1:100])
+t_dist = transformed(dist)
+
+Y = rand(rng, t_dist)
+@inferred logdensityof(t_dist, Y)
+Y = rand(rng, t_dist, 3)
+@inferred logdensityof(t_dist, Y)
+Y = rand(rng, t_dist, 3, 2)
+@inferred logdensityof(t_dist, Y)
+Y = rand(rng, t_dist, 3, 2, 1)
+@inferred logdensityof(t_dist, Y)

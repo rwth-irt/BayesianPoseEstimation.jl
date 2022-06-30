@@ -5,11 +5,7 @@
 using Base.Broadcast: broadcasted, Broadcasted, materialize
 using Bijectors
 using DensityInterface
-
-
-# TODO is this what the Vectorized distribution should have been? Yes, it is! It is so flexible with regards to the correct device and transformed + it avoids allocations for the array of distributions.
-
-# TODO remove ProductDistribution as it is a special case for VectorizedDistribution. Probably VectorizedDistribution, too since I can use Distribution.jl Product for testing.
+using Distributions
 
 """
     BroadcastedDistribution{T,N,M}
@@ -22,10 +18,13 @@ The reduction dimensions might differ from the dimensions of the parameters, in 
 
 `T` is the parameter type, `N` the number of 
 """
-struct BroadcastedDistribution{T,N,M<:Broadcasted}
+struct BroadcastedDistribution{T,N,M<:Broadcasted,S<:ValueSupport} <: Distribution{ArrayLikeVariate{N},S}
     partype::Type{T}
     dims::Dims{N}
     marginals::M
+
+    # Required to determine the value support of the distribution. first(Broadcasted) is quite efficient.
+    BroadcastedDistribution(partype::Type{T}, dims::Dims{N}, marginals::M) where {T,N,M<:Broadcasted} = new{T,N,M,marginals |> first |> typeof |> Distributions.value_support}(partype, dims, marginals)
 end
 
 """
@@ -78,16 +77,19 @@ Base.axes(dist::BroadcastedDistribution) = axes(dist.marginals)
 Base.ndims(::BroadcastedDistribution{<:Any,N}) where {N} = N
 Base.size(dist::BroadcastedDistribution) = size(dist.marginals)
 
-# DensityInterface
-
-@inline DensityInterface.DensityKind(::BroadcastedDistribution) = HasDensity()
-
 """
-    logdensityof(dist, x)
+    logpdf(dist, x)
 Evaluate the logdensity of multi-dimensional distributions and data using broadcasting.
 The 
 """
-DensityInterface.logdensityof(dist::BroadcastedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+
+# Required to avoid ambiguities with Distributions.jl
+Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+
+# By default, Distributions.jl disallows logdensitof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
+DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractArray) = logpdf(dist, x)
+DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractMatrix) = logpdf(dist, x)
 
 """
     sum_and_dropdims(A; dims)
@@ -103,7 +105,7 @@ sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
 Sample an array from `dist` of size `(size(marginals)..., dims...)`.
 The array type is based on the `rng` and the parameter type of the distribution.
 """
-function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Integer...) where {T}
+function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Int...) where {T}
     # could probably be generalized by implementing Base.eltype(AbstractVectorizedDistribution)
     A = array_for_rng(rng, T, size(marginals(dist))..., dims...)
     rand!(rng, dist, A)
@@ -113,7 +115,11 @@ end
     rand!(rng, dist, [dims...])
 Mutate the array `A` by sampling from `dist`.
 """
-Random.rand!(rng::AbstractRNG, dist::BroadcastedDistribution, A::AbstractArray) = _rand!(rng, marginals(dist), A)
+Random.rand!(rng::AbstractRNG, dist::BroadcastedDistribution, A::AbstractArray{<:Real}) = _rand!(rng, marginals(dist), A)
+
+# Bijectors
+
+Bijectors.bijector(dist::BroadcastedDistribution) = dist |> marginals |> first |> bijector
 
 """
     transformed(dist)
