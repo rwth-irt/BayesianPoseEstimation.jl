@@ -6,6 +6,7 @@
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
+using Bijectors
 using CUDA
 using Distributions
 using LinearAlgebra
@@ -176,12 +177,15 @@ M = @inferred rand(rng, dist, 3, 4);
 @test logdensityof(dist, M) |> size == (3, 4)
 @test logdensityof(dist, M) isa Array{Float16,2}
 
-# TransformedDistribution - correct calculation
+# TransformedDistribution
 dist = @inferred BroadcastedDistribution(KernelExponential, [Float64(i) for i = 1:100])
 t_dist = transformed(dist)
 product = Product([Exponential(inv(i)) for i = 1:100])
 t_product = transformed(product)
 
+@test bijector(dist) isa Bijectors.Log
+
+# correct calculation
 Y = @inferred rand(rng, t_dist, 3, 2, 2)
 @test logpdf(t_product, Y) ≈ logdensityof(t_dist, Y)
 
@@ -203,3 +207,19 @@ Y = rand(rng, t_dist, 3, 2)
 @inferred logdensityof(t_dist, Y)
 Y = rand(rng, t_dist, 3, 2, 1)
 @inferred logdensityof(t_dist, Y)
+
+# CUDA
+cudist = @inferred BroadcastedDistribution(KernelExponential, CuArray([Float64(i) for i = 1:100]))
+t_cudist = transformed(cudist)
+
+@test bijector(cudist) isa Bijectors.Log
+
+# correct calculation
+Y = @inferred rand(curng, t_cudist, 3, 2, 2)
+@test logpdf(t_product, Array(Y)) ≈ logdensityof(t_cudist, Y) |> Array
+
+# WARN for invlink, we need to keep the original distribution around. So use transformed(dist) inside the acceptance step
+@test minimum(Y) < 0
+X = @inferred invlink(cudist, Y)
+@test link(dist, X) ≈ Y
+@test minimum(X) > 0
