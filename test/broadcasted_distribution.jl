@@ -34,7 +34,7 @@ dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 @test rand(rng, dist, 3) |> size == (50, 10, 3)
 @test rand(rng, dist) |> size == (50, 10)
 
-# By default, Distributions.jl disallows logdensitof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
+# By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
 dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 X = rand(rng, dist)
 @inferred logdensityof(dist, X)
@@ -82,17 +82,16 @@ rand(product) |> flatten |> maybe_histogram
 rand(rng, dist) |> flatten |> maybe_histogram
 X = rand(rng, dist);
 @inferred logdensityof(dist, X)
-@test logdensityof(dist, X) isa Array{Float64,0}
+@test logdensityof(dist, X) isa Float64
 # WARN zero dimensional array
-@test logdensityof(dist, X)[] ≈ logdensityof(product, X)
+@test logdensityof(dist, X) ≈ logdensityof(product, X)
 
 # Special case: number of dims equals ndims of the data → scalar value
 dist = BroadcastedDistribution(mixture_fn, Dims(1:2), fill(10.0, 500))
 X = rand(rng, dist, 3)
 @inferred logdensityof(dist, X)
-@test logdensityof(dist, X) isa Array{Float64,0}
-# TODO nice, this supports multiple samples
-@test logdensityof(dist, X)[] ≈ logpdf(product, X) |> sum
+@test logdensityof(dist, X) isa Float64
+@test logdensityof(dist, X) ≈ logpdf(product, X) |> sum
 
 # VectorizedDistribution
 dist = BroadcastedDistribution(mixture_fn, fill(10.0, 100, 10))
@@ -106,7 +105,7 @@ dist = @inferred BroadcastedDistribution(normal_fn, Dims(1), [Float16(x) for x =
 X = @inferred rand(rng, dist);
 @inferred logdensityof(dist, X)
 @test logdensityof(dist, X) |> size == ()
-@test logdensityof(dist, X) isa Array{Float16,0}
+@test logdensityof(dist, X) isa Float16
 X = @inferred rand(rng, dist, 3);
 @inferred logdensityof(dist, X)
 @test logdensityof(dist, X) |> size == (3,)
@@ -121,7 +120,7 @@ dist = @inferred BroadcastedDistribution(KernelNormal, (1, 2), [Float16(i) for i
 X = @inferred rand(rng, dist);
 @inferred logdensityof(dist, X)
 @test logdensityof(dist, X) |> size == ()
-@test logdensityof(dist, X) isa Array{Float16,0}
+@test logdensityof(dist, X) isa Float16
 X = @inferred rand(rng, dist, 3);
 @inferred logdensityof(dist, X)
 @test logdensityof(dist, X) |> size == (3,)
@@ -167,7 +166,7 @@ dist = @inferred BroadcastedDistribution(KernelNormal, (1, 2), [Float16(i) for i
 M = @inferred rand(rng, dist);
 @inferred logdensityof(dist, M)
 @test logdensityof(dist, M) |> size == ()
-@test logdensityof(dist, M) isa Array{Float16,0}
+@test logdensityof(dist, M) isa Float16
 M = @inferred rand(rng, dist, 3);
 @inferred logdensityof(dist, M)
 @test logdensityof(dist, M) |> size == (3,)
