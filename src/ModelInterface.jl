@@ -37,8 +37,8 @@ Create a new random sample from the `IndependentModel` of size `dims`.
 """
 function Base.rand(rng::AbstractRNG, model::IndependentModel, dims::Integer...)
     var_nt = map(model.models) do m
-        # ModelVariables are more natural / efficient to sample. It should be up to the sampler logic to decide whether the transformation overhead is required. 
-        ModelVariable(rng, m, dims...)
+        # Sampler can transform the model to propose on ℝ
+        rand(rng, m, dims...)
     end
     Sample(NamedTuple(var_nt), -Inf)
 end
@@ -49,7 +49,7 @@ Maps `logdensityof` over models and variables with matching names.
 Uses 0.0 as if the variable name is non-existent in the sample.
 Note that all variables are assumed to be independent and vectorization is accounted for by broadcasting.
 """
-DensityInterface.logdensityof(model::IndependentModel{T}, sample::Sample) where {T} = reduce(.+, (map_intersect(logdensityof, model.models, variables(sample))))
+DensityInterface.logdensityof(model::IndependentModel{T}, sample::Sample) where {T} = .+(values(map_intersect(logdensityof, model.models, variables(sample)))...)
 
 
 # TODO If I would require Gibbs sampling where the variables are not independent I would probably implement a new GibbsModel.

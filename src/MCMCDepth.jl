@@ -37,7 +37,10 @@ export raw_value
 export Sample
 
 export flatten
+export log_prob
 export merge
+export names
+export types
 export unconstrained_state
 export variables
 

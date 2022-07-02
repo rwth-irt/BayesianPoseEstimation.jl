@@ -7,20 +7,22 @@
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
+using Distributions
 using MCMCDepth
 using Random
 using Test
 
-a_model = KernelExponential(2.0)
+a_model = KernelExponential(Float16(2.0))
 # Float32
-b_model = ProductDistribution([KernelExponential(2.0f0), KernelExponential(1.0f0), KernelExponential(0.5f0)])
-c_model = VectorizedDistribution(fill(KernelExponential(2.0), 2))
+b_model = BroadcastedDistribution(Exponential, [2.0f0, 1.0f0, 0.5f0])
+c_model = BroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 
 ab_model = IndependentModel((; a=a_model, b=b_model))
 ac_model = IndependentModel((; a=a_model, c=c_model))
 bc_model = IndependentModel((; a=a_model, c=c_model))
 abc_model = IndependentModel((; a=a_model, b=b_model, c=c_model))
 
+# TODO test expected type
 s = @inferred rand(Random.default_rng(), abc_model)
 @inferred logdensityof(IndependentModel((; a=a_model)), s)
 @inferred logdensityof(ab_model, s)

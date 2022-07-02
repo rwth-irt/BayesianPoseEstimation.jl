@@ -95,7 +95,7 @@ Distributions.logpdf(dist::BroadcastedDistribution{<:Any,N}, x::AbstractArray{<:
 Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
 Distributions.logpdf(dist::BroadcastedDistribution{<:Any,N}, x::AbstractArray{<:Real,N}) where {N} = sum(logdensityof.(marginals(dist), x))
 
-# By default, Distributions.jl disallows logdensitof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
+# By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). BroadcastedDistribution should be inherently allowing multiple samples.
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractArray) = logpdf(dist, x)
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractMatrix) = logpdf(dist, x)
 

@@ -54,6 +54,10 @@ Get the parameter type of the distribution, e.g. Float16
 Base.eltype(::Type{<:AbstractKernelDistribution{T}}) where {T} = T
 Base.eltype(::Type{<:UnivariateTransformed{T}}) where {T} = eltype(T)
 
+# By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). KernelDistributions should be inherently allowing multiple samples.
+DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractArray) = logpdf.(dist, x)
+DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractMatrix) = logpdf.(dist, x)
+
 # Random Interface
 
 """

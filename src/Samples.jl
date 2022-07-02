@@ -7,16 +7,16 @@ using AbstractMCMC, TupleVectors
 using Accessors
 
 """
-    Sample(variables, logp)
-Consists of the unconstrained state `variables` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
+    Sample{T,V}(variables, logp)
+Consists of the state `variables` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
 Samples are typed by `T,V` as the internal named tuple for the variable names types.
 """
-struct Sample{T,V<:Tuple{Vararg{AbstractVariable}}}
+struct Sample{T,V}
     variables::NamedTuple{T,V}
     logp::Float64
 end
 
-Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logp(s))\n  Variable names: $(names(s))")
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(log_prob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
     names(Sample)
@@ -25,46 +25,31 @@ Returns a tuple of the variable names.
 names(::Sample{T}) where {T} = T
 
 """
+    types(Sample)
+Returns a tuple of the variable types.
+"""
+types(::Sample{<:Any,V}) where {V} = V
+
+"""
     variables(Sample)
 Returns a named tuple of the variables.
 """
 variables(s::Sample) = s.variables
 
 """
-    state(sample, var_name)
-Returns the state in the model domain of the variable `var_name`.
-"""
-model_value(sample::Sample, var_name::Symbol) = model_value(variables(sample)[var_name])
-
-"""
-    raw_state(sample, var_name)
-Returns the state in the unconstrained domain of the variable `var_name`.
-"""
-raw_value(sample::Sample, var_name::Symbol) = raw_value(variables(sample)[var_name])
-
-"""
-    to_model_variables(sample)
-Converts all the variables of the `sample` to `ModelVariable`.
-"""
-to_model_variables(sample::Sample) = @set sample.variables = map(ModelVariable, variables(sample))
-
-"""
-    to_sample_variables(sample)
-Converts all the variables of the `sample` to `SampleVariable`.
-"""
-to_sample_variables(sample::Sample) = @set sample.variables = map(SampleVariable, variables(sample))
-
-"""
-    logp(sample)
+    log_prob(sample)
 Jacobian-corrected posterior log probability of the sample.
 """
-logp(sample::Sample) = sample.logp
+log_prob(sample::Sample) = sample.logp
 
+# TODO Create Common.jl with this and sum_and_dropdims
 """
     flatten(x)
 Flattens x to return a 1D array.
 """
 flatten(x) = collect(Iterators.flatten(x))
+
+# TEST move from variables to Sample test
 
 """
     map_intersect(f, a, b, default)
@@ -118,7 +103,7 @@ Base.:+(a::Sample, b::Sample) = merge(a, a + variables(b))
 Add a NamedTuple `b` to the sample `a`.
 """
 function Base.:+(a::Sample, b::NamedTuple)
-    sum_nt = map_intersect(+, variables(a), b)
+    sum_nt = map_intersect(.+, variables(a), b)
     @set a.variables = merge(a.variables, sum_nt)
 end
 
@@ -134,7 +119,7 @@ Base.:-(a::Sample, b::Sample) = merge(a, a - variables(b))
 Subtract a NamedTuple `b` from the sample `a`.
 """
 function Base.:-(a::Sample, b::NamedTuple)
-    sum_nt = map_intersect(-, variables(a), b)
+    sum_nt = map_intersect(.-, variables(a), b)
     @set a.variables = merge(a.variables, sum_nt)
 end
 
