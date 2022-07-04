@@ -42,55 +42,6 @@ Jacobian-corrected posterior log probability of the sample.
 """
 log_prob(sample::Sample) = sample.logp
 
-# TODO Create Common.jl with this and sum_and_dropdims
-"""
-    flatten(x)
-Flattens x to return a 1D array.
-"""
-flatten(x) = collect(Iterators.flatten(x))
-
-# TEST move from variables to Sample test
-
-"""
-    map_intersect(f, a, b, default)
-Maps the function `f` over the intersection of the keys of `a` and `b`.
-Uses the value of `default`, which may be a function of `value(a[i])`, if no matching key is found in `b`.
-Returns a NamedTuple with the same keys as `a` which makes it type-stable.
-"""
-map_intersect(f, a::NamedTuple{A}, b::NamedTuple, default) where {A} = NamedTuple{A}(map_intersect_(f, a, b, default))
-
-# Barrier for type stability of getindex?
-map_intersect_(f, a::NamedTuple{A}, b::NamedTuple{B}, default) where {A,B} =
-    map(A) do k
-        if k in B
-            f(a[k], b[k])
-        else
-            default
-        end
-    end
-
-map_intersect_(f, a::NamedTuple{A}, b::NamedTuple{B}, default_fn::Function) where {A,B} =
-    map(A) do k
-        if k in B
-            f(a[k], b[k])
-        else
-            default_fn(value([k]))
-        end
-    end
-
-"""
-    map_intersect(f, a, b)
-Maps the function `f` over the intersection of the keys of `a` and `b`.
-Uses the value of `a` if no matching key is found in `b`.
-Returns a NamedTuple with the same keys as `a` which makes it type-stable.
-"""
-function map_intersect(f, a::NamedTuple{A}, b::NamedTuple{B}) where {A,B}
-    # Type stability is delicate
-    filtered_keys = filter(in(A), B)
-    filtered_values = map(f, a[filtered_keys], b[filtered_keys])
-    NamedTuple{filtered_keys}(filtered_values)
-end
-
 """
     +(a, b)
 Add the sample `b` to the sample `a`.

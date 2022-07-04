@@ -99,13 +99,6 @@ Distributions.logpdf(dist::BroadcastedDistribution{<:Any,N}, x::AbstractArray{<:
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractArray) = logpdf(dist, x)
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractMatrix) = logpdf(dist, x)
 
-"""
-    sum_and_dropdims(A; dims)
-Sum the matrix A over the given dimensions and drop the very same dimensions afterwards.
-Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
-"""
-sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
-
 # Random Interface
 
 """

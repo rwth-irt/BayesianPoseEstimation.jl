@@ -4,25 +4,24 @@
 
 module MCMCDepth
 
-# lib includes
+# Common functions on Base types
+include("Common.jl")
+# Model primitives
+# TODO remove
 include("Variables.jl")
 include("Samples.jl")
-include("Parameters.jl")
 include("FunctionManipulation.jl")
 include("ModelInterface.jl")
 include("Proposals.jl")
-# TODO re-add or split?
-# include("Models.jl")
-include("MetropolisHastings.jl")
-include("Gibbs.jl")
-include("Visualization.jl")
 # Extensions
 include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("KernelDistributionsVariables.jl")
 include("BroadcastedDistribution.jl")
+# TODO remove
 include("VectorizedDistributions.jl")
 include("VectorizedDistributionsVariables.jl")
+# TODO remove
 include("Tiles.jl")
 # Inference
 include("Main.jl")
