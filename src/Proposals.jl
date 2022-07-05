@@ -2,8 +2,7 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO logdensityof(proposal, old, new) for transition probability? DensityInterface expects logdensityof(model, x)
-# TODO rand(rng, proposal, sample, dims...) instead of propose(...)? rand does not make sense for Gibbs
+# TODO use DensityInterface and Random? Would be incompatible to logdensityof(proposal, x) and rand does not make sense semantically for Gibbs
 using Random
 
 """
@@ -41,18 +40,12 @@ struct SymmetricProposal{T} <: AbstractProposal
     end
 end
 
-# TODO Should to_sample_variables be decided here?
 """
-    rand(rng, proposal, [dims...])
-Generate a new sample containing `SampleVariable` using the `proposal` and maybe conditioning on the old `sample`.
+    propose(rng, proposal, [sample], [dims...])
+Generate a new sample using the `proposal` and maybe conditioning on the old `sample`.
+Use dims to sample propose the variables multiple times (vectorization support).
 """
-Base.rand(rng::AbstractRNG, proposal::SymmetricProposal, dims::Integer...) = rand(rng, proposal.model, dims...) |> to_sample_variables
-
-"""
-    propose(rng, proposal, sample, [dims...])
-For the general case of dependent samples.
-"""
-propose(rng::AbstractRNG, proposal::SymmetricProposal, sample::Sample, dims...) = sample + rand(rng, proposal, dims...)
+propose(rng::AbstractRNG, proposal::SymmetricProposal, sample::Sample, dims...) = sample + rand(rng, model(proposal), dims...)
 
 """
     transition_probability(proposal, new_sample, prev_sample)
@@ -70,24 +63,19 @@ struct IndependentProposal{T} <: AbstractProposal
     model::T
 end
 
-# TODO Should I leave the generation of a ModelVariable implicit here or use `to_model_variables`?
-"""
-    rand(rng, proposal, [dims...])
-Generate a new sample containing `SampleVariable` using the `proposal`.
-"""
-Base.rand(rng::AbstractRNG, proposal::IndependentProposal, dims::Integer...) = rand(rng, model(proposal), dims...)
+propose(rng::AbstractRNG, proposal::IndependentProposal, dims...) = rand(rng, model(proposal), dims...)
 
 """
     propose(rng, proposal, sample, [dims...])
 Independent samples are just random values from the model.
 """
-propose(rng::AbstractRNG, proposal::IndependentProposal, sample::Sample, dims...) = merge(sample, rand(rng, model(proposal), dims...))
+propose(rng::AbstractRNG, proposal::IndependentProposal, sample::Sample, dims...) = merge(sample, propose(rng, proposal, dims...))
 
 """
     transition_probability(proposal, new_sample, prev_sample)
 For independent proposals, the transition probability does not depend on the previous sample.
 """
-transition_probability(proposal::IndependentProposal, new_sample::Sample, ::Sample) = logdensityof(proposal.model, new_sample)
+transition_probability(proposal::IndependentProposal, new_sample::Sample, ::Sample) = logdensityof(model(proposal), new_sample)
 
 # GibbsProposal
 
@@ -96,7 +84,7 @@ transition_probability(proposal::IndependentProposal, new_sample::Sample, ::Samp
 Has a function `fn(sample::Sample)` which analytically samples from a distribution conditioned on `sample`.
 """
 struct GibbsProposal{T} <: AbstractProposal
-    # TODO Do I want a named tuple of functions, or leave the logic to the function
+    # TODO Do I want a named tuple of functions, or leave the logic to the function? In this case, an AbstractGibbsProposal and a NamedGibbsProposal would make more sense.
     fn::T
 end
 
