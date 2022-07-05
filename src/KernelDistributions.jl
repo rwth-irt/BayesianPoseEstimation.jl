@@ -197,16 +197,22 @@ Distributions.insupport(::KernelNormal, ::Real) = true
 # KernelExponential
 
 struct KernelExponential{T<:Real} <: AbstractKernelDistribution{T,Continuous}
-    # WARN rate not scale (Distributions.jl)
-    λ::T
+    θ::T
 end
 KernelExponential(::Type{T}=Float32) where {T} = KernelExponential{T}(1.0)
 
-Base.show(io::IO, dist::KernelExponential{T}) where {T} = print(io, "KernelExponential{$(T)}, λ: $(dist.λ)")
+Base.show(io::IO, dist::KernelExponential{T}) where {T} = print(io, "KernelExponential{$(T)}, θ: $(dist.θ)")
 
-Distributions.logpdf(dist::KernelExponential{T}, x) where {T} = insupport(dist, x) ? -dist.λ * T(x) + log(dist.λ) : -typemax(T)
+function Distributions.logpdf(dist::KernelExponential{T}, x) where {T}
+    if insupport(dist, x)
+        λ = inv(dist.θ)
+        -λ * T(x) + log(λ)
+    else
+        -typemax(T)
+    end
+end
 
-Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = randexp(rng, T) / dist.λ
+Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = dist.θ * randexp(rng, T)
 
 Base.maximum(::KernelExponential{T}) where {T} = typemax(T)
 Base.minimum(::KernelExponential{T}) where {T} = zero(T)

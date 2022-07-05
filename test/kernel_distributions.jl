@@ -87,9 +87,8 @@ M = @inferred rand(curng, KernelExponential(), 100, 100)
 M = @inferred rand(curng, KernelExponential(Float16), 100, 100)
 @test eltype(M) == Float16
 
-# WARN Distributions uses Θ=1/λ by default
-exponential = Exponential(inv(0.1))
-ge = KernelExponential(0.1)
+exponential = Exponential(10.0)
+ge = KernelExponential(10.0)
 
 @test maximum(KernelExponential(Float16)) == Inf16
 @test minimum(KernelExponential(Float16)) == 0
@@ -169,7 +168,7 @@ logdensity_gcu_M(gcu, M) = logdensityof.(gcu, M)
 
 # KernelBinaryMixture
 gbm = KernelBinaryMixture(KernelExponential{Float64}(2.0), KernelUniform{Float64}(2.0, 10.0), 3, 1)
-bm = MixtureModel([Exponential(inv(2.0)), Uniform(2.0, 10.0)], normalize([3, 1], 1))
+bm = MixtureModel([Exponential(2.0), Uniform(2.0, 10.0)], normalize([3, 1], 1))
 
 M = @inferred rand(curng, KernelBinaryMixture(KernelExponential(2.0), KernelNormal{Float64}(10.0, 2), 3, 1), 100, 100)
 @test eltype(M) == Float64
