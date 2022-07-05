@@ -23,16 +23,18 @@ struct BroadcastedDistribution{T,N,M<:Broadcasted,S<:ValueSupport} <: Distributi
     dims::Dims{N}
     marginals::M
 
-    # Required to determine the value support of the distribution. first(Broadcasted) is quite efficient.
-    BroadcastedDistribution(partype::Type{T}, dims::Dims{N}, marginals::M) where {T,N,M<:Broadcasted} = new{T,N,M,marginals |> first |> typeof |> Distributions.value_support}(partype, dims, marginals)
+    # WARN Inferring the support via first(marginals) cannot be executed on the GPU. Right now, the workaround are different constructors.
+    BroadcastedDistribution(partype::Type{T}, dims::Dims{N}, marginals::M, ::Type{S}) where {T,N,M,S<:ValueSupport} = new{T,N,M,S}(partype, dims, marginals)
 end
+
+# TODO reuse code in constructors?
 
 """
     BroadcastedDistribution(dist_fn, dims, params...)
 Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
 The `dims` of the distribution which are reduced are set manually so they can differ from the dims of the parameters.
 """
-BroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...))
+BroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...), Continuous)
 
 """
     BroadcastedDistribution(dist_fn, dims, params...)
@@ -43,8 +45,15 @@ function BroadcastedDistribution(dist_fn, params...)
     marginals = broadcasted(dist_fn, params...)
     # Dims(1:length(...)) not type stable?
     dims = (1:length(axes(marginals))...,)
-    BroadcastedDistribution(promote_params_eltype(params...), dims, marginals)
+    BroadcastedDistribution(promote_params_eltype(params...), dims, marginals, Continuous)
 end
+
+"""
+    DiscreteBroadcastedDistribution(dist_fn, dims, params...)
+Construct a BroadcastedDistribution for a discrete distribution generating function, conditioned on params.
+The `dims` of the distribution which are reduced are set manually so they can differ from the dims of the parameters.
+"""
+DiscreteBroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...), Discrete)
 
 """
     promote_params_eltype(params...)
@@ -58,7 +67,7 @@ Lazy broadcasted array of distributions → use dot syntax, Broadcast.broadcaste
 """
 marginals(dist::BroadcastedDistribution) = dist.marginals
 
-Base.show(io::IO, dist::BroadcastedDistribution{T}) where {T} = print(io, "BroadcastedDistribution{$(T)}\n  dist function: $(recursive_marginals_string(marginals(dist)))\n  size: $(size(dist)) \n  dims: $(dist.dims)")
+Base.show(io::IO, dist::BroadcastedDistribution{T}) where {T} = print(io, "BroadcastedDistribution{$(T)}\n  dist function: $(recursive_marginals_string(marginals(dist)))\n  size: $(size(dist))\n  dims: $(dist.dims)\n  support: $(Distributions.value_support(dist))")
 
 """
     recursive_marginals_string
@@ -76,6 +85,7 @@ Base.axes(dist::BroadcastedDistribution) = axes(dist.marginals)
 # Might differ from the dims of the marginals
 Base.ndims(::BroadcastedDistribution{<:Any,N}) where {N} = N
 Base.size(dist::BroadcastedDistribution) = size(dist.marginals)
+Distributions.value_support(::BroadcastedDistribution{<:Any,<:Any,<:Any,S}) where {S} = S
 
 """
     logpdf(dist, x)
