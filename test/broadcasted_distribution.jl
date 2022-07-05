@@ -77,7 +77,7 @@ X = @inferred rand(curng, dist);
 # Correct computation of logdensityof by comparing to Distributions.jl 
 # All calculations in Float64
 dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 500))
-product = Product([MixtureModel([Exponential(inv(2.0)), Normal(10.0, 2.0)], normalize([3, 1], 1)) for i = 1:500])
+product = Product([MixtureModel([Exponential(2.0), Normal(10.0, 2.0)], normalize([3, 1], 1)) for i = 1:500])
 rand(product) |> flatten |> maybe_histogram
 rand(rng, dist) |> flatten |> maybe_histogram
 X = rand(rng, dist);
@@ -179,7 +179,7 @@ M = @inferred rand(rng, dist, 3, 4);
 # TransformedDistribution
 dist = @inferred BroadcastedDistribution(KernelExponential, [Float64(i) for i = 1:100])
 t_dist = transformed(dist)
-product = Product([Exponential(inv(i)) for i = 1:100])
+product = Product([Exponential(i) for i = 1:100])
 t_product = transformed(product)
 
 @test bijector(dist) isa Bijectors.Log
@@ -222,3 +222,10 @@ Y = @inferred rand(curng, t_cudist, 3, 2, 2)
 X = @inferred invlink(cudist, Y)
 @test link(dist, X) ≈ Y
 @test minimum(X) > 0
+
+# Test if the constructor is executed on the GPU, evaluating the support of the marginals is tricky
+CUDA.allowscalar(false)
+B = BroadcastedDistribution(KernelExponential, CUDA.fill(10.0, 1000))
+B = BroadcastedDistribution(KernelExponential, (1,), CUDA.fill(10.0, 1000))
+X = rand(CUDA.default_rng(), B, 2)
+logdensityof(B, X)

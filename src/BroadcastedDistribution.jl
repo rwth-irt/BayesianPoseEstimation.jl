@@ -23,7 +23,7 @@ struct BroadcastedDistribution{T,N,M<:Broadcasted,S<:ValueSupport} <: Distributi
     dims::Dims{N}
     marginals::M
 
-    # WARN Inferring the support via first(marginals) cannot be executed on the GPU. Right now, the workaround are different constructors.
+    # WARN Inferring the support via marginals |> first |> typeof cannot be executed on the GPU. What works is marginals |> materialize |> eltype but I want to avoid materializations which cause allocations.
     BroadcastedDistribution(partype::Type{T}, dims::Dims{N}, marginals::M, ::Type{S}) where {T,N,M,S<:ValueSupport} = new{T,N,M,S}(partype, dims, marginals)
 end
 
