@@ -57,6 +57,9 @@ struct ManipulatedFunction{F<:Function,G<:Function,T<:Tuple,U<:NamedTuple}
     kwargs::U
 end
 
+# TODO is this too hacky?
+Broadcast.broadcasted(::S, mf::ManipulatedFunction, args...) where {S<:Broadcast.BroadcastStyle} = Broadcast.broadcasted(mf.func, args...)
+
 function ManipulatedFunction(mf::ManipulatedFunction, nt::NamedTuple)
     func = partial(mf.func, nt)
     ManipulatedFunction(func, mf.original, mf.args, (; mf.kwargs..., nt...))
@@ -69,7 +72,7 @@ end
 
 function ManipulatedFunction(mf::ManipulatedFunction, ::Val{S}) where {S}
     func = kwarg_to_arg(mf.func, Val(S))
-    ManipulatedFunction(func, mf.original, mf.args, mf.kwargs)
+    ManipulatedFunction(func, mf.original, (mf.args..., S), mf.kwargs)
 end
 
 ManipulatedFunction(mf::ManipulatedFunction, s::Symbol) = ManipulatedFunction(mf, Val(s))

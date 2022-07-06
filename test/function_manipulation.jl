@@ -32,3 +32,19 @@ bench_kwargs_to_args = @inferred bench_ax | Val(:y)
 @benchmark bench_kwargs_to_args(3)
 
 # WARN it seems like having named parameters in the final function call is generally slower
+
+# Test GPU execution
+using CUDA
+test_partial(a; x, y) = a + x - y
+test_a = @inferred test_partial | (; x=2, y=3)
+a = CUDA.fill(1, 100)
+CUDA.@time test_a.(a)
+# WARN cannot be conditioned on named parameter via broadcasting a CUDA array since NamedTuple broadcasting is reserved → move to args before broadcasting
+test_kwargs_to_args = @inferred test_partial | Val(:y) | Val(:x)
+@test test_kwargs_to_args(1, 2, 3) == 2
+@test test_kwargs_to_args(1, 3, 2) == 0
+broadcast_1 = broadcast(test_kwargs_to_args, a, 2, 3)
+broadcast_2 = test_kwargs_to_args.(a, 2, 3)
+b = Broadcast.broadcasted(test_kwargs_to_args, a, 2, 3)
+broadcast_3 = Base.materialize(b)
+@test broadcast_1 == broadcast_2 == broadcast_3
