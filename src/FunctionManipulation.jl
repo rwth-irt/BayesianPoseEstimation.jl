@@ -49,35 +49,34 @@ kwarg_to_arg(f::Function, ::Val{S}) where {S} = (s, x...; y...) -> f(x...; (; S 
 Keep track of the original function and the arguments which are manipulated.
 Partial application using anonymous functions leads to ambiguous signatures.
 """
-struct ManipulatedFunction{F<:Function,T<:Tuple,U<:NamedTuple}
+struct ManipulatedFunction{F<:Function,G<:Function,T<:Tuple,U<:NamedTuple}
     func::F
-    # String is not bits, this is intended since only func should be called on GPU to prevent unnecessary copying
-    name::String
+    # Avoid allocations to store the name as string
+    original::G
     args::T
     kwargs::U
 end
 
-# TODO reduce code duplication
 function ManipulatedFunction(mf::ManipulatedFunction, nt::NamedTuple)
     func = partial(mf.func, nt)
-    ManipulatedFunction(func, mf.name, mf.args, (; mf.kwargs..., nt...))
+    ManipulatedFunction(func, mf.original, mf.args, (; mf.kwargs..., nt...))
 end
 
 function ManipulatedFunction(mf::ManipulatedFunction, t::Tuple)
     func = partial(mf.func, t)
-    ManipulatedFunction(func, mf.name, (mf.args..., t...), mf.kwargs)
+    ManipulatedFunction(func, mf.original, (mf.args..., t...), mf.kwargs)
 end
 
 function ManipulatedFunction(mf::ManipulatedFunction, ::Val{S}) where {S}
     func = kwarg_to_arg(mf.func, Val(S))
-    ManipulatedFunction(func, mf.name, (mf.args..., S), mf.kwargs)
+    ManipulatedFunction(func, mf.original, mf.args, mf.kwargs)
 end
 
 ManipulatedFunction(mf::ManipulatedFunction, s::Symbol) = ManipulatedFunction(mf, Val(s))
 ManipulatedFunction(mf::ManipulatedFunction, x) = ManipulatedFunction(mf, (x,))
 
 fn_name = String ∘ Symbol
-ManipulatedFunction(f::Function) = ManipulatedFunction(f, fn_name(f), (), (;))
+ManipulatedFunction(f::Function) = ManipulatedFunction(f, f, (), (;))
 ManipulatedFunction(f::Function, x) = ManipulatedFunction(ManipulatedFunction(f), x)
 
 """
@@ -88,7 +87,7 @@ Earlier `kwargs` are overridden.
 (mf::ManipulatedFunction)(args...; kwargs...) = mf.func(args...; kwargs...)
 
 # Pretty print
-Base.show(io::IO, pf::ManipulatedFunction) = print(io, "$(pf.name)($(pf.args)...; $(pf.kwargs)...) (partially applied function)")
+Base.show(io::IO, pf::ManipulatedFunction) = print(io, "$(fn_name(pf.original))($(pf.args)...; $(pf.kwargs)...) (partially applied function)")
 Base.show(io::IO, ::MIME"text/plain", pf::ManipulatedFunction) = show(io, pf)
 
 """
