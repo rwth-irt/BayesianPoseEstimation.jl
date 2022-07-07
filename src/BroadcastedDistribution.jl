@@ -82,6 +82,7 @@ function recursive_marginals_string(marginals)
 end
 
 Base.axes(dist::BroadcastedDistribution) = axes(dist.marginals)
+Base.Dims(dist::BroadcastedDistribution) = dist.dims
 # Might differ from the dims of the marginals
 Base.ndims(::BroadcastedDistribution{<:Any,N}) where {N} = N
 Base.size(dist::BroadcastedDistribution) = size(dist.marginals)
