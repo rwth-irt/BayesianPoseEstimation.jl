@@ -57,8 +57,8 @@ struct ManipulatedFunction{F<:Function,G<:Function,T<:Tuple,U<:NamedTuple}
     kwargs::U
 end
 
-# TODO is this too hacky?
-Broadcast.broadcasted(::S, mf::ManipulatedFunction, args...) where {S<:Broadcast.BroadcastStyle} = Broadcast.broadcasted(mf.func, args...)
+# Enables GPU execution, by bypassing ManipulatedFunction which is not isbits
+Broadcast.broadcasted(s::S, mf::ManipulatedFunction, args...) where {S<:Broadcast.BroadcastStyle} = Broadcast.broadcasted(s, mf.func, args...)
 
 function ManipulatedFunction(mf::ManipulatedFunction, nt::NamedTuple)
     func = partial(mf.func, nt)
