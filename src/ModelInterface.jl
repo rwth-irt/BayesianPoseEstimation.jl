@@ -11,8 +11,8 @@ using Random
 Models are the primitives to draw and evaluate samples.
 A model could be as simple as containing only one variable.
 - Random.rand(rng, model, dims...)::Sample
-- DensityInterface.logdensityof(model, sample::Sample)::Real.
-- is_identity(model)
+# TODO maybe rand! for optimization
+- DensityInterface.logdensityof(model, sample::Sample)::Real (logjac corrected)
 """
 
 """
@@ -49,7 +49,48 @@ Maps `logdensityof` over models and variables with matching names.
 Uses 0.0 as if the variable name is non-existent in the sample.
 Note that all variables are assumed to be independent and vectorization is accounted for by broadcasting.
 """
-DensityInterface.logdensityof(model::IndependentModel{T}, sample::Sample) where {T} = .+(values(map_intersect(logdensityof, model.models, variables(sample)))...)
+DensityInterface.logdensityof(model::IndependentModel, sample) = .+(values(map_intersect(logdensityof, model.models, variables(sample)))...)
 
+# TEST RngModel
+# TODO add to MCMCDepth.jl
+"""
+    RngModel
+Wraps an internal `model` and allows to provide an default RNG for this model.
+"""
+struct RngModel{T,U<:AbstractRNG}
+    model::T
+    rng::U
+end
+
+"""
+    rand([rng=model.rng], model, dims...)
+Generate a random sample from the internal model using the rng of the model.
+Ignores the rng argument.
+"""
+Base.rand(::AbstractRNG, model::RngModel, dims::Integer...) = rand(model.rng, model.model, dims...)
+Base.rand(model::RngModel, dims::Integer...) = rand(model.rng, model, dims...)
+
+DensityInterface.logdensityof(model::RngModel, sample) = logdensityof(model.model, sample)
+
+# TEST ComposedModel
+# TODO add to MCMCDepth.jl
+"""
+    ComposedModel
+Generate Samples from several models which in turn generate samples by merging them in order.
+"""
+struct ComposedModel{T<:Tuple}
+    models::T
+end
+
+"""
+    rand(rng, model, dims)
+Generate a sample by sampling the internal models and merging the samples iteratively.
+This means that the rightmost / last model variables are kept.
+However, duplicates should be avoided, because they cannot be mapped to a unique model when evaluating logdensityof.
+"""
+Base.rand(rng::AbstractRNG, model::Composed, dims...) = mapreduce(m -> rand(rng, m, dims...), merge, model.models)
+
+
+DensityInterface.logdensityof(model::ComposedModel, sample) = mapreduce(m -> logdensityof(m, sample), +, model.models)
 
 # TODO If I would require Gibbs sampling where the variables are not independent I would probably implement a new GibbsModel.
