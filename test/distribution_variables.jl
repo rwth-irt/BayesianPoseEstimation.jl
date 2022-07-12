@@ -14,26 +14,6 @@ using MCMCDepth
 using Random
 using Test
 
-# TODO Design decision: I will probably want to get rid of the Variables and operate on the raw arrays / scalars. This will allow me to get rid of logdensityof(::AbstractKernelDistribution, ::SpecializedVariable) which should be logdensityof(::Distribution, x::Any) or for unconstrained domains logdensityof(::TransformedDistribution, x::Any). Do I miss any features?
-
-# TODO I would have to transform the VectorizedDistribution → does it work on the GPU?
-# TODO wrong 
-@inferred rand(Random.default_rng(), transformed(KernelExponential(Float16)), 3)
-@inferred rand(Random.default_rng(), fill(transformed(KernelExponential(Float16)), 2), 3)
-
-D = CUDA.fill(KernelExponential(Float16), 3)
-T = transformed.(D)
-X = @inferred rand(CUDA.default_rng(), D, 2)
-Y = link.(D, X)
-# TODO this is not expected
-Y = @inferred rand(Random.default_rng(), Array(T), 2)
-Y = @inferred rand(CUDA.default_rng(), T, 2)
-Y = @inferred rand!(CUDA.default_rng(), D, Y)
-Y = @inferred rand!(CUDA.default_rng(), T, Y)
-X = invlink.(D, Y)
-
-# TODO test rand! of transformed transformed_kernel_distributions.jl
-
 # KernelDistribution Random 
 
 @inferred ModelVariable(KernelExponential())

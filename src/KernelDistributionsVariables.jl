@@ -20,6 +20,14 @@ ModelVariable(rng::AbstractRNG, dist::KernelOrKernelArray, dims...) = ModelVaria
 ModelVariable(dist::KernelOrKernelArray, dims...) = ModelVariable(Random.GLOBAL_RNG, dist, dims...)
 
 """
+    logdensityof(dist, variable)
+Evaluate the logdensity of the distribution `dist` and `variable` in the model domain.
+ModelVariables can be evaluated without transformation and logjac correction.
+"""
+DensityInterface.logdensityof(dist::AbstractKernelDistribution, variable::ModelVariable) = logdensityof.(dist, model_value(variable))
+DensityInterface.logdensityof(dist::AbstractArray{<:AbstractKernelDistribution}, variable::ModelVariable) = logdensityof.(dist, model_value(variable))
+
+"""
     SampleVariable(rng, dist)
 Create a `SampleVariable` by sampling from a `KernelDistribution`.
 """
@@ -31,17 +39,18 @@ SampleVariable(dist::KernelOrKernelArray, dims...) = SampleVariable(Random.GLOBA
 Serves as function barrier for broadcasting so it is compiled as a kernel and avoids allocations.
 """
 function logjac_corrected_logdensityof(dist, unconstrained_value, bijector::Bijector)
-    # logendsityof.(transformed.(d), raw_value(x)) would be elegant but would require that I implement Distributions.jl for KernelDistributions.jl.
+    # TODO logendsityof.(transformed.(d), raw_value(x)) would be elegant but would require that I implement Distributions.jl for KernelDistributions.jl or a custom TransformedDistribution.
     # This way it is explicit, like in my dissertation
     model_value, jac = with_logabsdet_jacobian(inverse(bijector), unconstrained_value)
     logdensityof(dist, model_value) + jac
 end
 
+# TODO Method ambiguities. For the DensityInterface it will probably make more sense to implement transformed distributions and store raw values in the Sample. Also see the above.
 """
     logdensityof(dist, variable)
 Evaluate the logjac corrected logdensity of the distribution `dist` and `variable` in the model domain.
 """
-DensityInterface.logdensityof(dist::AbstractKernelDistribution, variable::SampleVariable) = logjac_corrected_logdensityof.((dist,), raw_value(variable), (bijector(variable),))
+DensityInterface.logdensityof(dist::AbstractKernelDistribution, variable::SampleVariable) = logjac_corrected_logdensityof.(dist, raw_value(variable), bijector(variable))
 
 """
     logdensityof(dists, variable)
@@ -49,8 +58,9 @@ Evaluate the logjac corrected logdensity of the distribution `dist` and `variabl
 """
 function DensityInterface.logdensityof(dists::AbstractArray{<:AbstractKernelDistribution}, variable::SampleVariable)
     unconstrained_value = raw_value(variable)
-    dist = maybe_cuda(unconstrained_value, dists)
-    logjac_corrected_logdensityof.(dist, unconstrained_value, (bijector(variable),))
+    # TODO let it fail?
+    device_dists = maybe_cuda(unconstrained_value, dists)
+    logjac_corrected_logdensityof.(device_dists, unconstrained_value, bijector(variable))
 end
 
 """
@@ -59,9 +69,3 @@ Evaluate the logjac corrected logdensity of the distribution `dist` and `variabl
 Special case: scalar numbers would be returned as tuple when broadcasting.
 """
 DensityInterface.logdensityof(dist::AbstractKernelDistribution, variable::SampleVariable{<:Number}) = logjac_corrected_logdensityof(dist, raw_value(variable), bijector(variable))
-
-"""
-    logdensityof(dist, variable)
-Evaluate the logdensity of the distribution `dist` and `variable` in the model domain.
-"""
-DensityInterface.logdensityof(dist::KernelOrKernelArray, variable::ModelVariable) = logdensityof(dist, model_value(variable))
