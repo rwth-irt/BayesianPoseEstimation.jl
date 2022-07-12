@@ -51,11 +51,9 @@ Note that all variables are assumed to be independent and vectorization is accou
 """
 DensityInterface.logdensityof(model::IndependentModel, sample) = .+(values(map_intersect(logdensityof, model.models, variables(sample)))...)
 
-# TEST RngModel
-# TODO add to MCMCDepth.jl
 """
     RngModel
-Wraps an internal `model` and allows to provide an default RNG for this model.
+Wraps an internal `model` and allows to provide an individual RNG for this model.
 """
 struct RngModel{T,U<:AbstractRNG}
     model::T
@@ -72,8 +70,6 @@ Base.rand(model::RngModel, dims::Integer...) = rand(model.rng, model, dims...)
 
 DensityInterface.logdensityof(model::RngModel, sample) = logdensityof(model.model, sample)
 
-# TEST ComposedModel
-# TODO add to MCMCDepth.jl
 """
     ComposedModel
 Generate Samples from several models which in turn generate samples by merging them in order.
@@ -82,13 +78,15 @@ struct ComposedModel{T<:Tuple}
     models::T
 end
 
+ComposedModel(models...) = ComposedModel(models)
+
 """
     rand(rng, model, dims)
 Generate a sample by sampling the internal models and merging the samples iteratively.
 This means that the rightmost / last model variables are kept.
-However, duplicates should be avoided, because they cannot be mapped to a unique model when evaluating logdensityof.
+However, duplicates must be avoided, because they cannot be mapped to a unique model when evaluating logdensityof.
 """
-Base.rand(rng::AbstractRNG, model::Composed, dims...) = mapreduce(m -> rand(rng, m, dims...), merge, model.models)
+Base.rand(rng::AbstractRNG, model::ComposedModel, dims...) = mapreduce(m -> rand(rng, m, dims...), merge, model.models)
 
 
 DensityInterface.logdensityof(model::ComposedModel, sample) = mapreduce(m -> logdensityof(m, sample), +, model.models)
