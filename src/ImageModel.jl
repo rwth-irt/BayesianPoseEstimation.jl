@@ -4,6 +4,8 @@
 
 # TEST
 
+# TODO from Sample? I think PoseModel should handle it to hide the internal μ from the chain
+
 """
     ImageModel(pixel_dist, μ, o, normalize)
 Model to compare rendered and observed depth images.
@@ -35,8 +37,6 @@ BroadcastedDistribution(model::ImageModel) = BroadcastedDistribution(model.pixel
 Base.Dims(::ImageModel) = (1, 2)
 Base.Dims(::Type{<:ImageModel}) = (1, 2)
 
-# WARN the reduction of the VectorizedDistribution will lead to wrong results, since the marginals array will have the size WIDTH x HEIGHT x N_SAMPLES and not WIDTH x HEIGHT
-
 # Generate independent random numbers from m_pix(μ, o)
 Base.rand(rng::AbstractRNG, model::ImageModel, dims...) = rand(rng, BroadcastedDistribution(model), dims...)
 
@@ -46,9 +46,9 @@ function DensityInterface.logdensityof(model::ImageModel, x)
         # Count the number of rendered pixels and divide by it
         rendered_pixels = sum_and_dropdims(model.μ .> 0; dims=Dims(model))
         return log_p ./ rendered_pixels
-    else
-        return log_p
     end
+    # no normalization = raw sum of the pixel likelihoods
+    log_p
 end
 
 # TODO Custom indices more efficient? Possible on GPU without allocations?
@@ -74,6 +74,8 @@ struct PixelDistribution{T<:Real,U} <: AbstractKernelDistribution{T,Continuous}
     model::U
 end
 
+# TODO move distribution generator function to main script / specific experiment script. Best practice: one script per experiment?
+# WARN named parameters are less efficient
 """
     pixel_normal_exponential(σ, min, max, μ, θ, o)
 Generate a Pixel distribution from the given parameters.
@@ -83,8 +85,6 @@ function pixel_normal_exponential(σ, θ, min, max, μ, o)
     dist = KernelBinaryMixture(KernelNormal(μ, σ), KernelExponential(θ), o, 1.0 - o)
     PixelDistribution(min, max, dist)
 end
-
-# TODO move to main script, named parameters are less efficient
 pixel_normal_exponential_default = pixel_normal_exponential | (0.1, 0.1, 3)
 
 # Handle invalid values by ignoring them (log probability is zero)

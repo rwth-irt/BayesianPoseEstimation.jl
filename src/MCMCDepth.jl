@@ -2,6 +2,8 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+__precompile__()
+
 module MCMCDepth
 
 # Common functions on Base types
@@ -40,7 +42,9 @@ export unconstrained_state
 export variables
 
 # ModelInterface
+export ComposedModel
 export IndependentModel
+export RngModel
 
 # Proposals
 export GibbsProposal
