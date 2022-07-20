@@ -45,13 +45,12 @@ end
 
 """
     render(context, positions, orientations)
-Renders the positions and orientations and copies the result to the cache of the render context.
-Also returns the cache for immediate processing of the result.
+Renders the positions and orientations and returns a matching view to the mapped `render_data`.
 """
 function render(context::RenderContext, scene::Scene, object_id::Integer, poses::AbstractVector{<:Pose})
     # Apply each pose to the immutable scene and render the pose to layer number idx 
     for (idx, pose) in poses
-        scene_idx = @set scene.meshes[object_id] = pose
+        scene_idx = @set scene.meshes[object_id].pose = pose
         activate_layer(context.framebuffer, idx)
         clear_buffers()
         draw(context.program, scene_idx)

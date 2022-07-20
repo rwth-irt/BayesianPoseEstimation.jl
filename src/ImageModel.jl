@@ -3,14 +3,66 @@
 # All rights reserved. 
 
 # TEST
+# TODO is there any more elegant way? ObservationModel generates ImageModel on the fly which generates the PixelModel on the fly. This requires passing image_parameters down to the PixelModel. Probably only a Monolith model would solve this which generates the distributions in the functions.
 
-# TODO from Sample? I think PoseModel should handle it to hide the internal μ from the chain
+"""
+    ObservationModel
+Provide a position `t`, orientation `r` and occlusion `o`.
+Sets the pose of [object_id] to render depth of the scene.
+This is used in the logdensityof with the pixel_dist to compare the expected and the measured images.
+"""
+struct ObservationModel{C<:RenderContext,S<:Scene,D,O<:AbstractArray,P<:AbstractVector{<:Pose}}
+    # Latent variables last to enable partial application using FunctionManipulation.jl
+    render_context::C
+    scene::S
+    object_id::Int
+    pixel_dist::D
+    normalize_img::Bool
+    occlusion::O
+    poses::P
+end
+
+"""
+    ObservationModel(parameters, render_context, t, r, o)
+Convenience constructor which extracts the parameters into the ObservationModel and converts raw array representations of the position and orientation to a vector of poses.
+"""
+function ObservationModel(parameters::Parameters, render_context::RenderContext, t, r, o)
+    poses = to_pose(t, r, parameters.rotation_type)
+    ObservationModel(render_context, parameters.scene, parameters.object_id, parameters.pixel_dist, parameters.normalize_img, o, poses)
+end
+
+render(model::ObservationModel) = render(model.context, model.scene, model.object_id, model.t, model.r)
+
+"""
+    rand(rng, model, dims...)
+Generate a sample with variables (t=position, r=orientation, o=occlusion).
+"""
+function Base.rand(rng::AbstractRNG, model::ObservationModel, dims...)
+    img_model = ImageModel(model)
+    # TEST dims applies noise multiple times?
+    rand(rng, img_model, dims...)
+end
+
+function DensityInterface.logdensityof(model::ObservationModel, x)
+    img_model = ImageModel(model)
+    logdensityof(img_model, x)
+end
+
+"""
+    ImageModel(obs_model)
+Conveniently construct the image model from an ObservationModel.
+"""
+function ImageModel(obs_model::ObservationModel)
+    # μ as internal variable which will not be part of the sample
+    μ = render(obs_model)
+    ImageModel(obs_model.pixel_dist, μ, obs_model.o, obs_model.normalize_img)
+end
+
+# TODO Could I infer θ instead of o analytically, too? Integration might be possible for exponential family and conjugate priors. However, I would need to keep o fixed.
 
 """
     ImageModel(pixel_dist, μ, o, normalize)
 Model to compare rendered and observed depth images.
-
-# TODO Could I infer θ instead of o analytically, too? Integration might be possible for exponential family and conjugate priors. However, I would need to keep o fixed.
 During inference it takes care of missing values in the expected depth `μ` and only evaluates the logdensity for pixels with depth 0 < z < max_depth.
 Invalid values of z are set to zero by convention.
 
@@ -26,16 +78,15 @@ struct ImageModel{T,U<:AbstractArray,O<:AbstractArray}
 end
 
 """
-    ImageModel(pixel_dist, μ, θ, o)
-Make sure that the order of the parameters of pixel_dist matches μ, θ, o.
+    BroadcastedDistribution(img_model)
+Broadcast the expected value μ and the occlusion to generate pixel level distributions for all the latent variables.
+Since images are always 2D, the BroadcastedDistribution reduction dims are fixed to (1,2).
 """
-ImageModel(pixel_dist, μ, o) = ImageModel(pixel_dist, μ, o, true)
-
-BroadcastedDistribution(model::ImageModel) = BroadcastedDistribution(model.pixel_dist, Dims(model), model.μ, model.o)
+BroadcastedDistribution(img_model::ImageModel) = BroadcastedDistribution(img_model.pixel_dist, Dims(img_model), img_model.μ, img_model.o)
 
 # Image is always 2D
-Base.Dims(::ImageModel) = (1, 2)
-Base.Dims(::Type{<:ImageModel}) = (1, 2)
+const Base.Dims(::Type{<:ImageModel}) = (1, 2)
+const Base.Dims(::ImageModel) = Dims(ImageModel)
 
 # Generate independent random numbers from m_pix(μ, o)
 Base.rand(rng::AbstractRNG, model::ImageModel, dims...) = rand(rng, BroadcastedDistribution(model), dims...)
@@ -51,7 +102,7 @@ function DensityInterface.logdensityof(model::ImageModel, x)
     log_p
 end
 
-# TODO Custom indices more efficient? Possible on GPU without allocations?
+# TODO Custom indices more efficient? Possible on GPU without allocations? Should be handled by insupport? Branching in Kernels usually is not wanted.
 # function DensityInterface.logdensityof(d::ImageModel, z)
 #     # Only sum the logdensity for values for which filter_fn is true
 #     ind = findall(x -> d.params.min_depth < x < d.params.max_depth, d.μ)
@@ -75,7 +126,7 @@ struct PixelDistribution{T<:Real,U} <: AbstractKernelDistribution{T,Continuous}
 end
 
 # TODO move distribution generator function to main script / specific experiment script. Best practice: one script per experiment?
-# WARN named parameters are less efficient
+
 """
     pixel_normal_exponential(σ, min, max, μ, θ, o)
 Generate a Pixel distribution from the given parameters.
