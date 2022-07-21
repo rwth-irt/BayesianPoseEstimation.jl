@@ -86,12 +86,11 @@ export AnalyticGibbs
 export Gibbs
 
 # Visualization
-export colorize_depth
-export colorize_probability
 export density_variable
 export mean_image
-export plot_variable
+export plot_depth_img, plot_prob_img
 export polar_density_variable
+export plot_variable
 export polar_histogram_variable
 export scatter_position
 
