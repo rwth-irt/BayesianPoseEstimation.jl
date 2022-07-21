@@ -26,21 +26,38 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 
 # Observation Model
 ## Sensor Model
-* pixel_dist: Name of the depth pixel distribution
+* pixel_dist: Symbol of the depth pixel distribution
 * pixel_σ: Standard deviation of the sensor noise.
 * pixel_θ: Expected value of the exponential distribution → Occlusion expected closer or further away.
 
 ## Object Association
 * analytic_o: If true calculate the pixel association probability o analytically (Gibbs)
-* association_is, association_not: Names of the distributions if a pixel belongs to the object or not
-* const_o: Constant mixture coefficient for the pixel to object association / probability that a pixel belongs to the object.
+* association_is, association_not: Symbol of the distributions if a pixel belongs to the object or not
+* static_o: Constant mixture coefficient for the pixel to object association / probability that a pixel belongs to the object.
 
 ## Image Model
 * normalize_img: Normalize the likelihood of an image using the number of rendered pixels
 
 # Pose Model
 * rotation_type: Representation of rotations, e.g. RotXYZ [x,y,z] or QuatRotation [w,x,y,z] 
+* mean_t: Mean of the RFID measurement
+* σ_t: Standard deviation of RFID measurement, assumes independent x,y,z components
+## TODO Different rotation models?
 
+# Proposal Model
+* proposal_t: Proposal model for the position (gibbs, independent, symmetric)
+* proposal_σ_t: Standard deviation of the random walk moves for the position
+* proposal_r: Proposal model for the orientation (gibbs, independent, symmetric)
+* proposal_σ_r: Standard deviation of the random walk moves for the orientation
+
+# Inference
+* precision: Type of the floating point precision, typically Float32 (or Float64)
+* rng: Random number generator, CUDA.RNG will use GPU accelerated inference.
+* seed: Seed of the rng
+* algorithm: Symbol of the inference algorithm
+* n_samples: Number of samples in the chain
+* n_burn_in: Number of samples before recording the chain
+* n_thinning: Record only every n_thinning sample to the chain
 """
 Base.@kwdef struct Parameters
     # Meshes
@@ -65,35 +82,23 @@ Base.@kwdef struct Parameters
     analytic_o = false
     association_is = :KernelNormal
     association_not = :KernelExponential
+    static_o = fill(0.2, 100, 100)
     # Image Model
     normalize_img = true
     # Pose Model
     rotation_type = RotXYZ
-end
-
-"""
-  PriorParameters
-# Arguments
-- `<...>_t` describes the prior `MvNormal` estimate from the RFID sensor and the pixel association.
-- `o` describes the prior of each pixel belonging to the object of interest.
-"""
-Base.@kwdef struct PriorParameters
-    mean_t::Vector{Float32} = [0.0, 0.0, 2.0]
-    σ_t::Vector{Float32} = [0.05, 0.05, 0.05]
-    cov_t::Matrix{Float32} = Diagonal(σ_t)
-    o::Matrix{Float32} = fill(0.2, 100, 100)
-end
-
-"""
-  RandomWalkParameters
-Parameters of the zero centered normal distributions of a random walk proposal.
-"""
-Base.@kwdef struct RandomWalkParameters
-    σ_t::Vector{Float32} = [0.05, 0.05, 0.05]
-    cov_t::Matrix{Float32} = Diagonal(σ_t)
-    σ_r::Vector{Float32} = [0.05, 0.05, 0.05]
-    cov_r::Matrix{Float32} = Diagonal(σ_r)
-    σ_o::Float32 = 0.05
-    width::Int64 = 100
-    height::Int64 = 100
+    mean_t = [0.0, 0.0, 2.0]
+    σ_t = [0.05, 0.05, 0.05]
+    # Proposal Model
+    proposal_t = :SymmetricProposal
+    proposal_σ_t = [0.05, 0.05, 0.05]
+    proposal_r = :SymmetricProposal
+    proposal_σ_r = [0.05, 0.05, 0.05]
+    # Inference
+    precision = Float32
+    rng = CUDA.default_rng()
+    seed = 8418387917544508114
+    n_samples = 5000
+    n_burn_in = 1000
+    n_thinning = 2
 end
