@@ -46,7 +46,7 @@ end
     plot_prob_img
 Plot a probability image with a given `color_scheme` and use black for values of 0.
 """
-plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [1]") = plot_depth_img(img; color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title)
+plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]") = plot_depth_img(img; color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title)
 
 """
   convert(Matrix, chain, var_name::Symbol, step = 1)
