@@ -25,41 +25,66 @@ struct RenderContext{T,F<:GLAbstraction.FrameBuffer,C<:AbstractArray{T},P<:GLAbs
 end
 
 """
-    RenderContext(width, height, batch_size, [T=Array, prog=DepthProgram])
+    RenderContext(width, height, depth, [T=Array])
 Simplified generation of an OpenGL context for rendering depth images of a specific size.
 Batched rendering is enabled by generating a 3D Texture of Float32 with size (width, height, layer).
 Specify the `render_cache` type as `Array` vs. `CuArray` to choose your compute device for the inference calculations.
 """
-function RenderContext(width::Integer, height::Integer, batch_size::Integer, ::Type{T}=Array, prog=GLAbstraction.Program(SimpleVert, DepthFrag)) where {T<:AbstractArray}
+function RenderContext(width::Integer, height::Integer, depth::Integer, ::Type{T}=Array) where {T<:AbstractArray}
     window = context_offscreen(width, height)
     # RBO supports only 2D, Texture 3D for rendering multiple samples
-    framebuffer = depth_framebuffer(width, height, batch_size)
-    texture = first(framebuffer.attachments)
+    framebuffer = depth_framebuffer(width, height, depth)
+    texture = first(GLAbstraction.color_attachments(framebuffer))
     # Store depth values as Float32 to avoid conversion from Gray
     gl_buffer = PersistentBuffer(Float32, texture)
     render_data = T(gl_buffer)
+    program = GLAbstraction.Program(SimpleVert, DepthFrag)
     enable_depth_stencil()
     set_clear_color()
-    RenderContext(window, framebuffer, gl_buffer, render_data, prog)
+    RenderContext(window, framebuffer, gl_buffer, render_data, program)
 end
+
+"""
+    RenderContext(params, [T=Array])
+Generate a context from the MCMCDepth Parameters.
+"""
+RenderContext(params::Parameters, T::Type{<:AbstractArray}) = RenderContext(params.width, params.height, params.depth, T)
+
+Base.show(io::IO, context::RenderContext{T}) where {T} = print(io, "RenderContext{$(T)}\n$(context.framebuffer)\nRender Data: $(typeof(context.render_data))")
+
 
 """
     render(context, positions, orientations)
 Renders the positions and orientations and returns a matching view to the mapped `render_data`.
 """
 function render(context::RenderContext, scene::Scene, object_id::Integer, poses::AbstractVector{<:Pose})
+    # Draw to framebuffer
+    GLAbstraction.bind(context.framebuffer)
     # Apply each pose to the immutable scene and render the pose to layer number idx 
-    for (idx, pose) in poses
+    for (idx, pose) in enumerate(poses)
         scene_idx = @set scene.meshes[object_id].pose = pose
         activate_layer(context.framebuffer, idx)
         clear_buffers()
-        draw(context.program, scene_idx)
+        draw(context.shader_program, scene_idx)
     end
     width, height = size(context.gl_buffer)
     depth = length(poses)
-    # TODO or can I execute any calculations while using async_copyto!?
+    # WARN According to Stackoverflow CUDA and OpenGL do run concurrently
+    # TODO any CPU computations or double buffered rendering?
     # Copy only the rendered poses for performance and return a matching view, so broadcasting ignores the other (old) render_data
     unsafe_copyto!(context.gl_buffer, context.framebuffer, width, height, depth)
     @view context.render_data[:, :, 1:depth]
+end
+
+"""
+    Scene(params, context)
+Generate a Scene for a given set of `Parameters` and `RenderContext` .
+"""
+function SciGL.Scene(params::Parameters, context::RenderContext)
+    camera = CvCamera(params.width, params.height, params.f_x, params.f_y, params.c_x, params.c_y; near=params.min_depth, far=params.max_depth) |> SceneObject
+    meshes = map(params.mesh_files) do file
+        load_mesh(context.shader_program, file) |> SceneObject
+    end
+    Scene(camera, meshes)
 end
 

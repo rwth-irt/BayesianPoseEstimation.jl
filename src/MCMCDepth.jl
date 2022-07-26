@@ -24,11 +24,10 @@ include("Tiles.jl")
 # Inference
 include("Main.jl")
 
-# Variables
-export ModelVariable
-export SampleVariable
-export model_value, model_value_with_logjac
-export raw_value
+# Common
+export flatten
+export map_intersect
+export to_rotation, to_translation, to_pose
 
 # Samples
 export Sample
@@ -59,6 +58,10 @@ export transition_probability
 export DepthImageParameters
 export PriorParameters
 export RandomWalkParameters
+
+# RenderContext
+export RenderContext
+export render
 
 # Models
 export DepthExponential

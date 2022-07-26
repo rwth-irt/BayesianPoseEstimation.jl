@@ -66,7 +66,7 @@ Base.@kwdef struct Parameters
     # Camera
     width = 100
     height = 100
-    depth = 1
+    depth = 500
     f_x = 120
     f_y = 120
     c_x = 50
@@ -77,7 +77,7 @@ Base.@kwdef struct Parameters
     pixel_dist = :DepthNormalExponentialUniform
     pixel_σ = 0.1
     pixel_θ = 1.0
-    mix_exponential::T = T(0.8)
+    mix_exponential = 0.8
     # Pixel association
     analytic_o = false
     association_is = :KernelNormal
