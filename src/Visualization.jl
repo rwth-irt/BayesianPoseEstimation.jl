@@ -7,8 +7,7 @@ using Images
 using Plots
 using Plots.PlotMeasures
 using StatsBase
-# TODO only use relevant parts
-using StatsPlots
+import StatsPlots: density as stats_density
 
 """
    value_or_typemax(x, [min=zero(x)])
@@ -79,7 +78,7 @@ Creates a density plot for the given variable.
 """
 function density_variable(chains, var_name, step=1, palette=:tol_bright)
     M = convert(Matrix, chains, var_name, step)
-    Plots.density(transpose(M), fill=true, fillalpha=0.4, palette=palette)
+    density(transpose(M), fill=true, fillalpha=0.4, palette=palette)
 end
 
 """
@@ -88,7 +87,7 @@ Creates a density plot in polar coordinates for the given variable.
 """
 function polar_density_variable(chains, var_name, step=1, palette=:tol_bright)
     M = convert(Matrix, chains, var_name, step)
-    StatsPlots.density(M', proj=:polar, fill=true, fillalpha=0.4, palette=palette)
+    stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=palette)
 end
 
 """
