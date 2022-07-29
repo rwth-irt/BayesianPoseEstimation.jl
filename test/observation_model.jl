@@ -73,7 +73,7 @@ p = to_pose(t, r, QuatRotation)
 maybe_plot(plot_depth_img, @view μ[:, :, 1])
 @test size(μ) == (100, 100, 1)
 @test eltype(μ) == Float32
-@test maximum(μ) == 1.1870024f0
+@test maximum(μ) == 1.7077528f0
 
 # Visualize ImageModel with rendering
 img_model = ImageModel(pixel_normal_exponential_default, μ, o, true)

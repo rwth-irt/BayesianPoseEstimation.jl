@@ -5,7 +5,9 @@
 using ColorSchemes
 using Images
 using Plots
+using Plots.PlotMeasures
 using StatsBase
+# TODO only use relevant parts
 using StatsPlots
 
 """
@@ -15,20 +17,24 @@ Use it to generate the background for the heatmap.
 """
 value_or_typemax(x, min=zero(x)) = x > min ? x : typemax(x)
 
+# TODO add kwargs...
 """
     plot_depth_img
 Plot a depth image with a given `color_scheme` and use black for values of 0.
 """
-function plot_depth_img(img; color_scheme=:viridis, reverse=true, colorbar_title="depth [m]")
+function plot_depth_img(img; color_scheme=:viridis, reverse=true, colorbar_title="depth [m]", clims=nothing)
     # Copy because of the inplace operations
     # color_grad = cgrad(color_scheme; rev=reverse)
     color_grad = cgrad(color_scheme; rev=reverse)
     # pushfirst!(color_scheme, 0)
     mask = img .> 0
-    min = minimum(img[mask])
-    max = maximum(img)
+    if clims === nothing
+        min = minimum(img[mask])
+        max = maximum(img)
+        clims = (min, max)
+    end
     width, height = size(img)
-    plot = heatmap(transpose(value_or_typemax.(img)); colorbar_title=colorbar_title, color=color_grad, clims=(min, max), aspect_ratio=1, yflip=true, x_ticks=[0, width / 2, width], y_ticks=[0, height / 2, height])
+    plot = heatmap(transpose(value_or_typemax.(img)); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:zerolines, x_ticks=[width], xmirror=true, y_ticks=[0, height])
 
     xlabel!(plot, "x-pixels")
     ylabel!(plot, "y-pixels")
@@ -38,7 +44,7 @@ end
     plot_prob_img
 Plot a probability image with a given `color_scheme` and use black for values of 0.
 """
-plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]") = plot_depth_img(img; color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title)
+plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]") = plot_depth_img(img; color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title, clims=(0, 1))
 
 """
   convert(Matrix, chain, var_name::Symbol, step = 1)
