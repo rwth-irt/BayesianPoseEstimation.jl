@@ -9,20 +9,11 @@ using StatsBase
 using StatsPlots
 
 """
-    normalize_depth(img)
-Normalizes the values to [0,1].
+   value_or_typemax(x, [min=zero(x)])
+If the x > min, x is returned otherwise typemax.
+Use it to generate the background for the heatmap.
 """
-function normalize_depth(img)
-    # OpenGL and Julia have different conventions for columns and rows
-    depth = transpose(img[:, end:-1:1])
-    # offset: ignore 0s by setting them to inf
-    depth_img = [ifelse(iszero(x), Inf, x) for x in depth]
-    depth_img = depth .- minimum(depth_img)
-    # set inf to 0 again
-    depth_img = [ifelse(isinf(x), zero(x), x) for x in depth_img]
-    # scale
-    depth_img = depth_img ./ maximum(depth_img)
-end
+value_or_typemax(x, min=zero(x)) = x > min ? x : typemax(x)
 
 """
     plot_depth_img
@@ -30,14 +21,15 @@ Plot a depth image with a given `color_scheme` and use black for values of 0.
 """
 function plot_depth_img(img; color_scheme=:viridis, reverse=true, colorbar_title="depth [m]")
     # Copy because of the inplace operations
-    color_scheme = copy(color_list(color_scheme))
-    if reverse
-        reverse!(color_scheme)
-    end
-    pushfirst!(color_scheme, 0)
-    min = minimum(img[img.>0])
+    # color_grad = cgrad(color_scheme; rev=reverse)
+    color_grad = cgrad(color_scheme; rev=reverse)
+    # pushfirst!(color_scheme, 0)
+    mask = img .> 0
+    min = minimum(img[mask])
     max = maximum(img)
-    plot = heatmap(img; clims=(min, max), seriescolor=color_scheme, aspect_ratio=1, colorbar_title=colorbar_title)
+    width, height = size(img)
+    plot = heatmap(transpose(value_or_typemax.(img)); colorbar_title=colorbar_title, color=color_grad, clims=(min, max), aspect_ratio=1, yflip=true, x_ticks=[0, width / 2, width], y_ticks=[0, height / 2, height])
+
     xlabel!(plot, "x-pixels")
     ylabel!(plot, "y-pixels")
 end
