@@ -16,7 +16,7 @@ If the x > min, x is returned otherwise typemax.
 Use it to generate the background for the heatmap.
 """
 value_or_typemax(x, min=zero(x)) = x > min ? x : typemax(x)
-.
+
 """
     plot_depth_img
 Plot a depth image with a given `color_scheme` and use black for values of 0.
