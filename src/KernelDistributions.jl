@@ -64,7 +64,7 @@ DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractMatri
     rand(rng, dist, [dims...])
 Sample an Array from `dist` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Int...)
+function Base.rand(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Int64...)
     A = array_for_rng(rng, eltype(dist), dims...)
     _rand!(rng, dist, A)
 end

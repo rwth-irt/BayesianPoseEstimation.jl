@@ -2,6 +2,9 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using CoordinateTransformations
+using Rotations
+
 """
     flatten(x)
 Flattens x to return a 1D array.
@@ -54,3 +57,27 @@ Sum the matrix A over the given dimensions and drop the very same dimensions aft
 Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
 """
 sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
+
+"""
+    pose_vector(t, r, [rot_type=RotXYZ])
+Convert and broadcast positions and orientations to a vector of `Pose`.
+"""
+to_pose(t, r, rot_type=RotXYZ) = Pose.(to_translation(t), to_rotation(r, rot_type))
+to_pose(t::AbstractVector, r::AbstractVector, rot_type=RotXYZ) = Pose(to_translation(t), to_rotation(r, rot_type))
+
+"""
+    to_translation(A)
+Convert an array to a vector of `Translation` column wise.
+"""
+to_translation(A::AbstractArray{<:Number}) = [Translation(t) for t in eachcol(A)]
+to_translation(A::AbstractArray{<:Translation}) = A
+to_translation(v::AbstractVector{<:Number}) = Translation(v)
+
+"""
+    to_rotation(A, [T=RotXYZ])
+Convert an array to a vector of `Rotation` column wise, optionally specifying the orientation representation `T`.
+"""
+to_rotation(A::AbstractArray{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = [T(r...) for r in eachcol(A)]
+# SciGL will take care of conversion to affine transformation matrix
+to_rotation(A::AbstractArray{<:Rotation}, ::Rotation) = A
+to_rotation(v::AbstractVector{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = T(v...)

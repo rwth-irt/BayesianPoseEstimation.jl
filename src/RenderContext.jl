@@ -54,18 +54,41 @@ Base.show(io::IO, context::RenderContext{T}) where {T} = print(io, "RenderContex
 
 
 """
-    render(context, positions, orientations)
-Renders the positions and orientations and returns a matching view to the mapped `render_data`.
+    render(context, scene, object_id, pose, layer_id)
+Render the scene with the given pose for the object to the layer of the framebuffer of the context.
 """
-function render(context::RenderContext, scene::Scene, object_id::Integer, poses::AbstractVector{<:Pose})
+function render(context::RenderContext, scene::Scene, object_id::Integer, pose::Pose, layer_id::Integer)
     # Draw to framebuffer
     GLAbstraction.bind(context.framebuffer)
+    scene_pose = @set scene.meshes[object_id].pose = pose
+    activate_layer(context.framebuffer, layer_id)
+    clear_buffers()
+    draw(context.shader_program, scene_pose)
+    GLAbstraction.unbind(context.framebuffer)
+end
+
+"""
+    render(context, scene, object_id, pose)
+Renders the object with a given pose in the scene.
+Returns a matching view to the mapped render data array of the context.
+"""
+function render(context::RenderContext, scene::Scene, object_id::Integer, pose::Pose)
+    # Render single pose to the first layer
+    render(context, scene, object_id, pose, 1)
+    width, height = size(context.gl_buffer)
+    unsafe_copyto!(context.gl_buffer, context.framebuffer, width, height)
+    @view context.render_data[:, :, 1]
+end
+
+"""
+    render(context, scene, object_id, pose)
+Renders the object with a given set of poses in the scene.
+Returns a matching view to the mapped render data array of the context.
+"""
+function render(context::RenderContext, scene::Scene, object_id::Integer, poses::AbstractVector{<:Pose})
     # Apply each pose to the immutable scene and render the pose to layer number idx 
     for (idx, pose) in enumerate(poses)
-        scene_idx = @set scene.meshes[object_id].pose = pose
-        activate_layer(context.framebuffer, idx)
-        clear_buffers()
-        draw(context.shader_program, scene_idx)
+        render(context, scene, object_id, pose, idx)
     end
     width, height = size(context.gl_buffer)
     depth = length(poses)

@@ -21,7 +21,11 @@ include("BroadcastedDistribution.jl")
 include("VectorizedDistributions.jl")
 # TODO remove
 include("Tiles.jl")
-# Inference
+include("Visualization.jl")
+# Plumbing together the depth image based pose estimator
+include("Parameters.jl")
+include("RenderContext.jl")
+include("ObservationModel.jl")
 include("Main.jl")
 
 # Common
@@ -64,6 +68,10 @@ export RenderContext
 export render
 
 # Models
+export PixelDistribution
+export ImageModel
+export ObservationModel
+
 export DepthExponential
 export DepthExponentialUniform
 export DepthImageMeasure
@@ -117,6 +125,8 @@ export to_cpu
 
 # Extensions and Reexports
 using Reexport
+@reexport import Rotations: QuatRotation, RotXYZ
+@reexport import CoordinateTransformations: Translation
 # TODO Required anymore?
 @reexport import SciGL: to_gpu
 
