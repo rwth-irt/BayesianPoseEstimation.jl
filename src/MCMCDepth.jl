@@ -17,10 +17,9 @@ include("Proposals.jl")
 include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
-# TODO remove
-include("VectorizedDistributions.jl")
-# TODO remove
-include("Tiles.jl")
+# Inference / Sampling algorithms
+include("MetropolisHastings.jl")
+include("Gibbs.jl")
 include("Visualization.jl")
 # Plumbing together the depth image based pose estimator
 include("Parameters.jl")
@@ -118,17 +117,10 @@ export KernelUniform
 export BroadcastedDistribution
 export sum_and_dropdims
 
-# Vectorized distributions
-export ProductDistribution
-export VectorizedDistribution
-export to_cpu
-
 # Extensions and Reexports
 using Reexport
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
-# TODO Required anymore?
-@reexport import SciGL: to_gpu
 
 @reexport import DensityInterface: logdensityof
 @reexport import Random: rand!
