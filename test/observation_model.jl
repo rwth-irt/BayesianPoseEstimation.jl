@@ -150,3 +150,80 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 
 # TODO test multiple poses & multiple associations
+# Multiple Poses
+t_dist = BroadcastedDistribution(KernelNormal, [0, 0, 1.5], [0.01, 0.01, 0.01])
+r_dist = BroadcastedDistribution(KernelNormal, [0, 0, 0, 0], [1.0, 1.0, 1.0, 1.0])
+T = rand(t_dist, 10)
+R = rand(r_dist, 10)
+
+obs_model = ObservationModel(params, render_context, scene, T, R, o)
+μ = render(obs_model)
+@test size(μ) == (100, 100, 10)
+@test eltype(μ) == Float32
+maybe_plot(plot_depth_img, μ[:, :, 4])
+
+img_10 = rand(curng, obs_model)
+@test size(img_10) == (100, 100, 10)
+@test eltype(img_10) == Float32
+for layer_id in 1:(size(img_10)[3]-1)
+    @test @views img_10[:, :, layer_id] != img_10[:, :, layer_id+1]
+end
+maybe_plot(plot_depth_img, img_10[:, :, 5])
+
+img_10_2 = rand(curng, obs_model, 2)
+@test size(img_10_2) == (100, 100, 10, 2)
+@test eltype(img_10_2) == Float32
+for layer_id in 1:(size(img_10_2)[3]-1)
+    for rand_id in 1:(size(img_10_2)[4])
+        @test @views img_10_2[:, :, layer_id, rand_id] != img_10_2[:, :, layer_id+1, rand_id]
+    end
+end
+
+# Multiple associations
+O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
+obs_model = ObservationModel(params, render_context, scene, t, r, O)
+μ = render(obs_model)
+@test size(μ) == (100, 100)
+@test eltype(μ) == Float32
+maybe_plot(plot_depth_img, μ)
+
+img_10 = rand(curng, obs_model)
+@test size(img_10) == (100, 100, 10)
+@test eltype(img_10) == Float32
+for layer_id in 1:(size(img_10)[3]-1)
+    @test @views img_10[:, :, layer_id] != img_10[:, :, layer_id+1]
+end
+maybe_plot(plot_depth_img, img_10[:, :, 5])
+
+img_10_2 = rand(curng, obs_model, 2)
+@test size(img_10_2) == (100, 100, 10, 2)
+@test eltype(img_10_2) == Float32
+for layer_id in 1:(size(img_10_2)[3]-1)
+    for rand_id in 1:(size(img_10_2)[4])
+        @test @views img_10_2[:, :, layer_id, rand_id] != img_10_2[:, :, layer_id+1, rand_id]
+    end
+end
+
+# Multiple poses & associations
+O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 5)
+obs_model = ObservationModel(params, render_context, scene, T, R, O)
+@test_throws DimensionMismatch img_10 = rand(curng, obs_model)
+
+O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
+obs_model = ObservationModel(params, render_context, scene, T, R, O)
+img_10 = rand(curng, obs_model)
+@test size(img_10) == (100, 100, 10)
+@test eltype(img_10) == Float32
+for layer_id in 1:(size(img_10)[3]-1)
+    @test @views img_10[:, :, layer_id] != img_10[:, :, layer_id+1]
+end
+maybe_plot(plot_depth_img, img_10[:, :, 8])
+
+img_10_2 = rand(curng, obs_model, 2)
+@test size(img_10_2) == (100, 100, 10, 2)
+@test eltype(img_10_2) == Float32
+for layer_id in 1:(size(img_10_2)[3]-1)
+    for rand_id in 1:(size(img_10_2)[4])
+        @test @views img_10_2[:, :, layer_id, rand_id] != img_10_2[:, :, layer_id+1, rand_id]
+    end
+end
