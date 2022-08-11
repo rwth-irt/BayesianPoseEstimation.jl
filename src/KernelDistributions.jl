@@ -72,6 +72,9 @@ end
 # Avoid recursions of the above
 Base.rand(rng::AbstractRNG, transformed_dist::UnivariateTransformed{<:AbstractKernelDistribution}) = transformed_dist.transform(rand(rng, transformed_dist.dist))
 
+# Distributions.jl implementation won't run on the GPU. Only use the most general case, which might be slower but more robust
+Base.rand(rng::AbstractRNG, dist::Truncated{<:AbstractKernelDistribution{T}}) where {T} = invlogcdf(dist.untruncated, logaddexp(T(dist.loglcdf), T(dist.logtp) - randexp(rng, T)))
+
 # Arrays of KernelDistributions → sample from the distributions instead of selecting random elements of the array
 
 """
@@ -214,19 +217,13 @@ end
 
 Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = dist.θ * randexp(rng, T)
 
-# Truncated{KernelExponential}
-Distributions.logcdf(dist::KernelExponential{T}, x::Real) where {T} = log1mexp(-max(T(x) / dist.θ, zero(T)))
-Distributions.invlogcdf(dist::KernelExponential{T}, lp::Real) where {T} = -log1mexp(T(lp)) * dist.θ
-function Base.rand(rng::AbstractRNG, dist::Truncated{<:KernelExponential{T}}) where {T}
-    d0 = dist.untruncated
-    # rand will only be used for testing, so robust but slower
-    return invlogcdf(d0, logaddexp(T(dist.loglcdf), T(dist.logtp) - randexp(rng, T)))
-end
-
 Base.maximum(::KernelExponential{T}) where {T} = typemax(T)
 Base.minimum(::KernelExponential{T}) where {T} = zero(T)
 Bijectors.bijector(::KernelExponential) = Bijectors.Log{0}()
 Distributions.insupport(dist::KernelExponential, x::Real) = minimum(dist) <= x
+# Support Truncated{KernelExponential}
+Distributions.logcdf(dist::KernelExponential{T}, x::Real) where {T} = log1mexp(-max(T(x) / dist.θ, zero(T)))
+Distributions.invlogcdf(dist::KernelExponential{T}, lp::Real) where {T} = -log1mexp(T(lp)) * dist.θ
 
 # KernelUniform
 
