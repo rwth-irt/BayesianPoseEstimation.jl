@@ -108,6 +108,23 @@ logdensity_ge_M(ge, M) = logdensityof.(ge, M)
 @test logcdf(ge, 1.0) == logcdf(exponential, 1.0)
 @test logcdf(ge, 0.0) == logcdf(exponential, 0.0)
 @test logcdf(ge, -1.0) == logcdf(exponential, -1.0)
+@test_throws DomainError invlogcdf(ge, 0.1)
+@test invlogcdf(ge, 0.0) == invlogcdf(exponential, 0.0)
+@test invlogcdf(ge, -1.0) == invlogcdf(exponential, -1.0)
+
+# Truncated{KernelExponential}
+te = truncated(exponential, 1.0, 2.0)
+tge = truncated(ge, 1.0, 2.0)
+M = rand(curng, tge, 1000)
+@test M isa CuArray
+@test 1.0 < minimum(M) < maximum(M) < 2.0
+logdensity_tge_M(tge, M) = logdensityof.(tge, M)
+@inferred logdensity_ge_M(tge, M)
+@test logdensityof(tge, 0.9) == logdensityof(te, 0.9)
+@test logdensityof(tge, 1.0) == logdensityof(te, 1.0)
+@test logdensityof(tge, 1.5) == logdensityof(te, 1.5)
+@test logdensityof(tge, 2.0) == logdensityof(te, 2.0)
+@test logdensityof(tge, 2.1) == logdensityof(te, 2.1)
 
 # KernelUniform
 M = @inferred rand(curng, KernelUniform(Float64), 100, 100)

@@ -43,7 +43,7 @@ Thus, we default to Float32, mostly for memory capacity reasons.
 abstract type AbstractKernelDistribution{T,S<:ValueSupport} <: UnivariateDistribution{S} end
 
 # WARN parametric alias causes method ambiguities, since the parametric type is always present
-const KernelOrTransformedKernel = Union{AbstractKernelDistribution,UnivariateTransformed{<:AbstractKernelDistribution}}
+const KernelOrTransformedKernel = Union{AbstractKernelDistribution,UnivariateTransformed{<:AbstractKernelDistribution},Truncated{<:AbstractKernelDistribution}}
 
 const KernelOrKernelArray = Union{KernelOrTransformedKernel,AbstractArray{<:KernelOrTransformedKernel}}
 
@@ -212,10 +212,16 @@ function Distributions.logpdf(dist::KernelExponential{T}, x) where {T}
     end
 end
 
-# Support for truncated distribution
-Distributions.logcdf(d::KernelExponential{T}, x::Real) where {T} = log1mexp(-max(T(x) / d.θ, zero(T)))
-
 Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = dist.θ * randexp(rng, T)
+
+# Truncated{KernelExponential}
+Distributions.logcdf(dist::KernelExponential{T}, x::Real) where {T} = log1mexp(-max(T(x) / dist.θ, zero(T)))
+Distributions.invlogcdf(dist::KernelExponential{T}, lp::Real) where {T} = -log1mexp(T(lp)) * dist.θ
+function Base.rand(rng::AbstractRNG, dist::Truncated{<:KernelExponential{T}}) where {T}
+    d0 = dist.untruncated
+    # rand will only be used for testing, so robust but slower
+    return invlogcdf(d0, logaddexp(T(dist.loglcdf), T(dist.logtp) - randexp(rng, T)))
+end
 
 Base.maximum(::KernelExponential{T}) where {T} = typemax(T)
 Base.minimum(::KernelExponential{T}) where {T} = zero(T)
