@@ -213,7 +213,7 @@ function Distributions.logpdf(dist::KernelExponential{T}, x) where {T}
 end
 
 # Support for truncated distribution
-Distributions.logcdf(d::KernelExponential, x::Real) = log1mexp(-max(x / d.θ, 0))
+Distributions.logcdf(d::KernelExponential{T}, x::Real) where {T} = log1mexp(-max(T(x) / d.θ, zero(T)))
 
 Base.rand(rng::AbstractRNG, dist::KernelExponential{T}) where {T} = dist.θ * randexp(rng, T)
 
