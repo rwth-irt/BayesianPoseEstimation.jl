@@ -105,6 +105,9 @@ logdensity_ge_M(ge, M) = logdensityof.(ge, M)
 @test logdensityof(ge, 1.0) == logdensityof(exponential, 1.0)
 @test logdensityof(ge, 0.0) == logdensityof(exponential, 0.0)
 @test logdensityof(ge, -1.0) == logdensityof(exponential, -1.0)
+@test logcdf(ge, 1.0) == logcdf(exponential, 1.0)
+@test logcdf(ge, 0.0) == logcdf(exponential, 0.0)
+@test logcdf(ge, -1.0) == logcdf(exponential, -1.0)
 
 # KernelUniform
 M = @inferred rand(curng, KernelUniform(Float64), 100, 100)
