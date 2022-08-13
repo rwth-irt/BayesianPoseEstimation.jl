@@ -26,22 +26,11 @@ curng = CUDA.default_rng()
 Random.seed!(curng, 42)
 CUDA.allowscalar(false)
 
-# TODO move distribution generator function to main script / specific experiment script. Best practice: one script per experiment?
-"""
-    pixel_normal_exponential(min, max, σ, θ, μ, o)
-Generate a Pixel distribution from the given parameters.
-Putting static parameters first allows partial application of the function.
-"""
-function pixel_normal_exponential(min, max, σ, θ, μ, o)
-    # TODO Generating random "occlusions" behind the object does not make sense. Would need some kind of truncated exponential. However, it might be more robust, since it allows for random outliers.
-    dist = KernelBinaryMixture(KernelNormal(μ, σ), KernelExponential(θ), o, one(o) - o)
-    PixelDistribution(min, max, dist)
-end
-# WARN This might defeat chosen float precision
-pixel_normal_exponential_default = pixel_normal_exponential | (0.1f0, 3.0f0, 0.01f0, 1.0f0)
 
+# WARN This might defeat chosen float precision
+my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 3.0f0, 0.01f0, 1.0f0)
 # TODO Benchmark transfer time vs. inference time → double buffering worth it? If transfer is significant compared to inference?
-pix_dist = pixel_normal_exponential_default(1.0f0, 0.1f0)
+pix_dist = my_pixel_dist(1.0f0, 0.1f0)
 x = rand(curng, pix_dist, 100, 100)
 maybe_plot(histogram, x |> Array |> flatten)
 maybe_plot(plot_depth_img, Array(x))
@@ -58,7 +47,7 @@ maybe_plot(plot_prob_img, Array(o), clims=nothing)
 maybe_plot(plot_prob_img, Array(o))
 # Higher association probability so the ape can be recognized
 o = rand(curng, KernelUniform(0.0f0, 1.0f0), 100, 100)
-img_model = ImageModel(pixel_normal_exponential_default, μ, o, true)
+img_model = ImageModel(my_pixel_dist, μ, o, true)
 imgs = rand(curng, img_model)
 @test size(imgs) == (100, 100, 5)
 ℓ = @inferred logdensityof(img_model, imgs)
@@ -83,7 +72,7 @@ p = to_pose(t, r, QuatRotation)
 maybe_plot(plot_depth_img, Array(μ))
 
 # Single rand
-img_model = ImageModel(pixel_normal_exponential_default, μ, o, true)
+img_model = ImageModel(my_pixel_dist, μ, o, true)
 img = rand(curng, img_model)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
@@ -119,7 +108,7 @@ for layer_id in 1:(size(μ_10)[3]-1)
 end
 
 # Multiple poses & rand image model
-img_model_10 = ImageModel(pixel_normal_exponential_default, μ_10, o, true)
+img_model_10 = ImageModel(my_pixel_dist, μ_10, o, true)
 img_10_2 = rand(curng, img_model_10, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
@@ -144,7 +133,7 @@ end
 
 # WARN lots of things have to be right when using eval of params
 params = @set params.rotation_type = QuatRotation
-params = @set params.pixel_dist = pixel_normal_exponential_default
+params = @set params.pixel_dist = my_pixel_dist
 obs_model = ObservationModel(params, render_context, scene, t, r, o)
 μ = render(obs_model)
 @test size(μ) == (100, 100)

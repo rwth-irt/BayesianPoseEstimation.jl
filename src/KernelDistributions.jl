@@ -34,12 +34,11 @@ The Interface requires the following to be implemented:
 - `Base.rand(rng, dist::MyKernelDistribution{T})::T` generate a single random number from the distribution
 - `Distributions.logpdf(dist::MyKernelDistribution{T}, x)::T` evaluate the normalized logdensity
 - `Base.maximum(d), Base.minimum(d), Distributions.insupport(d)`: Determine the support of the distribution
+- `Distributions.logcdf(d, x), Distributions.invlogcdf(d, x)`: Support for Truncated{D}
 
 Most of the time Float64 precision is not required, especially for GPU computations.
 Thus, we default to Float32, mostly for memory capacity reasons.
 """
-
-# TODO Update docs: Distributions.logpdf, Distributions.insupport
 abstract type AbstractKernelDistribution{T,S<:ValueSupport} <: UnivariateDistribution{S} end
 
 # WARN parametric alias causes method ambiguities, since the parametric type is always present
@@ -91,6 +90,7 @@ end
 Mutate the array A by sampling from `dist`.
 """
 Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:KernelOrTransformedKernel}, A::AbstractArray) = _rand!(rng, dist, A)
+Random.rand!(rng::AbstractRNG, dist::KernelOrTransformedKernel, A::AbstractArray{<:Real}) = _rand!(rng, dist, A)
 
 # CPU implementation
 
@@ -106,12 +106,7 @@ end
 
 # GPU implementation
 
-# TODO Might want this to fail instead of fallback? Might not even get called anymore?
-function _rand!(rng::AbstractRNG, dist, A::CuArray{T}) where {T}
-    @warn "Using unsupported RNG of type $(typeof(rng)) on CuArray. Falling back to SLOW sampling on CPU and copying it to the GPU."
-    copyto!(A, rand!(rng, dist, Array{T}(undef, size(A)...)))
-end
-
+# Currently only the CUDA.RNG is supported in Kernels.
 function _rand!(rng::CUDA.RNG, dist, A::CuArray)
     d = maybe_cuda(A, dist)
     _rand_cuda_rng(d, A, rng.seed, rng.counter)
@@ -150,8 +145,6 @@ CuArray for CUDA.RNG and Array for all other RNGs.
 """
 array_for_rng(::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = Array{T}(undef, dims...)
 array_for_rng(::CUDA.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
-# TODO not supported on GPU yet
-array_for_rng(::CURAND.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
 
 # TODO Might want this to fail instead of fallback?
 """
@@ -266,14 +259,18 @@ Distributions.insupport(dist::KernelCircularUniform, x::Real) = minimum(dist) <=
 # KernelBinaryMixture
 
 # Value support makes only sense to be either Discrete or Continuous
-struct KernelBinaryMixture{T<:Real,S<:ValueSupport,U<:AbstractKernelDistribution{T,S},V<:AbstractKernelDistribution{T,S}} <: AbstractKernelDistribution{T,S}
+struct KernelBinaryMixture{T<:AbstractFloat,S<:ValueSupport,U<:UnivariateDistribution{S},V<:UnivariateDistribution{S}} <: AbstractKernelDistribution{T,S}
     dist_1::U
     dist_2::V
     # Prefer log here, since the logdensity will be used more often than rand
     log_weight_1::T
     log_weight_2::T
-    KernelBinaryMixture(dist_1::U, dist_2::V, weight_1, weight_2) where {T,S<:ValueSupport,U<:AbstractKernelDistribution{T,S},V<:AbstractKernelDistribution{T,S}} = new{T,S,U,V}(dist_1, dist_2, Float32(log(weight_1 / (weight_1 + weight_2))), Float32(log(weight_2 / (weight_1 + weight_2))))
+    KernelBinaryMixture{T}(dist_1::U, dist_2::V, weight_1, weight_2) where {T,S<:ValueSupport,U<:UnivariateDistribution{S},V<:UnivariateDistribution{S}} = new{T,S,U,V}(dist_1, dist_2, log(weight_1 / (weight_1 + weight_2)), log(weight_2 / (weight_1 + weight_2)))
 end
+
+KernelBinaryMixture(::Type{T}, dist_1, dist_2, weight_1, weight_2) where {T} = KernelBinaryMixture{T}(dist_1, dist_2, weight_1, weight_2)
+KernelBinaryMixture(dist_1, dist_2, weight_1::T, weight_2::T) where {T} = KernelBinaryMixture{T}(dist_1, dist_2, weight_1, weight_2)
+
 
 Base.show(io::IO, dist::KernelBinaryMixture{T}) where {T} = print(io, "KernelBinaryMixture{$(T)}\n  components: $(dist.dist_1), $(dist.dist_2) \n  log weights: $(dist.log_weight_1), $(dist.log_weight_2)")
 

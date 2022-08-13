@@ -25,6 +25,7 @@ include("Visualization.jl")
 include("Parameters.jl")
 include("RenderContext.jl")
 include("ObservationModel.jl")
+include("Models.jl")
 include("Main.jl")
 
 # Common
@@ -71,15 +72,7 @@ export PixelDistribution
 export ImageModel
 export ObservationModel
 
-export DepthExponential
-export DepthExponentialUniform
-export DepthImageMeasure
-export DepthNormal
-export DepthNormalExponential
-export DepthNormalExponentialUniform
-export DepthNormalUniform
-export DepthUniform
-export WrappedModel
+export mix_normal_exponential, mix_normal_truncated_exponential
 
 export image_association
 export pixel_association
