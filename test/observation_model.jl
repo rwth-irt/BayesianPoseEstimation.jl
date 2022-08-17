@@ -26,41 +26,10 @@ curng = CUDA.default_rng()
 Random.seed!(curng, 42)
 CUDA.allowscalar(false)
 
-
-# WARN This might defeat chosen float precision
-my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 3.0f0, 0.01f0, 1.0f0)
-# TODO Benchmark transfer time vs. inference time → double buffering worth it? If transfer is significant compared to inference?
-pix_dist = my_pixel_dist(1.0f0, 0.1f0)
-x = rand(curng, pix_dist, 100, 100)
-maybe_plot(histogram, x |> Array |> flatten)
-maybe_plot(plot_depth_img, Array(x))
-logdensityof(pix_dist, x) == logdensityof.(pix_dist, x)
-
-# ImageModel
-
-μ = rand(curng, KernelNormal(1.0f0, 0.01f0), 100, 100, 5)
-maybe_plot(plot_depth_img, Array(@view μ[:, :, 1]))
-# Test overriding clims
-o = rand(curng, KernelUniform(0.5f0, 1.0f0), 100, 100)
-maybe_plot(plot_prob_img, Array(o), clims=nothing)
-# Test normal scaling
-maybe_plot(plot_prob_img, Array(o))
-# Higher association probability so the ape can be recognized
-o = rand(curng, KernelUniform(0.0f0, 1.0f0), 100, 100)
-img_model = ImageModel(my_pixel_dist, μ, o, true)
-imgs = rand(curng, img_model)
-@test size(imgs) == (100, 100, 5)
-ℓ = @inferred logdensityof(img_model, imgs)
-@test size(ℓ) == (5,)
-@test eltype(ℓ) == Float32
-maybe_plot(plot_depth_img, Array(@view imgs[:, :, 1]))
-
-# RenderContext with ImageModel
-
+# Setup render context & scene
 params = MCMCDepth.Parameters()
 render_context = RenderContext(params.width, params.height, params.depth, CuArray)
 scene = Scene(params, render_context)
-
 # CvCamera like ROS looks down positive z
 t = [0, 0, 1.5]
 r = normalize!([1, 0, 0, 0])
@@ -71,8 +40,18 @@ p = to_pose(t, r, QuatRotation)
 @test maximum(μ) == 1.7077528f0
 maybe_plot(plot_depth_img, Array(μ))
 
+# TODO Benchmark transfer time vs. inference time → double buffering worth it? If transfer is significant compared to inference?
+
+# PixelDistribution
+my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 3.0f0, 0.01f0, 1.0f0)
+pix_dist = my_pixel_dist(1.0f0, 0.1f0)
+x = rand(curng, pix_dist, 100, 100)
+maybe_plot(histogram, x |> Array |> flatten)
+logdensityof(pix_dist, x) == logdensityof.(pix_dist, x)
+
 # Single rand
-img_model = ImageModel(my_pixel_dist, μ, o, true)
+o = rand(curng, KernelUniform(0.5f0, 1.0f0), 100, 100)
+img_model = ImageModel(true, my_pixel_dist, μ, o)
 img = rand(curng, img_model)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
@@ -108,7 +87,7 @@ for layer_id in 1:(size(μ_10)[3]-1)
 end
 
 # Multiple poses & rand image model
-img_model_10 = ImageModel(my_pixel_dist, μ_10, o, true)
+img_model_10 = ImageModel(true, my_pixel_dist, μ_10, o)
 img_10_2 = rand(curng, img_model_10, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
@@ -129,30 +108,28 @@ for layer_id in 1:(size(img_10_2)[3]-1)
     end
 end
 
-# ObservationModel
-
+# ImageModel from scene & pose
 # WARN lots of things have to be right when using eval of params
 params = @set params.rotation_type = QuatRotation
 params = @set params.pixel_dist = my_pixel_dist
-obs_model = ObservationModel(params, render_context, scene, t, r, o)
-μ = render(obs_model)
-@test size(μ) == (100, 100)
-@test eltype(μ) == Float32
-maybe_plot(plot_depth_img, Array(μ))
+img_model_fn = ImageModel | (params, render_context, scene)
+img_model_pose = img_model_fn(t, r, o)
+@test size(img_model_pose.μ) == (100, 100)
+@test eltype(img_model_pose.μ) == Float32
 
 # Single random noise
-img = rand(curng, obs_model)
+img = rand(curng, img_model_pose)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
-maybe_plot(plot_depth_img, Array(img))
-ℓ = @inferred logdensityof(obs_model, img)
+maybe_plot(plot_depth_img, Array(img); clims=(0.0, 2.0))
+ℓ = @inferred logdensityof(img_model_pose, img)
 @test ℓ isa Float32
 
 # Multiple random noise
-img_10 = rand(curng, obs_model, 10)
+img_10 = rand(curng, img_model_pose, 10)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10)
+ℓ = @inferred logdensityof(img_model_pose, img_10)
 @test size(ℓ) == (10,)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10)[3]-1)
@@ -166,16 +143,14 @@ r_dist = BroadcastedDistribution(KernelNormal, [0, 0, 0, 0], [1.0, 1.0, 1.0, 1.0
 T = rand(t_dist, 10)
 R = rand(r_dist, 10)
 
-obs_model = ObservationModel(params, render_context, scene, T, R, o)
-μ = render(obs_model)
-@test size(μ) == (100, 100, 10)
-@test eltype(μ) == Float32
-maybe_plot(plot_depth_img, Array(view(μ, :, :, 4)))
+img_model_pose = img_model_fn(T, R, o)
+@test size(img_model_pose.μ) == (100, 100, 10)
+@test eltype(img_model_pose.μ) == Float32
 
-img_10 = rand(curng, obs_model)
+img_10 = rand(curng, img_model_pose)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10)
+ℓ = @inferred logdensityof(img_model_pose, img_10)
 @test size(ℓ) == (10,)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10)[3]-1)
@@ -184,10 +159,10 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 4)))
 
-img_10_2 = rand(curng, obs_model, 2)
+img_10_2 = rand(curng, img_model_pose, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10_2)
+ℓ = @inferred logdensityof(img_model_pose, img_10_2)
 @test size(ℓ) == (10, 2)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10_2)[3])
@@ -205,16 +180,14 @@ end
 
 # Multiple associations
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
-obs_model = ObservationModel(params, render_context, scene, t, r, O)
-μ = render(obs_model)
-@test size(μ) == (100, 100)
-@test eltype(μ) == Float32
-maybe_plot(plot_depth_img, Array(μ))
+img_model_pose = img_model_fn(t, r, O)
+@test size(img_model_pose.μ) == (100, 100)
+@test eltype(img_model_pose.μ) == Float32
 
-img_10 = rand(curng, obs_model)
+img_10 = rand(curng, img_model_pose)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10)
+ℓ = @inferred logdensityof(img_model_pose, img_10)
 @test size(ℓ) == (10,)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10)[3]-1)
@@ -223,10 +196,10 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 5)))
 
-img_10_2 = rand(curng, obs_model, 2)
+img_10_2 = rand(curng, img_model_pose, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10_2)
+ℓ = @inferred logdensityof(img_model_pose, img_10_2)
 @test size(ℓ) == (10, 2)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10_2)[3])
@@ -244,15 +217,15 @@ end
 
 # Multiple poses & associations
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 5)
-obs_model = ObservationModel(params, render_context, scene, T, R, O)
-@test_throws DimensionMismatch img_10 = rand(curng, obs_model)
+img_model_pose = img_model_fn(T, R, O)
+@test_throws DimensionMismatch img_10 = rand(curng, img_model_pose)
 
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
-obs_model = ObservationModel(params, render_context, scene, T, R, O)
-img_10 = rand(curng, obs_model)
+img_model_pose = img_model_fn(T, R, O)
+img_10 = rand(curng, img_model_pose)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10)
+ℓ = @inferred logdensityof(img_model_pose, img_10)
 @test size(ℓ) == (10,)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10)[3]-1)
@@ -261,10 +234,10 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 8)))
 
-img_10_2 = rand(curng, obs_model, 2)
+img_10_2 = rand(curng, img_model_pose, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
-ℓ = @inferred logdensityof(obs_model, img_10_2)
+ℓ = @inferred logdensityof(img_model_pose, img_10_2)
 @test size(ℓ) == (10, 2)
 @test ℓ isa CuArray{Float32}
 for layer_id in 1:(size(img_10_2)[3])

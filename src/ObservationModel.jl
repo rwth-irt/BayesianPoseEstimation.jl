@@ -2,57 +2,12 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TEST
-# TODO is there any more elegant way? ObservationModel generates ImageModel on the fly which generates the PixelModel on the fly. This requires passing image_parameters down to the PixelModel. Probably only a Monolith model would solve this which generates the distributions in the functions.
+using Base.Broadcast: broadcasted
+using Base: Callable
+using SciGL
 
 """
-    ObservationModel
-Provide a single or a vector of poses `p` and the pixel association probabilities `o`.
-Sets the pose of [object_id] to render depth of the scene.
-This is used in the logdensityof with the pixel_dist to compare the expected and the measured images.
-"""
-struct ObservationModel{C<:RenderContext,S<:Scene,D,O<:AbstractArray,P}
-    # Latent variables last to enable partial application using FunctionManipulation.jl
-    render_context::C
-    scene::S
-    object_id::Int
-    pixel_dist::D
-    normalize_img::Bool
-    o::O
-    p::P
-end
-
-"""
-    ObservationModel(parameters, render_context, scene, t, r, o)
-Convenience constructor which extracts the parameters into the ObservationModel and converts raw array representations of the position and orientation to a vector of poses.
-"""
-function ObservationModel(parameters::Parameters, render_context::RenderContext, scene, t, r, o)
-    # TODO document what gets `eval`ed
-    pose = to_pose(t, r, eval(parameters.rotation_type))
-    ObservationModel(render_context, scene, parameters.object_id, eval(parameters.pixel_dist), parameters.normalize_img, o, pose)
-end
-
-render(model::ObservationModel) = render(model.render_context, model.scene, model.object_id, model.p)
-
-"""
-    rand(rng, model, dims...)
-Generate a sample with variables (t=position, r=orientation, o=occlusion).
-"""
-function Base.rand(rng::AbstractRNG, model::ObservationModel, dims::Integer...)
-    img_model = ImageModel(model)
-    # TEST dims applies noise multiple times?
-    rand(rng, img_model, dims...)
-end
-
-function DensityInterface.logdensityof(model::ObservationModel, x)
-    img_model = ImageModel(model)
-    logdensityof(img_model, x)
-end
-
-# TODO Could I infer θ instead of o analytically, too? Integration might be possible for exponential family and conjugate priors. However, I would need to keep o fixed.
-
-"""
-    ImageModel(pixel_dist, μ, o, normalize)
+    ImageModel(normalize_img, broadcasted_dist, μ)
 Model to compare rendered and observed depth images.
 During inference it takes care of missing values in the expected depth `μ` and only evaluates the logdensity for pixels with depth 0 < z < max_depth.
 Invalid values of z are set to zero by convention.
@@ -61,41 +16,54 @@ Each pixel is assumed to be independent and the measurement can be described by 
 `μ` is the expected value and `o` is the object association probability.
 Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
 """
-struct ImageModel{T,U<:AbstractArray,O<:AbstractArray}
-    pixel_dist::T
+struct ImageModel{T,N,B<:BroadcastedDistribution{T,N},U<:AbstractArray{T}}
+    normalize_img::Bool
+    broadcasted_dist::B
+    # Need to access μ to calculate the normalization constant
     μ::U
-    o::O
-    normalize::Bool
 end
 
 """
-    ImageModel(obs_model)
-Conveniently construct the image model from an ObservationModel.
+    ImageModel(normalize_img, pixel_dist, μ, o)
+Generates a `BroadcastedDistribution` of dim (1,2) from the `pix_dist`, expected depth `μ` and the association probability `o`.
 """
-function ImageModel(obs_model::ObservationModel)
-    # μ as internal variable which will not be part of the sample
-    μ = render(obs_model)
-    ImageModel(obs_model.pixel_dist, μ, obs_model.o, obs_model.normalize_img)
+function ImageModel(normalize_img::Bool, pixel_dist, μ::AbstractArray, o::AbstractArray)
+    broadcasted_dist = BroadcastedDistribution(pixel_dist, Dims(ImageModel), μ, o)
+    ImageModel(normalize_img, broadcasted_dist, μ)
 end
 
 """
-    BroadcastedDistribution(img_model)
-Broadcast the expected value μ and the occlusion to generate pixel level distributions for all the latent variables.
-Since images are always 2D, the BroadcastedDistribution reduction dims are fixed to (1,2).
+    ImageModel(render_context, scene, object_id, rotation_type, normalize_img, pixel_dist, t, r, o)
+Generate an ImageModel by rendering the expected depth `μ` for the provided scene.
+Sets the pose of `object_id` to the position(s) `t` and orientation(s) `r`.
 """
-BroadcastedDistribution(img_model::ImageModel) = BroadcastedDistribution(img_model.pixel_dist, Dims(img_model), img_model.μ, img_model.o)
+function ImageModel(render_context::RenderContext, scene::Scene, object_id::Integer, rotation_type::Type, normalize_img::Bool, pixel_dist, t::AbstractArray, r::AbstractArray, o::AbstractArray)
+    p = to_pose(t, r, rotation_type)
+    μ = render(render_context, scene, object_id, p)
+    ImageModel(normalize_img, pixel_dist, μ, o)
+end
+
+"""
+    ImageModel(parameters, render_context, scene, t, r, o)
+Convenience constructor which extracts the `object_id`, `normalize_img`, `rotation_type` and `pixel_dist` from the `parameters` struct.
+Note that `rotation_type` and `pixel_dist` are expected as Symbols which get evaled at runtime. 
+"""
+ImageModel(parameters::Parameters, render_context::RenderContext, scene::Scene, t::AbstractArray, r::AbstractArray, o::AbstractArray) = ImageModel(render_context, scene, parameters.object_id, eval(parameters.rotation_type), parameters.normalize_img, eval(parameters.pixel_dist), t, r, o)
 
 # Image is always 2D
 const Base.Dims(::Type{<:ImageModel}) = (1, 2)
 const Base.Dims(::ImageModel) = Dims(ImageModel)
 
 # Generate independent random numbers from m_pix(μ, o)
-Base.rand(rng::AbstractRNG, model::ImageModel, dims::Integer...) = rand(rng, BroadcastedDistribution(model), dims...)
+Base.rand(rng::AbstractRNG, model::ImageModel, dims::Integer...) = rand(rng, model.broadcasted_dist, dims...)
+
+# DensityInterface
+@inline DensityKind(::ImageModel) = HasDensity()
 
 function DensityInterface.logdensityof(model::ImageModel, x)
-    log_p = logdensityof(BroadcastedDistribution(model), x)
-    if model.normalize
-        # Count the number of rendered pixels and divide by it
+    log_p = logdensityof(model.broadcasted_dist, x)
+    if model.normalize_img
+        # Normalization: divide by the number of rendered pixels
         rendered_pixels = sum_and_dropdims(model.μ .> 0; dims=Dims(model))
         return log_p ./ rendered_pixels
     end
@@ -103,27 +71,14 @@ function DensityInterface.logdensityof(model::ImageModel, x)
     log_p
 end
 
-# TODO Custom indices more efficient? Possible on GPU without allocations? Should be handled by insupport? Branching in Kernels usually is not wanted.
-# function DensityInterface.logdensityof(d::ImageModel, z)
-#     # Only sum the logdensity for values for which filter_fn is true
-#     ind = findall(x -> d.params.min_depth < x < d.params.max_depth, d.μ)
-#     sum = 0.0
-#     for i in ind
-#         # Preprocess the measurement
-#         z_i = d.params.min_depth < z[i] < d.params.max_depth ? z[i] : zero(z[i])
-#         sum = sum + logdensity(d.params.pixel_measure(d.μ[i], d.o[i], d.params), z_i)
-#     end
-#     sum
-# end
-
 """
     PixelDistribution
 Distribution of an independent pixel which handles out of range measurements by ignoring them.
 """
-struct PixelDistribution{T<:Real,U} <: AbstractKernelDistribution{T,Continuous}
+struct PixelDistribution{T<:Real,M} <: AbstractKernelDistribution{T,Continuous}
     min::T
     max::T
-    model::U
+    model::M
 end
 
 # Handle invalid values by ignoring them (log probability is zero)
@@ -136,6 +91,6 @@ end
 
 Base.maximum(dist::PixelDistribution) = dist.max
 Base.minimum(dist::PixelDistribution) = dist.min
-# logpdf handles out of support so no transformation is required or even desired
+# logpdf explicitly handles outliers, so no transformation is desired
 Bijectors.bijector(::PixelDistribution) = Bijectors.Identity{0}()
 Distributions.insupport(dist::PixelDistribution, x::Real) = minimum(dist) < x < maximum(dist)
