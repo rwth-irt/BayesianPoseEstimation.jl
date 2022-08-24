@@ -54,9 +54,13 @@ end
 """
     sum_and_dropdims(A; dims)
 Sum the matrix A over the given dimensions and drop the very same dimensions afterwards.
-Returns an array of size () instead of a scalar. Conditional conversion to scalar would defeat type stability. 
+In case of a matching number of dimensions, a scalar is returned
 """
-sum_and_dropdims(A; dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
+sum_and_dropdims(A; dims) = sum_and_dropdims(A, dims)
+
+# Cannot dispatch on named parameter
+sum_and_dropdims(A, dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
+sum_and_dropdims(A::AbstractArray{<:Any,N}, dims::Dims{N}) where {N} = sum(A)
 
 """
     pose_vector(t, r, [rot_type=RotXYZ])
