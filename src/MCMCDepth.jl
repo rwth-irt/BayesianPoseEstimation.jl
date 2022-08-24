@@ -19,12 +19,13 @@ include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
-include("Gibbs.jl")
+# TODO include("Gibbs.jl")
 include("Visualization.jl")
 # Plumbing together the depth image based pose estimator
 include("Parameters.jl")
 include("RenderContext.jl")
 include("ObservationModel.jl")
+include("AssociationModel.jl")
 include("Models.jl")
 include("Main.jl")
 
@@ -43,6 +44,19 @@ export names
 export types
 export unconstrained_state
 export variables
+
+# Kernel distributions
+export AbstractKernelDistribution
+export measure_theory, kernel_distribution
+export KernelBinaryMixture
+export KernelCircularUniform
+export KernelExponential
+export KernelNormal
+export KernelUniform
+
+# Broadcasted distribution
+export BroadcastedDistribution
+export sum_and_dropdims
 
 # ModelInterface
 export ComposedModel
@@ -69,8 +83,10 @@ export render
 
 # Models
 export PixelDistribution
-export ImageModel
 export ObservationModel
+
+export PixelAssociation
+export ImageAssociation
 
 export mix_normal_exponential, mix_normal_truncated_exponential
 
@@ -96,19 +112,6 @@ export polar_density_variable
 export plot_variable
 export polar_histogram_variable
 export scatter_position
-
-# Kernel distributions
-export AbstractKernelDistribution
-export measure_theory, kernel_distribution
-export KernelBinaryMixture
-export KernelCircularUniform
-export KernelExponential
-export KernelNormal
-export KernelUniform
-
-# Broadcasted distribution
-export BroadcastedDistribution
-export sum_and_dropdims
 
 # Extensions and Reexports
 using Reexport
