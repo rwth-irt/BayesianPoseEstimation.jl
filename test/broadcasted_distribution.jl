@@ -26,7 +26,10 @@ rng = Random.default_rng(42)
 # ProductDistribution
 
 # Generate a mixture model with all parameters fixed except the mean of the normal (like the depth pixel model)
-mixture_fn(μ) = KernelBinaryMixture(KernelExponential(2.0), KernelNormal(μ, 2.0), 3, 1)
+mixture_fn(μ) = KernelBinaryMixture(KernelExponential(2.0), KernelNormal(μ, 2.0), 3.0, 1.0)
+bm = @inferred mixture_fn(1.0)
+@test exp(bm.log_weight_1) == 3.0 / 4
+@test exp(bm.log_weight_2) == 1.0 / 4
 dist = @inferred BroadcastedDistribution(mixture_fn, (1, 2), fill(10.0, 50, 10))
 dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 
