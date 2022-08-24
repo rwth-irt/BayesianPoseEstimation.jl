@@ -40,7 +40,7 @@ function Base.rand(rng::AbstractRNG, model::IndependentModel, dims::Integer...)
         # Sampler can transform the model to propose on ℝ
         rand(rng, m, dims...)
     end
-    Sample(NamedTuple(var_nt), -Inf)
+    Sample(var_nt, -Inf)
 end
 
 """
