@@ -72,6 +72,20 @@ logdensity_gn_M(gn, M) = logdensityof.(gn, M)
 @inferred logdensity_gn_M(gn, M)
 @test logdensityof(gn, 1.0) == logdensityof(normal, 1.0)
 
+# Truncated{KernelNormal}
+tn = truncated(normal, 1.0, 2.0)
+tgn = truncated(gn, 1.0, 2.0)
+M = rand(curng, tgn, 1000)
+@test M isa CuArray
+@test 1.0 < minimum(M) < maximum(M) < 2.0
+logdensity_tgn_M(tgn, M) = logdensityof.(tgn, M)
+@inferred logdensity_gn_M(tgn, M)
+@test logdensityof(tgn, 0.9) == logdensityof(tn, 0.9)
+@test logdensityof(tgn, 1.0) == logdensityof(tn, 1.0)
+@test logdensityof(tgn, 1.5) == logdensityof(tn, 1.5)
+@test logdensityof(tgn, 2.0) == logdensityof(tn, 2.0)
+@test logdensityof(tgn, 2.1) == logdensityof(tn, 2.1)
+
 # KernelExponential
 M = @inferred rand(curng, KernelExponential(Float64), 100, 100)
 @test eltype(M) == Float64

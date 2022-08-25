@@ -10,6 +10,7 @@ using MCMCDepth
 using LogExpFunctions
 using Logging
 using Random
+using StatsFuns: normlogcdf, norminvlogcdf, xval, zval
 
 
 # TODO At one point most of the distributions could be replaced with Distributions.jl. Mixtures could be problematic.
@@ -189,6 +190,10 @@ Base.maximum(::KernelNormal{T}) where {T} = typemax(T)
 Base.minimum(::KernelNormal{T}) where {T} = typemin(T)
 Bijectors.bijector(::KernelNormal) = Bijectors.Identity{0}()
 Distributions.insupport(::KernelNormal, ::Real) = true
+
+# Support Truncated{KernelNormal}
+Distributions.logcdf(dist::KernelNormal{T}, x::Real) where {T} = normlogcdf(dist.μ, dist.σ, x)
+Distributions.invlogcdf(dist::KernelNormal{T}, lp::Real) where {T} = norminvlogcdf(dist.μ, dist.σ, lp)
 
 # KernelExponential
 
