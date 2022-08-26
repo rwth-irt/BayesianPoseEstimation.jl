@@ -2,7 +2,7 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using Base.Broadcast: broadcasted, Broadcasted
+using Base.Broadcast: broadcasted, instantiate, materialize, Broadcasted
 using Bijectors
 using DensityInterface
 using Distributions
@@ -19,12 +19,10 @@ The reduction dimensions `N` might differ from the dimensions of the parameters,
 struct BroadcastedDistribution{T,N,M<:Broadcasted,S<:ValueSupport} <: Distribution{ArrayLikeVariate{N},S}
     dims::Dims{N}
     marginals::M
-
-    # WARN Inferring the support via marginals |> first |> typeof cannot be executed on the GPU. What works is marginals |> materialize |> eltype but I want to avoid materializations which cause allocations.
-    BroadcastedDistribution(::Type{T}, dims::Dims{N}, marginals::M, ::Type{S}) where {T,N,M,S<:ValueSupport} = new{T,N,M,S}(dims, marginals)
 end
 
-# TODO reuse code in constructors?
+# WARN Inferring the support via marginals |> first |> typeof cannot be executed on the GPU. What works is marginals |> materialize |> eltype but I want to avoid materializations which cause allocations.
+BroadcastedDistribution(::Type{T}, dims::Dims{N}, marginals::M, ::Type{S}) where {T,N,M,S<:ValueSupport} = BroadcastedDistribution{T,N,M,S}(dims, marginals)
 
 """
     BroadcastedDistribution(dist_fn, dims, params...)
@@ -34,14 +32,14 @@ The `dims` of the distribution which are reduced are set manually so they can di
 BroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...), Continuous)
 
 """
-    BroadcastedDistribution(dist_fn, dims, params...)
+    BroadcastedDistribution(dist_fn, params...)
 Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
 Defaults the reduction dimensions of the first `ndims(dists)` dimensions.
 """
 function BroadcastedDistribution(dist_fn, params...)
-    marginals = broadcasted(dist_fn, params...)
-    # Dims(1:length(...)) not type stable?
-    dims = (1:length(axes(marginals))...,)
+    # instantiate to call ndims
+    marginals = broadcasted(dist_fn, params...) |> instantiate
+    dims = (1:ndims(marginals)...,)
     BroadcastedDistribution(promote_params_eltype(params...), dims, marginals, Continuous)
 end
 
@@ -120,10 +118,14 @@ Random.rand!(rng::AbstractRNG, dist::BroadcastedDistribution, A::AbstractArray{<
 
 # Bijectors
 
-Bijectors.bijector(dist::BroadcastedDistribution) = dist |> marginals |> first |> bijector
+# Each entry might have an individual parameterization of the bijector, also helps with correct device
+Bijectors.bijector(dist::BroadcastedDistribution) = dist |> marginals .|> bijector
 
 """
     transformed(dist)
 Lazily transforms the distribution type to the unconstrained domain.
 """
 Bijectors.transformed(dist::BroadcastedDistribution{T,<:Any,<:Any,S}) where {T,S} = BroadcastedDistribution(T, dist.dims, broadcasted(transformed, dist.marginals), S)
+
+Bijectors.link(dist::BroadcastedDistribution, x) = link.(dist |> marginals, x)
+Bijectors.invlink(dist::BroadcastedDistribution, y) = invlink.(dist |> marginals, y)

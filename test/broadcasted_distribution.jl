@@ -20,6 +20,7 @@ maybe_histogram(x...) = PLOT ? histogram(x...) : nothing
 
 # Yup 42 is bad style
 curng = CUDA.RNG(42)
+CUDA.allowscalar(false)
 rng = Random.default_rng(42)
 
 # WARN Different distribution types not supported only different parametrization of the same type
@@ -30,7 +31,7 @@ mixture_fn(μ) = KernelBinaryMixture(KernelExponential(2.0), KernelNormal(μ, 2.
 bm = @inferred mixture_fn(1.0)
 @test exp(bm.log_weight_1) == 3.0 / 4
 @test exp(bm.log_weight_2) == 1.0 / 4
-dist = @inferred BroadcastedDistribution(mixture_fn, (1, 2), fill(10.0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, (1,), fill(10.0, 50, 10))
 dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 
 # Correct size
@@ -50,10 +51,16 @@ X = rand(rng, dist, 3, 2, 1)
 
 # Correct device
 dist = BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
-X = @inferred rand(rng, dist)
+X = @inferred rand(rng, dist, 2)
+@test X isa Array{Float64,3}
+ℓ = @inferred logdensityof(dist, X)
+@test ℓ isa Array{Float64,1}
+
 dist = BroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
-X = @inferred rand(curng, dist)
-@test X isa CuArray{Float64,2}
+X = @inferred rand(curng, dist, 2)
+@test X isa CuArray{Float64,3}
+ℓ = @inferred logdensityof(dist, X)
+@test ℓ isa CuArray{Float64,1}
 
 # Type stability
 dist = BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
@@ -185,7 +192,7 @@ t_dist = transformed(dist)
 product = Product([Exponential(i) for i = 1:100])
 t_product = transformed(product)
 
-@test bijector(dist) isa Bijectors.Log
+@test bijector(dist) |> eltype <: Bijectors.Log
 
 # correct calculation
 Y = @inferred rand(rng, t_dist, 3, 2, 2)
@@ -214,7 +221,7 @@ Y = rand(rng, t_dist, 3, 2, 1)
 cudist = @inferred BroadcastedDistribution(KernelExponential, CuArray([Float64(i) for i = 1:100]))
 t_cudist = transformed(cudist)
 
-@test bijector(cudist) isa Bijectors.Log
+@test bijector(cudist) |> eltype <: Bijectors.Log
 
 # correct calculation
 Y = @inferred rand(curng, t_cudist, 3, 2, 2)
@@ -223,11 +230,10 @@ Y = @inferred rand(curng, t_cudist, 3, 2, 2)
 # WARN for invlink, we need to keep the original distribution around. So use transformed(dist) inside the acceptance step
 @test minimum(Y) < 0
 X = @inferred invlink(cudist, Y)
-@test link(dist, X) ≈ Y
+@test link(cudist, X) ≈ Y
 @test minimum(X) > 0
 
 # Test if the constructor is executed on the GPU, evaluating the support of the marginals is tricky
-CUDA.allowscalar(false)
 B = BroadcastedDistribution(KernelExponential, CUDA.fill(10.0, 1000))
 B = BroadcastedDistribution(KernelExponential, (1,), CUDA.fill(10.0, 1000))
 X = rand(CUDA.default_rng(), B, 2)
