@@ -87,10 +87,10 @@ Distributions.value_support(::BroadcastedDistribution{<:Any,<:Any,<:Any,S}) wher
     logpdf(dist, x)
 Evaluate the logdensity of multi-dimensional distributions and data using broadcasting.
 """
-Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 
 # <:Real Required to avoid ambiguities with Distributions.jl
-Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x); dims=dist.dims)
+Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 
 # By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). BroadcastedDistribution is inherently designed for multiple samples so allow them explicitly.
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractArray) = logpdf(dist, x)

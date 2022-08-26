@@ -52,15 +52,21 @@ function map_intersect(f, a::NamedTuple{A}, b::NamedTuple{B}) where {A,B}
 end
 
 """
-    sum_and_dropdims(A; dims)
+    sum_and_dropdims(A,[;] dims)
 Sum the matrix A over the given dimensions and drop the very same dimensions afterwards.
 In case of a matching number of dimensions, a scalar is returned
 """
 sum_and_dropdims(A; dims) = sum_and_dropdims(A, dims)
+# Cannot dispatch on named parameter so implement helper methods below
+sum_and_dropdims(A, dims::Dims) = dropdims(sum(A; dims=dims), dims=dims)
+# Case of matching dimensions → return scalar
+sum_and_dropdims(A::AbstractArray{<:Any,N}, ::Dims{N}) where {N} = sum(A)
 
-# Cannot dispatch on named parameter
-sum_and_dropdims(A, dims) = dropdims(sum(A; dims=dims), dims=Tuple(dims))
-sum_and_dropdims(A::AbstractArray{<:Any,N}, dims::Dims{N}) where {N} = sum(A)
+# WARN Do not try to implement reduction of Broadcasted via Base.mapreducedim!
+# LinearIndices(::Broadcasted{<:Any,<:Tuple{Any}}) only works for 1D case: https://github.com/JuliaLang/julia/blob/v1.8.0/base/broadcast.jl#L245
+# Type hijacking does not work, since Broadcasted handles indexing differently which results to different results
+# Base.LinearIndices(bc::Broadcast.Broadcasted{<:Any,<:Tuple}) = LinearIndices(axes(bc))
+# Base.has_fast_linear_indexing(bc::Broadcast.Broadcasted{<:Broadcast.BroadcastStyle,<:Tuple}) = false
 
 """
     pose_vector(t, r, [rot_type=RotXYZ])
