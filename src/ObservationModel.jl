@@ -19,7 +19,7 @@ Other static parameters should be applied partially to the function beforehand (
 struct ObservationModel{T,N,B<:BroadcastedDistribution{T,N},U<:AbstractArray{T}}
     normalize_img::Bool
     broadcasted_dist::B
-    # Need to access μ to calculate the normalization constant
+    # For the calculation of the normalization constant
     μ::U
 end
 
@@ -32,6 +32,7 @@ function ObservationModel(normalize_img::Bool, pixel_dist, μ::AbstractArray, o:
     ObservationModel(normalize_img, broadcasted_dist, μ)
 end
 
+# TODO μ is used by this and the association model → outsource to avoid rendering twice
 """
     ObservationModel(render_context, scene, object_id, rotation_type, normalize_img, pixel_dist, t, r, o)
 Generate an ObservationModel by rendering the expected depth `μ` for the provided scene.
@@ -43,6 +44,7 @@ function ObservationModel(render_context::RenderContext, scene::Scene, object_id
     ObservationModel(normalize_img, pixel_dist, μ, o)
 end
 
+# TODO assembling the model from params should probably happen on a higher level by partially eval and applying the parameters.
 """
     ObservationModel(parameters, render_context, scene, t, r, o)
 Convenience constructor which extracts the `object_id`, `normalize_img`, `rotation_type` and `pixel_dist` from the `parameters` struct.
@@ -73,24 +75,37 @@ end
 
 """
     PixelDistribution
-Distribution of an independent pixel which handles out of range measurements by ignoring them.
+Distribution of an independent pixel which handles invalid expected values `μ`
 """
 struct PixelDistribution{T<:Real,M} <: AbstractKernelDistribution{T,Continuous}
-    min::T
-    max::T
+    # Shouls not cause memory overhead if used in lazily broadcasted context
+    μ::T
+    # Do not constrain M<:AbstractKernelDistribution{T} because it might be transformed / truncated
     model::M
 end
 
-# Handle invalid values by ignoring them (log probability is zero)
-Distributions.logpdf(dist::PixelDistribution{T}, x) where {T} = insupport(dist, x) ? logdensityof(dist.model, x) : zero(T)
-
-function Base.rand(rng::AbstractRNG, dist::PixelDistribution{T}) where {T}
-    depth = rand(rng, dist.model)
-    insupport(dist, depth) ? depth : zero(T)
+function Distributions.logpdf(dist::PixelDistribution{T}, x) where {T}
+    if insupport(dist, dist.μ)
+        logdensityof(dist.model, x)
+    else
+        # If the expected value is invalid, it does not provide any information
+        zero(T)
+    end
 end
 
-Base.maximum(dist::PixelDistribution) = dist.max
-Base.minimum(dist::PixelDistribution) = dist.min
+function Base.rand(rng::AbstractRNG, dist::PixelDistribution{T}) where {T}
+    # Valid values only in open interval so exclude the boundary
+    if !insupport(dist, dist.μ)
+        return zero(T)
+    end
+    rand(rng, dist.model)
+end
+
+Base.maximum(dist::PixelDistribution) = maximum(dist.model)
+# Negative measurements do not make any sense, all others might, depending on the underlying model.
+Base.minimum(dist::PixelDistribution{T}) where {T} = max(zero(T), minimum(dist.model))
 # logpdf explicitly handles outliers, so no transformation is desired
-Bijectors.bijector(::PixelDistribution) = Bijectors.Identity{0}()
+Bijectors.bijector(::PixelDistribution) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
+Distributions
+# Limit values are invalid (especially 0) so evaluate open interval instead of closed
 Distributions.insupport(dist::PixelDistribution, x::Real) = minimum(dist) < x < maximum(dist)

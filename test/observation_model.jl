@@ -8,6 +8,7 @@ using .MCMCDepth
 
 using Accessors
 using CUDA
+using Distributions
 using LinearAlgebra
 using MCMCDepth
 using Plots
@@ -43,11 +44,30 @@ maybe_plot(plot_depth_img, Array(μ))
 # TODO Benchmark transfer time vs. inference time → double buffering worth it? If transfer is significant compared to inference?
 
 # PixelDistribution
-my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 3.0f0, 0.01f0, 1.0f0)
+
+"""
+    pixel_normal_exponential(min, max, σ, θ, μ, o)
+Generate a Pixel distribution from the given parameters.
+Putting static parameters first allows partial application of the function.
+"""
+function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}
+    # TODO should these generators be part of experiment specific scripts or should I provide some default ones?
+    # TODO Compare whether truncated even makes a difference
+    dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
+    PixelDistribution(μ, dist)
+end
+
+my_pixel_dist = mix_normal_truncated_exponential | (0.01f0, 1.0f0)
 pix_dist = my_pixel_dist(1.0f0, 0.1f0)
 x = rand(curng, pix_dist, 100, 100)
 maybe_plot(histogram, x |> Array |> flatten)
-logdensityof(pix_dist, x) == logdensityof.(pix_dist, x)
+ℓ = @inferred logdensityof(pix_dist, x)
+@test ℓ == logdensityof.(pix_dist, x)
+@test !isinf(sum(ℓ))
+maybe_plot(plot_prob_img, ℓ |> Array)
+# Exponential truncated to 0.0 is problematic, invalid values of μ should be ignored
+pix_dist = my_pixel_dist(0.0f0, 0.1f0)
+logdensityof(pix_dist, 0.0)
 
 # Single rand
 o = rand(curng, KernelUniform(0.5f0, 1.0f0), 100, 100)
@@ -57,7 +77,9 @@ img = rand(curng, obs_model)
 @test eltype(img) == Float32
 maybe_plot(plot_depth_img, Array(img))
 ℓ = @inferred logdensityof(obs_model, img)
+@test !isinf(ℓ)
 @test ℓ isa Float32
+maybe_plot(plot_prob_img, logdensityof.(my_pixel_dist.(μ, o), img) |> Array)
 
 # Multiple rand image model
 img_10 = rand(curng, obs_model, 10)
