@@ -85,27 +85,30 @@ struct PixelDistribution{T<:Real,M} <: AbstractKernelDistribution{T,Continuous}
 end
 
 function Distributions.logpdf(dist::PixelDistribution{T}, x) where {T}
-    if insupport(dist, dist.μ)
+    if insupport(dist, dist.μ) && insupport(dist, x)
         logdensityof(dist.model, x)
     else
-        # If the expected value is invalid, it does not provide any information
+        # If the expected value or the observation is invalid, it does not provide any information
         zero(T)
     end
 end
 
 function Base.rand(rng::AbstractRNG, dist::PixelDistribution{T}) where {T}
-    # Valid values only in open interval so exclude the boundary
     if !insupport(dist, dist.μ)
-        return zero(T)
+        zero(T)
+    else
+        depth = rand(rng, dist.model)
+        # maximum is inf
+        depth > minimum(dist) ? depth : minimum(dist)
     end
-    rand(rng, dist.model)
 end
 
-Base.maximum(dist::PixelDistribution) = maximum(dist.model)
+# Depth pixels can have any positive value not like radar
+Base.maximum(::PixelDistribution{T}) where {T} = typemax(T)
 # Negative measurements do not make any sense, all others might, depending on the underlying model.
 Base.minimum(dist::PixelDistribution{T}) where {T} = max(zero(T), minimum(dist.model))
 # logpdf explicitly handles outliers, so no transformation is desired
 Bijectors.bijector(::PixelDistribution) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
 Distributions
-# Limit values are invalid (especially 0) so evaluate open interval instead of closed
-Distributions.insupport(dist::PixelDistribution, x::Real) = minimum(dist) < x < maximum(dist)
+# Depth pixels can have any positive value, zero and negative are invalid
+Distributions.insupport(dist::PixelDistribution, x::Real) = minimum(dist) < x

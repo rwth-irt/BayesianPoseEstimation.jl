@@ -57,17 +57,32 @@ function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:R
     PixelDistribution(μ, dist)
 end
 
-my_pixel_dist = mix_normal_truncated_exponential | (0.01f0, 1.0f0)
-pix_dist = my_pixel_dist(1.0f0, 0.1f0)
-x = rand(curng, pix_dist, 100, 100)
-maybe_plot(histogram, x |> Array |> flatten)
-ℓ = @inferred logdensityof(pix_dist, x)
-@test ℓ == logdensityof.(pix_dist, x)
-@test !isinf(sum(ℓ))
-maybe_plot(plot_prob_img, ℓ |> Array)
+my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
 # Exponential truncated to 0.0 is problematic, invalid values of μ should be ignored
 pix_dist = my_pixel_dist(0.0f0, 0.1f0)
-logdensityof(pix_dist, 0.0)
+x = rand(curng, pix_dist, 100, 100)
+@test maximum(x) == 0
+@test minimum(x) == 0
+
+@test logdensityof(pix_dist, 1.0) == 0
+@test logdensityof(pix_dist, 0.0) == 0
+@test logdensityof(pix_dist, -eps(Float32)) == 0
+
+# Valid μ range
+pix_dist = my_pixel_dist(0.5f0, 0.5f0)
+x = rand(curng, pix_dist, 100, 100)
+@test minimum(x) >= 0
+maybe_plot(histogram, x |> Array |> flatten)
+
+@test logdensityof(pix_dist, 1.0) != 0
+@test logdensityof(pix_dist, 0.0) == 0
+@test logdensityof(pix_dist, -eps(Float32)) == 0
+
+ℓ = @inferred logdensityof(pix_dist, x)
+@test minimum(ℓ) != 0
+@test ℓ == logdensityof.(pix_dist, x)
+@test !isinf(sum(ℓ))
+maybe_plot(histogram, ℓ |> Array |> flatten)
 
 # Single rand
 o = rand(curng, KernelUniform(0.5f0, 1.0f0), 100, 100)
@@ -79,7 +94,9 @@ maybe_plot(plot_depth_img, Array(img))
 ℓ = @inferred logdensityof(obs_model, img)
 @test !isinf(ℓ)
 @test ℓ isa Float32
-maybe_plot(plot_prob_img, logdensityof.(my_pixel_dist.(μ, o), img) |> Array)
+maybe_plot(plot_prob_img, logdensityof.(my_pixel_dist.(μ, o), img) .|> exp |> Array; colorbar_title="logdensity", clims=nothing)
+# Shorter differences should result in higher logdensity. Keep in mind the mixture.
+maybe_plot(plot_depth_img, img .- μ |> Array; colorbar_title="depth difference [m]")
 
 # Multiple rand image model
 img_10 = rand(curng, obs_model, 10)
