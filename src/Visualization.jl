@@ -20,29 +20,32 @@ value_or_typemax(x, min=zero(x)) = x > min ? x : typemax(x)
     plot_depth_img
 Plot a depth image with a given `color_scheme` and use black for values of 0.
 """
-function plot_depth_img(img; color_scheme=:viridis, reverse=true, colorbar_title="depth [m]", clims=nothing, kwargs...)
-    # Copy because of the inplace operations
-    # color_grad = cgrad(color_scheme; rev=reverse)
-    color_grad = cgrad(color_scheme; rev=reverse)
-    # pushfirst!(color_scheme, 0)
-    mask = img .> 0
-    if clims === nothing
-        min = minimum(img[mask])
-        max = maximum(img)
-        clims = (min, max)
-    end
-    width, height = size(img)
-    plot = heatmap(transpose(value_or_typemax.(img)); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:zerolines, x_ticks=[width], xmirror=true, y_ticks=[0, height], kwargs...)
+function plot_depth_img(img; zero_to_typemax=true, color_scheme=:viridis, reverse=true, colorbar_title="depth [m]", clims=nothing, kwargs...)
+  # Copy because of the inplace operations
+  # color_grad = cgrad(color_scheme; rev=reverse)
+  color_grad = cgrad(color_scheme; rev=reverse)
+  # pushfirst!(color_scheme, 0)
+  mask = img .> 0
+  if clims === nothing
+    min = minimum(img[mask])
+    max = maximum(img)
+    clims = (min, max)
+  end
+  width, height = size(img)
+  if zero_to_typemax
+    img = value_or_typemax.(img)
+  end
+  plot = heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:zerolines, x_ticks=[width], xmirror=true, y_ticks=[0, height], kwargs...)
 
-    xlabel!(plot, "x-pixels")
-    ylabel!(plot, "y-pixels")
+  xlabel!(plot, "x-pixels")
+  ylabel!(plot, "y-pixels")
 end
 
 """
     plot_prob_img
 Plot a probability image with a given `color_scheme` and use black for values of 0.
 """
-plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]", kwargs...) = plot_depth_img(img; color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title, clims=(0, 1), kwargs...)
+plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]", kwargs...) = plot_depth_img(img; zero_to_typemax=false, color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title, clims=(0, 1), kwargs...)
 
 """
   convert(Matrix, chain, var_name::Symbol, step = 1)
