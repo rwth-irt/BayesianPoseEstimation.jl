@@ -17,20 +17,21 @@ using Test
 
 pyplot()
 params = MCMCDepth.Parameters()
-render_context = RenderConte
+params = @set params.mesh_files = ["meshes/BM067R.obj"]
+render_context = RenderContext(params.width, params.height, params.depth, Array)
 
 # CvCamera like ROS looks down positive z
 scene = Scene(params, render_context)
-t = [0, 0, 1.5]
-r = normalize!([1, 0, 0, 0])
-p = to_pose(t, r, QuatRotation)
+t = [-0.05, 0.05, 0.25]
+r = [1, 1, 0]
+p = to_pose(t, r, RotXYZ)
 μ = render(render_context, scene, 1, p)
 
 # Plot depth images and override some plot parameters
-histogram(μ |> Array |> flatten)
 plot_depth_img(μ)
 plot_depth_img(μ; color_scheme=:cividis)
 plot_depth_img(μ; reverse=false)
+histogram(μ |> flatten)
 
 # Probability images
 o = rand(KernelUniform(0.5f0, 1.0f0), 100, 100)
