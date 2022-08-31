@@ -35,5 +35,5 @@ histogram(μ |> flatten)
 
 # Probability images
 o = rand(KernelUniform(0.5f0, 1.0f0), 100, 100)
-plot_prob_img(o)
+plot_prob_img(o, value_to_typemax=maximum(o))
 plot_prob_img(o, clims=nothing)
