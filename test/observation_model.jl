@@ -29,17 +29,19 @@ CUDA.allowscalar(false)
 
 # Setup render context & scene
 params = MCMCDepth.Parameters()
+params = @set params.mesh_files = ["meshes/BM067R.obj"]
 render_context = RenderContext(params.width, params.height, params.depth, CuArray)
-scene = Scene(params, render_context)
+
 # CvCamera like ROS looks down positive z
-t = [0, 0, 1.5]
-r = normalize!([1, 0, 0, 0])
+scene = Scene(params, render_context)
+t = [-0.05, 0.05, 0.25]
+r = normalize([1, 1, 0, 1])
 p = to_pose(t, r, QuatRotation)
 μ = render(render_context, scene, 1, p)
+maybe_plot(plot_depth_img, Array(μ))
 @test size(μ) == (100, 100)
 @test eltype(μ) == Float32
-@test maximum(μ) == 1.7077528f0
-maybe_plot(plot_depth_img, Array(μ))
+@test maximum(μ) > 0
 
 # TODO Benchmark transfer time vs. inference time → double buffering worth it? If transfer is significant compared to inference?
 
@@ -85,7 +87,7 @@ maybe_plot(histogram, x |> Array |> flatten)
 maybe_plot(histogram, ℓ |> Array |> flatten)
 
 # Single rand
-o = rand(curng, KernelUniform(0.5f0, 1.0f0), 100, 100)
+o = rand(curng, KernelUniform(0.8f0, 1.0f0), 100, 100)
 obs_model = ObservationModel(true, my_pixel_dist, μ, o)
 img = rand(curng, obs_model)
 @test size(img) == (100, 100)
@@ -94,7 +96,7 @@ maybe_plot(plot_depth_img, Array(img))
 ℓ = @inferred logdensityof(obs_model, img)
 @test !isinf(ℓ)
 @test ℓ isa Float32
-maybe_plot(plot_prob_img, logdensityof.(my_pixel_dist.(μ, o), img) .|> exp |> Array; colorbar_title="logdensity", clims=nothing)
+maybe_plot(plot_depth_img, logdensityof.(my_pixel_dist.(μ, o), img) .|> exp |> Array; colorbar_title="logdensity", reverse=false, value_to_typemax=1)
 # Shorter differences should result in higher logdensity. Keep in mind the mixture.
 maybe_plot(plot_depth_img, img .- μ |> Array; colorbar_title="depth difference [m]")
 
@@ -112,7 +114,7 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 
 # Multiple random poses
-t_dist = [KernelNormal(0, 0.01), KernelNormal(0, 0.01), KernelNormal(1.5, 0.01)]
+t_dist = [KernelNormal(t[1], 0.01), KernelNormal(t[2], 0.01), KernelNormal(t[3], 0.01)]
 r_dist = [KernelNormal(), KernelNormal(), KernelNormal(), KernelNormal()]
 T = rand(rng, t_dist, 10)
 # QuatRotation takes care of normalization
