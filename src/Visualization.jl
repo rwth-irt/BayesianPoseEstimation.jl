@@ -27,7 +27,7 @@ function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=
   # color_grad = cgrad(color_scheme; rev=reverse)
   color_grad = cgrad(color_scheme; rev=reverse)
   # pushfirst!(color_scheme, 0)
-  mask = img .> 0
+  mask = img .!= value_to_typemax
   if clims === nothing
     min = minimum(img[mask])
     max = maximum(img)
@@ -35,7 +35,7 @@ function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=
   end
   width, height = size(img)
   img = value_or_typemax.(img, value_to_typemax)
-  plot = heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:zerolines, x_ticks=[width], xmirror=true, y_ticks=[0, height], kwargs...)
+  plot = heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:zerolines, x_ticks=[width], xmirror=true, y_ticks=[0, height], background_color_outside=:transparent, kwargs...)
 
   xlabel!(plot, "x-pixels")
   ylabel!(plot, "y-pixels")
