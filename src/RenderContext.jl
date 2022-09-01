@@ -10,8 +10,8 @@ using SciGL
     RenderContext
 Stores all the static information required for rendering the object in the scene (everything except the latent variables like pose and occlusion).
 Use it for offscreen rendering to the texture attachment of the `framebuffer`.
-The `render_cache` maps the storage of the `gl_buffer` to an (Cu)Array.
-Thus, copy the data from the `framebuffer` to the `gl_buffer` to update the `render_cache`.
+The `render_data` maps the storage of the `gl_buffer` to an (Cu)Array which keeps the memory consumption constant.
+Thus, copy the data from the `framebuffer` to the `gl_buffer` to update the `render_data`.
 Either use the synchronous `unsafe_copyto!` or use `async_copyto!` and `sync_buffer` if you can execute calculation in the meantime.
 """
 struct RenderContext{T,F<:GLAbstraction.FrameBuffer,C<:AbstractArray{T},P<:GLAbstraction.AbstractProgram}
@@ -28,7 +28,7 @@ end
     RenderContext(width, height, depth, [T=Array])
 Simplified generation of an OpenGL context for rendering depth images of a specific size.
 Batched rendering is enabled by generating a 3D Texture of Float32 with size (width, height, layer).
-Specify the `render_cache` type as `Array` vs. `CuArray` to choose your compute device for the inference calculations.
+Specify the `render_data` type as `Array` vs. `CuArray` to choose your compute device for the inference calculations.
 """
 function RenderContext(width::Integer, height::Integer, depth::Integer, ::Type{T}=Array) where {T<:AbstractArray}
     window = context_offscreen(width, height)
@@ -52,61 +52,60 @@ RenderContext(params::Parameters, T::Type{<:AbstractArray}) = RenderContext(para
 
 Base.show(io::IO, context::RenderContext{T}) where {T} = print(io, "RenderContext{$(T)}\n$(context.framebuffer)\nRender Data: $(typeof(context.render_data))")
 
-
 """
-    render(context, scene, object_id, pose, layer_id)
+    render(render_context, scene, object_id, pose, layer_id)
 Render the scene with the given pose for the object to the layer of the framebuffer of the context.
 """
-function render(context::RenderContext, scene::Scene, object_id::Integer, pose::Pose, layer_id::Integer)
+function render(render_context::RenderContext, scene::Scene, object_id::Integer, pose::Pose, layer_id::Integer)
     # Draw to framebuffer
-    GLAbstraction.bind(context.framebuffer)
+    GLAbstraction.bind(render_context.framebuffer)
     scene_pose = @set scene.meshes[object_id].pose = pose
-    activate_layer(context.framebuffer, layer_id)
+    activate_layer(render_context.framebuffer, layer_id)
     clear_buffers()
-    draw(context.shader_program, scene_pose)
-    GLAbstraction.unbind(context.framebuffer)
+    draw(render_context.shader_program, scene_pose)
+    GLAbstraction.unbind(render_context.framebuffer)
 end
 
 """
-    render(context, scene, object_id, pose)
+    render(render_context, scene, object_id, pose)
 Renders the object with a given pose in the scene.
 Returns a matching view to the mapped render data array of the context.
 """
-function render(context::RenderContext, scene::Scene, object_id::Integer, pose::Pose)
+function render(render_context::RenderContext, scene::Scene, object_id::Integer, pose::Pose)
     # Render single pose to the first layer
-    render(context, scene, object_id, pose, 1)
-    width, height = size(context.gl_buffer)
-    unsafe_copyto!(context.gl_buffer, context.framebuffer, width, height)
-    @view context.render_data[:, :, 1]
+    render(render_context, scene, object_id, pose, 1)
+    width, height = size(render_context.gl_buffer)
+    unsafe_copyto!(render_context.gl_buffer, render_context.framebuffer, width, height)
+    @view render_context.render_data[:, :, 1]
 end
 
 """
-    render(context, scene, object_id, pose)
+    render(render_context, scene, object_id, pose)
 Renders the object with a given set of poses in the scene.
 Returns a matching view to the mapped render data array of the context.
 """
-function render(context::RenderContext, scene::Scene, object_id::Integer, poses::AbstractVector{<:Pose})
+function render(render_context::RenderContext, scene::Scene, object_id::Integer, poses::AbstractVector{<:Pose})
     # Apply each pose to the immutable scene and render the pose to layer number idx 
     for (idx, pose) in enumerate(poses)
-        render(context, scene, object_id, pose, idx)
+        render(render_context, scene, object_id, pose, idx)
     end
-    width, height = size(context.gl_buffer)
+    width, height = size(render_context.gl_buffer)
     depth = length(poses)
     # WARN According to Stackoverflow CUDA and OpenGL do run concurrently
     # TODO any CPU computations or double buffered rendering?
     # Copy only the rendered poses for performance and return a matching view, so broadcasting ignores the other (old) render_data
-    unsafe_copyto!(context.gl_buffer, context.framebuffer, width, height, depth)
-    @view context.render_data[:, :, 1:depth]
+    unsafe_copyto!(render_context.gl_buffer, render_context.framebuffer, width, height, depth)
+    @view render_context.render_data[:, :, 1:depth]
 end
 
 """
-    Scene(params, context)
+    Scene(params, render_context)
 Generate a Scene for a given set of `Parameters` and `RenderContext` .
 """
-function SciGL.Scene(params::Parameters, context::RenderContext)
+function SciGL.Scene(params::Parameters, render_context::RenderContext)
     camera = CvCamera(params.width, params.height, params.f_x, params.f_y, params.c_x, params.c_y; near=params.min_depth, far=params.max_depth) |> SceneObject
     meshes = map(params.mesh_files) do file
-        load_mesh(context.shader_program, file) |> SceneObject
+        load_mesh(render_context.shader_program, file) |> SceneObject
     end
     Scene(camera, meshes)
 end
