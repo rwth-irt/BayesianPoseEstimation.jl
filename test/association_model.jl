@@ -75,7 +75,7 @@ values = @inferred rand(rng, pa, 10000)
 @test logdensityof(pa, μ) != 1
 @test logdensityof(pa, μ + eps(μ)) == 1
 
-# ImageAssociation
+# ImageAssociation for pixel-wise association
 Q_o = CUDA.fill(0.5f0, 100, 100)
 μ = render(render_context, scene, 1, p)
 maybe_plot(plot_depth_img, Array(μ))
@@ -85,9 +85,6 @@ img = @inferred rand(curng, ia)
 @test img isa CuMatrix{Float32}
 @test size(img) == (100, 100)
 maybe_plot(plot_depth_img, Array(img))
-
-# TODO this would be expected for a scalar o → extract Dims from given prior
-# TODO test scalar o in ObservationModel
 ℓ = @inferred logdensityof(ia, img)
 @test ℓ isa CuMatrix{Float32}
 @test size(ℓ) == size(img)
@@ -95,4 +92,30 @@ maybe_plot(plot_depth_img, Array(img))
 @test maximum(ℓ) <= 1.0
 @test 0.0 <= mean(ℓ) <= 1.0
 @test isapprox(mean(ℓ), mean(Q_o); atol=0.01)
-maybe_plot(plot_prob_img, Array(ℓ))
+maybe_plot(plot_prob_img, Array(ℓ), value_to_typemax=nothing)
+
+img = @inferred rand(curng, ia, 2)
+@test img isa CuArray{Float32,3}
+@test size(img) == (100, 100, 2)
+ℓ = @inferred logdensityof(ia, img)
+@test ℓ isa CuArray{Float32,3}
+@test size(ℓ) == size(img)
+@test minimum(ℓ) >= 0.0
+@test maximum(ℓ) <= 1.0
+@test 0.0 <= mean(ℓ) <= 1.0
+@test isapprox(mean(ℓ), mean(Q_o); atol=0.01)
+
+# ImageAssociation for scalar association probability
+ia = ImageAssociation(my_dist_is, my_dist_not, prior, μ)
+img = @inferred rand(curng, ia)
+@test img isa CuMatrix{Float32}
+@test size(img) == (100, 100)
+maybe_plot(plot_depth_img, Array(img))
+ℓ = @inferred logdensityof(ia, img)
+@test ℓ isa CuMatrix{Float32}
+@test size(ℓ) == size(img)
+@test minimum(ℓ) >= 0.0
+@test maximum(ℓ) <= 1.0
+@test 0.0 <= mean(ℓ) <= 1.0
+@test isapprox(mean(ℓ), prior; atol=0.01)
+maybe_plot(plot_prob_img, Array(ℓ), value_to_typemax=nothing)

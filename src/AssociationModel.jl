@@ -5,42 +5,23 @@
 using DensityInterface
 using Distributions
 
-# TODO should a Sample be passed?
-
 """
     ImageAssociation
 Broadcasts the analytic PixelAssociation over images given the expected depth `μ` and a prior association `prior`.
-Each PixelAssociation consists of a distribution `dist_is` for the probability of a pixel belonging to the object of interest and `dist_is` which models the probability of the pixel not belonging to this object.
+Each PixelAssociation consists of a distribution `dist_is(z|μ)` for the probability of a pixel belonging to the object of interest and `dist_not(z|μ)` which models the probability of the pixel not belonging to this object.
 """
-struct ImageAssociation{T,N,B<:BroadcastedDistribution{T,N}}
-    broadcasted_dist::B
-end
-
-function ImageAssociation(dist_is, dist_not, dims, prior, μ)
+function ImageAssociation(dist_is, dist_not, prior, μ)
     # Make PixelAssociation broadcastable over q and μ
     pixel_association(q, μ) = PixelAssociation(q, dist_is(μ), dist_not(μ))
-    ImageAssociation(BroadcastedDistribution(pixel_association, dims, prior, μ))
+    # No reduction wanted → dims=()
+    BroadcastedDistribution(pixel_association, (), prior, μ)
 end
-
-# General case is not reduction → dims=()
-ImageAssociation(dist_is, dist_not, prior, μ) = ImageAssociation(dist_is, dist_not, (), prior, μ)
-# In case of scalar prior, the output of the BroadcastedDistribution should also be a scalar per image → dims=(1,2)
-ImageAssociation(dist_is, dist_not, prior::Real, μ) = ImageAssociation(dist_is, dist_not, (1, 2), prior, μ)
-
-const Base.Dims(::ImageAssociation{<:Any,N}) where {N} = Dims(N)
-
-# Sample from p(o|q,μ)
-Base.rand(rng::AbstractRNG, model::ImageAssociation, dims::Integer...) = rand(rng, model.broadcasted_dist, dims...)
-
-@inline DensityKind(::ImageAssociation) = HasDensity()
-# Represents log(p(o|q,μ,z))
-DensityInterface.logdensityof(model::ImageAssociation, x) = logdensityof(model.broadcasted_dist, x)
 
 # Per pixel association
 
 """
     PixelAssociation
-Consists of a distribution `dist_is` for the probability of a pixel belonging to the object of interest and `dist_is` which models the probability of the pixel not belonging to this object.
+Consists of a distribution `dist_is` for the probability of a pixel belonging to the object of interest and `dist_not` which models the probability of the pixel not belonging to this object.
 Moreover, a prior `prior` is required for the association probability.
 Typically both distributions are conditioned on the expected depth μ of the pixel.
 The logpdf is calculated analytically by marginalizing the two distributions.
