@@ -52,7 +52,7 @@ function DensityInterface.logdensityof(model::PosteriorModel, sample)
     ℓ_prior + ℓ_likelihood
 end
 
-
+# TODO move to it's own file?
 # TODO Parametric
 struct RenderProposal#{T<:Rotation}
     # Render related objects
