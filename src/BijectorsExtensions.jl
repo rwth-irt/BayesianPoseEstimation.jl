@@ -4,6 +4,26 @@
 
 using Bijectors
 
+# TODO Quaternion Bijector? Distribution? Proposal?
+# Quaternion from Bivectors
+# https://probablydance.com/2017/08/05/intuitive-quaternions/
+
+# Integration of PDF
+# https://marc-b-reynolds.github.io/quaternions/2017/11/10/AveRandomRot.html
+
+# Sphere sampling
+# https://imois.in/posts/random-vectors-and-rotations-in-3d/
+# http://corysimon.github.io/articles/uniformdistn-on-sphere/
+# https://mathworld.wolfram.com/SpherePointPicking.html
+
+# Perturbations
+# https://public.am.files.1drv.com/y4mUWxmKEVqohznZ-iuTqNUjep9-nJkJps-GkKE9hhep1FFDzA6AuAsFfTw75s89ILNVlXFRN2hxyrRpe-vLSM7YjfLBKWzEGI2e2NyiFE7cfv9xTos2DvLToyTsohi1tG23IGWQV4V9cjwPBtTwlhhnSV1VhVj0W--ZtfltQwF3DqqChpHg8fuGzv6GjptWuk1SWN9mLIzgsVd_DSiSNapd0QlYHrkWds4J5Olbp_oQVs
+
+# Implementations Rotations.jl uses Quaternion.jl and I think I use Rotations.jl in SciGL
+# https://github.com/JuliaGeometry/Quaternions.jl/blob/master/src/Quaternion.jl
+
+# TODO would have to write custom proposal, since the composition is the quaternion product
+
 """
     Circular
 Transform ℝ → [0,2π)
