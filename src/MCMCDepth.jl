@@ -26,7 +26,6 @@ include("Parameters.jl")
 include("RenderContext.jl")
 include("ObservationModel.jl")
 include("AssociationModel.jl")
-include("Models.jl")
 include("Main.jl")
 
 # Common
