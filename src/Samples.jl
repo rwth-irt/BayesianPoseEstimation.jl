@@ -76,12 +76,14 @@ end
 
 """
     merge(a, b...)
-Left-to-Right merges the samples as with bs.
+Left-to-Right merges the samples.
 This means the the rightmost variables are kept.
 Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
 """
-function Base.merge(a::Sample, b::Sample...)
-    merged_variables = merge(variables(a), map(variables, b)...)
+Base.merge(a::Sample, b::Sample...) = merge(a, map(variables, b)...)
+
+function Base.merge(a::Sample, b::NamedTuple...)
+    merged_variables = merge(variables(a), b...)
     Sample(merged_variables, -Inf)
 end
 
@@ -101,8 +103,7 @@ function AbstractMCMC.bundle_samples(
     start=1,
     step=1
 )
-    # TODO make sure only to use relevant variables, for example only the ones specified by the variable names of the NamedTuple of models.
-    # TODO make sure to copy CuArrays to the CPU or we will run out of memory soon
+    # TODO make sure only to use relevant variables, for example only the ones specified by the variable names of the NamedTuple of the prior.
     variables = map(variables, samples)
     TupleVector(variables[start:step:end])
 end
