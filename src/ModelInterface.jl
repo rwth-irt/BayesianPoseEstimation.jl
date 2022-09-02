@@ -49,7 +49,9 @@ Maps `logdensityof` over models and variables with matching names.
 Uses 0.0 as if the variable name is non-existent in the sample.
 Note that all variables are assumed to be independent and vectorization is accounted for by broadcasting.
 """
-DensityInterface.logdensityof(model::IndependentModel, sample) = .+(values(map_intersect(logdensityof, model.models, variables(sample)))...)
+DensityInterface.logdensityof(model::IndependentModel, sample) = .+(promote(values(map_intersect(logdensityof, model.models, variables(sample)))...)...)
+
+# .+(promote(values(map_intersect(logdensityof, model.models, variables(sample))))...)
 
 """
     RngModel

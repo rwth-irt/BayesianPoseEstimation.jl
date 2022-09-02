@@ -31,13 +31,13 @@ function Base.rand(rng::AbstractRNG, model::PosteriorModel, dims::Integer...)
     # TODO should not be used during inference, instead rand from the prior.
     prior_sample = rand(rng, model.prior_model, dims...)
     render_sample = render(model.render_context, model.scene, model.object_id, model.rotation_type, prior_sample)
-    observation_instance = model.observation_model(render_sample.μ, render_sample.o)
+    observation_instance = model.observation_model(variables(render_sample).μ, variables(render_sample).o)
     z = rand(rng, observation_instance)
     merge(render_sample, (; z=z))
 end
 
 function render(render_context::RenderContext, scene::Scene, object_id::Integer, rotation_type::Type, sample::Sample)
-    p = to_pose(sample.t, sample.r, rotation_type)
+    p = to_pose(variables(sample).t, variables(sample).r, rotation_type)
     μ = render(render_context, scene, object_id, p)
     # μ is only a view of the render_data. Storing it in every sample is cheap.
     merge(sample, (; μ=μ))
@@ -47,9 +47,9 @@ end
 @inline DensityKind(::PosteriorModel) = HasDensity()
 function DensityInterface.logdensityof(model::PosteriorModel, sample)
     ℓ_prior = logdensityof(model.prior_model, sample)
-    observation_instance = model.observation_model(render_sample.μ, render_sample.o)
-    ℓ_likelihood = logdensityof(observation_instance, sample.z)
-    ℓ_prior + ℓ_likelihood
+    observation_instance = model.observation_model(variables(sample).μ, variables(sample).o)
+    ℓ_likelihood = logdensityof(observation_instance, variables(sample).z)
+    .+(promote(ℓ_prior, ℓ_likelihood)...)
 end
 
 # TODO move to it's own file?

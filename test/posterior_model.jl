@@ -21,8 +21,9 @@ end
 maybe_plot(fn, x...; y...) = PLOT ? fn(x...; y...) : nothing
 rng = Random.default_rng()
 Random.seed!(rng, 42)
+cpu_model = RngModel | rng
 curng = CUDA.default_rng()
-
+Random.seed!(curng, 42)
 
 # Parameters
 params = MCMCDepth.Parameters()
@@ -32,20 +33,22 @@ Random.seed!(params.rng, params.seed)
 CUDA.allowscalar(false)
 
 # PriorModel
-mean_t = [0, 0, 1.5] .|> params.precision |> CuArray
-σ_t = params.σ_t .|> params.precision |> CuArray
-t_model = BroadcastedDistribution(KernelNormal, mean_t, σ_t)
+# Pose only makes sense on CPU since CUDA cannot start render calls to OpenGL
+mean_t = [0, 0, 1.5] .|> params.precision
+σ_t = params.σ_t .|> params.precision
+t_model = BroadcastedDistribution(KernelNormal, mean_t, σ_t) |> cpu_model
 # TODO This is hacky, any clean implementation which avoids broadcasting over fake parameters?
 circular_uniform(::Any) = KernelCircularUniform()
-r_model = BroadcastedDistribution(circular_uniform, CuVector{params.precision}(undef, 3))
+r_model = BroadcastedDistribution(circular_uniform, Array{params.precision}(undef, 3)) |> cpu_model
 uniform(::Any) = KernelUniform()
-o_model = BroadcastedDistribution(uniform, CuMatrix{params.precision}(undef, params.width, params.height))
+# Use the rng from params
+o_model = BroadcastedDistribution(uniform, CuArray{params.precision}(undef, params.width, params.height))
 prior_model = PriorModel(t_model, r_model, o_model)
 sample = @inferred rand(params.rng, prior_model)
 @test keys(variables(sample)) == (:t, :r, :o)
-@test variables(sample).t isa CuArray{params.precision,1}
+@test variables(sample).t isa Array{params.precision,1}
 @test variables(sample).t |> size == (3,)
-@test variables(sample).r isa CuArray{params.precision,1}
+@test variables(sample).r isa Array{params.precision,1}
 @test variables(sample).r |> size == (3,)
 @test variables(sample).o isa CuArray{params.precision,2}
 @test variables(sample).o |> size == (params.width, params.height)
@@ -53,13 +56,31 @@ sample = @inferred rand(params.rng, prior_model)
 @test ℓ isa Float32
 
 sample5 = @inferred rand(params.rng, prior_model, 5)
-@test keys(variables(sample3)) == (:t, :r, :o)
-@test variables(sample5).t isa CuArray{params.precision,2}
+@test keys(variables(sample5)) == (:t, :r, :o)
+@test variables(sample5).t isa Array{params.precision,2}
 @test variables(sample5).t |> size == (3, 5)
-@test variables(sample5).r isa CuArray{params.precision,2}
+@test variables(sample5).r isa Array{params.precision,2}
 @test variables(sample5).r |> size == (3, 5)
 @test variables(sample5).o isa CuArray{params.precision,3}
 @test variables(sample5).o |> size == (params.width, params.height, 5)
 ℓ = @inferred logdensityof(prior_model, sample5)
-@test ℓ isa CuArray{params.precision,1}
+@test ℓ isa Array{params.precision,1}
 @test size(ℓ) == (5,)
+
+# PosteriorModel
+function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}
+    # TODO should these generators be part of experiment specific scripts or should I provide some default ones?
+    # TODO Compare whether truncated even makes a difference
+    dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
+    PixelDistribution(μ, dist)
+end
+my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
+observation_model = ObservationModel | (params.normalize_img, my_pixel_dist)
+posterior_model = PosteriorModel(render_context, scene, params.object_id, params.rotation_type, prior_model, observation_model)
+# TODO translation & rotation do not make sense on the GPU
+# TODO inferred
+sample = rand(curng, posterior_model)
+logdensityof(posterior_model, sample)
+
+sample5 = rand(curng, posterior_model, 5)
+logdensityof(posterior_model, sample5)
