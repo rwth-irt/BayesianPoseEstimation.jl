@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using CoordinateTransformations
+using CUDA
 using Rotations
 
 """
@@ -91,3 +92,6 @@ to_rotation(A::AbstractArray{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = 
 # SciGL will take care of conversion to affine transformation matrix
 to_rotation(A::AbstractArray{<:Rotation}, ::Rotation) = A
 to_rotation(v::AbstractVector{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = T(v...)
+
+# TODO defining it in the package might lead to unexpected behaviour, move to script?
+Base.promote_rule(::Type{<:CuArray}, ::Type{<:Array}) = Array
