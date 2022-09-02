@@ -97,6 +97,10 @@ export preprocess
 export prior_depth_model
 export random_walk_proposal
 
+export PriorModel
+export PosteriorModel
+export RenderProposal
+
 # MetropolisHastings
 export MetropolisHastings
 
