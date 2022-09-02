@@ -33,8 +33,16 @@ types(::Sample{<:Any,V}) where {V} = V
 """
     variables(Sample)
 Returns a named tuple of the variables.
+getproperty has been implemented so that the variables can easily be accessed by the dot syntax.
 """
 variables(s::Sample) = s.variables
+
+# Simplified access to the variables by name
+Base.getproperty(a::Sample, sym::Symbol) = getproperty(a, Val(sym))
+Base.getproperty(a::Sample, ::Val{:variables}) = getfield(a, :variables)
+Base.getproperty(a::Sample, ::Val{:logp}) = getfield(a, :logp)
+Base.getproperty(a::Sample, ::Val{K}) where {K} = getfield(a.variables, K)
+
 
 """
     log_prob(sample)
