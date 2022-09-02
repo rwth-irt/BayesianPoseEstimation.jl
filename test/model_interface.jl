@@ -42,7 +42,7 @@ s = @inferred rand(Random.default_rng(), abc_model, 3)
 
 # RngModel
 xoshiro = Xoshiro()
-rng_model = RngModel(abc_model, xoshiro)
+rng_model = RngModel(xoshiro, abc_model)
 # Same rng is used both times
 Random.seed!(xoshiro, 42)
 s1 = rand(Random.default_rng(), rng_model)

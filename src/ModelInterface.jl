@@ -56,8 +56,8 @@ DensityInterface.logdensityof(model::IndependentModel, sample) = .+(values(map_i
 Wraps an internal `model` and allows to provide an individual RNG for this model.
 """
 struct RngModel{T,U<:AbstractRNG}
-    model::T
     rng::U
+    model::T
 end
 
 """
