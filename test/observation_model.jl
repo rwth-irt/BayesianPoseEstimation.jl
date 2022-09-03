@@ -150,11 +150,10 @@ for layer_id in 1:(size(img_10_2)[3]-1)
 end
 
 # ImageModel from scene & pose
-# WARN lots of things have to be right when using eval of params
-params = @set params.rotation_type = QuatRotation
-params = @set params.pixel_dist = my_pixel_dist
-obs_model_fn = ObservationModel | (params, render_context, scene)
-obs_model_tro = obs_model_fn(t, r, o)
+obs_model_fn = ObservationModel | (params.normalize_img, my_pixel_dist)
+pose_tr = to_pose(t, r, QuatRotation)
+μ_tr = render(render_context, scene, params.object_id, pose_tr)
+obs_model_tro = obs_model_fn(μ_tr, o)
 @test size(obs_model_tro.μ) == (100, 100)
 @test eltype(obs_model_tro.μ) == Float32
 
@@ -183,8 +182,10 @@ t_dist = BroadcastedDistribution(KernelNormal, [0, 0, 1.5], [0.01, 0.01, 0.01])
 r_dist = BroadcastedDistribution(KernelNormal, [0, 0, 0, 0], [1.0, 1.0, 1.0, 1.0])
 T = rand(t_dist, 10)
 R = rand(r_dist, 10)
+pose_TR = to_pose(T, R, QuatRotation)
+μ_TR = render(render_context, scene, params.object_id, pose_TR)
 
-obs_model_TRo = obs_model_fn(T, R, o)
+obs_model_TRo = obs_model_fn(μ_TR, o)
 @test size(obs_model_TRo.μ) == (100, 100, 10)
 @test eltype(obs_model_TRo.μ) == Float32
 
@@ -221,7 +222,7 @@ end
 
 # Multiple associations
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
-obs_model_trO = obs_model_fn(t, r, O)
+obs_model_trO = obs_model_fn(μ_tr, O)
 @test size(obs_model_trO.μ) == (100, 100)
 @test eltype(obs_model_trO.μ) == Float32
 
@@ -258,11 +259,11 @@ end
 
 # Multiple poses & associations
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 5)
-obs_model_TRO = obs_model_fn(T, R, O)
+obs_model_TRO = obs_model_fn(μ_TR, O);
 @test_throws DimensionMismatch img_10 = rand(curng, obs_model_TRO)
 
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
-img_model_pose = obs_model_fn(T, R, O)
+img_model_pose = obs_model_fn(μ_TR, O)
 img_10 = rand(curng, img_model_pose)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32

@@ -75,27 +75,6 @@ end
 
 transition_probability(proposal::RenderProposal, new_sample, prev_sample) = transition_probability(proposal.proposal, new_sample, prev_sample)
 
-
-# TODO μ is used by this and the association model → outsource to avoid rendering twice
-"""
-    ObservationModel(render_context, scene, object_id, rotation_type, normalize_img, pixel_dist, t, r, o)
-Generate an ObservationModel by rendering the expected depth `μ` for the provided scene.
-Sets the pose of `object_id` to the position(s) `t` and orientation(s) `r`.
-"""
-function ObservationModel(render_context::RenderContext, scene::Scene, object_id::Integer, rotation_type::Type, normalize_img::Bool, pixel_dist, t::AbstractArray, r::AbstractArray, o::AbstractArray)
-    p = to_pose(t, r, rotation_type)
-    μ = render(render_context, scene, object_id, p)
-    ObservationModel(normalize_img, pixel_dist, μ, o)
-end
-
-# TODO assembling the model from params should probably happen on a higher level by partially eval and applying the parameters.
-"""
-    ObservationModel(parameters, render_context, scene, t, r, o)
-Convenience constructor which extracts the `object_id`, `normalize_img`, `rotation_type` and `pixel_dist` from the `parameters` struct.
-Note that `rotation_type` and `pixel_dist` are expected as Symbols which get evaled at runtime. 
-"""
-ObservationModel(parameters::Parameters, render_context::RenderContext, scene::Scene, t::AbstractArray, r::AbstractArray, o::AbstractArray) = ObservationModel(render_context, scene, parameters.object_id, eval(parameters.rotation_type), parameters.normalize_img, eval(parameters.pixel_dist), t, r, o)
-
 # function Random.rand(rng::AbstractRNG, T::Type, prior::PoseDepthPrior)
 #     tro_sample = rand(rng, T, prior.tro_model)
 #     t = model_value(tro_sample, :t)
