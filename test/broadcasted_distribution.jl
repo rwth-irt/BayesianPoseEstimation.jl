@@ -50,37 +50,37 @@ X = rand(rng, dist, 3, 2, 1)
 @inferred logdensityof(dist, X)
 
 # Correct device
-dist = BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 X = @inferred rand(rng, dist, 2)
 @test X isa Array{Float64,3}
 ℓ = @inferred logdensityof(dist, X)
 @test ℓ isa Array{Float64,1}
 
-dist = BroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
 X = @inferred rand(curng, dist, 2)
 @test X isa CuArray{Float64,3}
 ℓ = @inferred logdensityof(dist, X)
 @test ℓ isa CuArray{Float64,1}
 
 # Type stability
-dist = BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 X = @inferred rand(rng, dist);
 @test X isa Array{Float64,2}
-dist = BroadcastedDistribution(mixture_fn, fill(10.0f0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0f0, 50, 10))
 X = @inferred rand(rng, dist);
 @test X isa Array{Float32,2}
-dist = BroadcastedDistribution(mixture_fn, fill(Float16(10), 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(Float16(10), 50, 10))
 X = @inferred rand(rng, dist);
 @test X isa Array{Float16,2}
 
 # TODO CUDA.RNG also requires CUDA parameters. Will be tricky to use the correct RNG for the correct device. Probably use the correct rng based on the parameters.
-dist = BroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
 X = @inferred rand(curng, dist);
 @test X isa CuArray{Float64,2}
-dist = BroadcastedDistribution(mixture_fn, CUDA.fill(10.0f0, 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, CUDA.fill(10.0f0, 50, 10))
 X = @inferred rand(curng, dist);
 @test X isa CuArray{Float32,2}
-dist = BroadcastedDistribution(mixture_fn, CUDA.fill(Float16(10), 50, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, CUDA.fill(Float16(10), 50, 10))
 X = @inferred rand(curng, dist);
 @test X isa CuArray{Float16,2}
 
@@ -97,14 +97,14 @@ X = rand(rng, dist);
 @test logdensityof(dist, X) ≈ logdensityof(product, X)
 
 # Special case: number of dims equals ndims of the data → scalar value
-dist = BroadcastedDistribution(mixture_fn, Dims(1:2), fill(10.0, 500))
+dist = @inferred BroadcastedDistribution(mixture_fn, Dims(1:2), fill(10.0, 500))
 X = rand(rng, dist, 3)
 @inferred logdensityof(dist, X)
 @test logdensityof(dist, X) isa Float64
 @test logdensityof(dist, X) ≈ logpdf(product, X) |> sum
 
 # VectorizedDistribution
-dist = BroadcastedDistribution(mixture_fn, fill(10.0, 100, 10))
+dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 100, 10))
 
 # Test different sizes of the marginals and rand(..., dims)
 normal_fn(μ::T) where {T} = KernelNormal(μ, T(0.1))
@@ -234,7 +234,7 @@ X = @inferred invlink(cudist, Y)
 @test minimum(X) > 0
 
 # Test if the constructor is executed on the GPU, evaluating the support of the marginals is tricky
-B = BroadcastedDistribution(KernelExponential, CUDA.fill(10.0, 1000))
-B = BroadcastedDistribution(KernelExponential, (1,), CUDA.fill(10.0, 1000))
+B = @inferred BroadcastedDistribution(KernelExponential, CUDA.fill(10.0, 1000))
+B = @inferred BroadcastedDistribution(KernelExponential, (1,), CUDA.fill(10.0, 1000))
 X = rand(CUDA.default_rng(), B, 2)
 logdensityof(B, X)
