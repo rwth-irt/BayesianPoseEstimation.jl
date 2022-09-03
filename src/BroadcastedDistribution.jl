@@ -106,7 +106,6 @@ The array type is based on the `rng` and the parameter type of the distribution.
 function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Int...) where {T}
     # could probably be generalized by implementing Base.eltype(AbstractVectorizedDistribution)
     A = array_for_rng(rng, T, size(marginals(dist))..., dims...)
-    print(typeof(A))
     rand!(rng, dist, A)
 end
 
