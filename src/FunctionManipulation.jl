@@ -51,7 +51,7 @@ kwarg_to_arg(f::Callable, ::Val{S}) where {S} = (s, x...; y...) -> f(x...; (; S 
 Keep track of the original function and the arguments which are manipulated.
 Partial application using anonymous functions leads to ambiguous signatures.
 """
-struct ManipulatedFunction{F<:Callable,G<:Callable,T<:Tuple,U<:NamedTuple}
+struct ManipulatedFunction{F<:Callable,G<:Callable,T<:Tuple,U<:NamedTuple} <: Function
     func::F
     # Avoid allocations to store the name as string
     original::G
