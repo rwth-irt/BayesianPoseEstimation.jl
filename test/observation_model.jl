@@ -54,12 +54,13 @@ Putting static parameters first allows partial application of the function.
 """
 function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}
     # TODO should these generators be part of experiment specific scripts or should I provide some default ones?
-    # TODO Compare whether truncated even makes a difference
+    # TODO Compare whether truncated even makes a difference. Probably in the association.
     dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
     PixelDistribution(μ, dist)
 end
 
-my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
+# WARN Anonymous functions, which are used inside ManipulatedFunctions, are not type stable in global scope. https://discourse.julialang.org/t/question-on-type-inference-with-anonymous-functions-and-broadcast/78102/2
+const my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
 # Exponential truncated to 0.0 is problematic, invalid values of μ should be ignored
 pix_dist = my_pixel_dist(0.0f0, 0.1f0)
 x = rand(curng, pix_dist, 100, 100)
@@ -88,7 +89,7 @@ maybe_plot(histogram, ℓ |> Array |> flatten)
 
 # Single rand
 o = rand(curng, KernelUniform(0.8f0, 1.0f0), 100, 100)
-obs_model = ObservationModel(true, my_pixel_dist, μ, o)
+obs_model = @inferred ObservationModel(true, my_pixel_dist, μ, o)
 img = rand(curng, obs_model)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
@@ -128,7 +129,7 @@ for layer_id in 1:(size(μ_10)[3]-1)
 end
 
 # Multiple poses & rand image model
-obs_model_10 = ObservationModel(true, my_pixel_dist, μ_10, o)
+obs_model_10 = @inferred ObservationModel(true, my_pixel_dist, μ_10, o)
 img_10_2 = rand(curng, obs_model_10, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
@@ -150,10 +151,11 @@ for layer_id in 1:(size(img_10_2)[3]-1)
 end
 
 # ImageModel from scene & pose
-obs_model_fn = ObservationModel | (params.normalize_img, my_pixel_dist)
+const obs_model_fn(μ, o) = ObservationModel(params.normalize_img, my_pixel_dist, μ, o)
 pose_tr = to_pose(t, r, QuatRotation)
 μ_tr = render(render_context, scene, params.object_id, pose_tr)
-obs_model_tro = obs_model_fn(μ_tr, o)
+obs_model_tro = @inferred obs_model_fn(μ_tr, o)
+
 @test size(obs_model_tro.μ) == (100, 100)
 @test eltype(obs_model_tro.μ) == Float32
 
@@ -185,7 +187,7 @@ R = rand(r_dist, 10)
 pose_TR = to_pose(T, R, QuatRotation)
 μ_TR = render(render_context, scene, params.object_id, pose_TR)
 
-obs_model_TRo = obs_model_fn(μ_TR, o)
+obs_model_TRo = @inferred obs_model_fn(μ_TR, o)
 @test size(obs_model_TRo.μ) == (100, 100, 10)
 @test eltype(obs_model_TRo.μ) == Float32
 
@@ -222,7 +224,7 @@ end
 
 # Multiple associations
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
-obs_model_trO = obs_model_fn(μ_tr, O)
+obs_model_trO = @inferred obs_model_fn(μ_tr, O)
 @test size(obs_model_trO.μ) == (100, 100)
 @test eltype(obs_model_trO.μ) == Float32
 
@@ -259,11 +261,11 @@ end
 
 # Multiple poses & associations
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 5)
-obs_model_TRO = obs_model_fn(μ_TR, O);
+obs_model_TRO = @inferred obs_model_fn(μ_TR, O);
 @test_throws DimensionMismatch img_10 = rand(curng, obs_model_TRO)
 
 O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
-img_model_pose = obs_model_fn(μ_TR, O)
+img_model_pose = @inferred obs_model_fn(μ_TR, O)
 img_10 = rand(curng, img_model_pose)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
