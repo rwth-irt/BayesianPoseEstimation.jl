@@ -49,38 +49,3 @@ function DensityInterface.logdensityof(model::PosteriorModel, sample)
     ℓ_likelihood = logdensityof(observation_instance, variables(sample).z)
     .+(promote(ℓ_prior, ℓ_likelihood)...)
 end
-
-# TODO move to it's own file?
-# TODO Parametric
-# TODO Test
-struct RenderProposal#{T<:Rotation}
-    # Render related objects
-    render_context
-    scene
-    object_id
-    rotation_type#::T
-    # Probabilistic model
-    proposal
-end
-
-# TODO hard-coded variable names? t, o, μ
-function propose(rng::AbstractRNG, proposal::RenderProposal, dims...)
-    sample = propose(rng, proposal.proposal, dims...)
-    p = to_pose(sample.t, sample.r, proposal.rotation_type)
-    # μ is only a view of the render_data. Storing it in every sample is cheap.
-    μ = render(proposal.render_context, proposal.scene, object_id, p)
-    merge(sample, (; μ=μ))
-end
-
-transition_probability(proposal::RenderProposal, new_sample, prev_sample) = transition_probability(proposal.proposal, new_sample, prev_sample)
-
-# function Random.rand(rng::AbstractRNG, T::Type, prior::PoseDepthPrior)
-#     tro_sample = rand(rng, T, prior.tro_model)
-#     t = model_value(tro_sample, :t)
-#     r = model_value(tro_sample, :o)
-#     # TODO multiple hypotheses by implementing rand([rng=GLOBAL_RNG], [S], [dims...]) ? Probably best of both worlds: Render number on basis of vectorized measures in the tiled texture. For uniform interface it is probably best to include tiles in all Depth models. DepthModels.jl with AbstractDepthModel? tiles(::AbstractDepthModel)
-#     μ = prior.render_fn(t, r)
-#     μ_var = ModelVariable(μ, asℝ)
-#     μ_sample = Sample((; μ=μ_var), -Inf)
-#     merge(tro_sample, μ_sample)
-# end

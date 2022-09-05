@@ -109,4 +109,3 @@ function SciGL.Scene(params::Parameters, render_context::RenderContext)
     end
     Scene(camera, meshes)
 end
-
