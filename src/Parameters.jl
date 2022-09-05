@@ -2,7 +2,9 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using CUDA
 using LinearAlgebra
+using Rotations
 
 # TODO Use https://juliadynamics.github.io/DrWatson.jl/dev/save/ for reproducible experiments, make a new experiments project and dev src/MCMCDepth as described in their documentation
 
@@ -86,7 +88,7 @@ Base.@kwdef struct Parameters
     # Image Model
     normalize_img = true
     # Pose Model
-    rotation_type = RotXYZ
+    rotation_type = :RotXYZ
     mean_t = [0.0, 0.0, 2.0]
     σ_t = [0.05, 0.05, 0.05]
     # Proposal Model
@@ -102,3 +104,24 @@ Base.@kwdef struct Parameters
     n_burn_in = 1000
     n_thinning = 2
 end
+
+array_for_rng(p::Parameters) = array_for_rng(p.rng)
+
+# Automatically convert to correct precision
+Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
+Base.getproperty(p::Parameters, ::Val{K}) where {K} = getfield(p, K)
+
+Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
+Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))
+
+Base.getproperty(p::Parameters, ::Val{:static_o}) = p.precision.(getfield(p, :static_o))
+Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.precision.(getfield(p, :pixel_σ))
+Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.precision.(getfield(p, :pixel_θ))
+Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.precision.(getfield(p, :mix_exponential))
+
+Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.precision.(getfield(p, :mean_t))
+Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.precision.(getfield(p, :σ_t))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.precision.(getfield(p, :proposal_σ_t))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.precision.(getfield(p, :proposal_σ_r))
+
+Base.getproperty(p::Parameters, ::Val{:rotation_type}) = Base.typename(getfield(p, :rotation_type)).wrapper{p.precision} 
