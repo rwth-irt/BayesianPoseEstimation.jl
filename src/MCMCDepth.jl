@@ -54,6 +54,8 @@ export KernelExponential
 export KernelNormal
 export KernelUniform
 
+export array_for_rng
+
 # Broadcasted distribution
 export BroadcastedDistribution
 export sum_and_dropdims
