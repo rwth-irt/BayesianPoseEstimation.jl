@@ -40,7 +40,7 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * normalize_img: Normalize the likelihood of an image using the number of rendered pixels
 
 # Pose Model
-* rotation_type: Representation of rotations, e.g. RotXYZ [x,y,z] or QuatRotation [w,x,y,z] 
+* rotation_type: Representation of rotations, e.g. :RotXYZ [x,y,z] or :QuatRotation [w,x,y,z] 
 * mean_t: Mean of the RFID measurement
 * σ_t: Standard deviation of RFID measurement, assumes independent x,y,z components
 ## TODO Different rotation models?
@@ -53,7 +53,7 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 
 # Inference
 * precision: Type of the floating point precision, typically Float32 (or Float64)
-* rng: Random number generator, CUDA.RNG will use GPU accelerated inference.
+* device: :CUDA or :CPU which is used in Parameters.array_type and Parameters.rng.
 * seed: Seed of the rng
 * algorithm: Symbol of the inference algorithm
 * n_samples: Number of samples in the chain
