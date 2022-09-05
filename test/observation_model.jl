@@ -28,15 +28,17 @@ Random.seed!(curng, 42)
 CUDA.allowscalar(false)
 
 # Setup render context & scene
-params = MCMCDepth.Parameters()
-params = @set params.mesh_files = ["meshes/BM067R.obj"]
-render_context = RenderContext(params.width, params.height, params.depth, CuArray)
+parameters = MCMCDepth.Parameters()
+parameters = @set parameters.mesh_files = ["meshes/BM067R.obj"]
+parameters = @set parameters.rotation_type = :QuatRotation
+
+render_context = RenderContext(parameters.width, parameters.height, parameters.depth, CuArray)
 
 # CvCamera like ROS looks down positive z
-scene = Scene(params, render_context)
+scene = Scene(parameters, render_context)
 t = [-0.05, 0.05, 0.25]
 r = normalize([1, 1, 0, 1])
-p = to_pose(t, r, QuatRotation)
+p = to_pose(t, r, parameters.rotation_type)
 μ = render(render_context, scene, 1, p)
 maybe_plot(plot_depth_img, Array(μ))
 @test size(μ) == (100, 100)
@@ -59,11 +61,11 @@ function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:R
     PixelDistribution(μ, dist)
 end
 
-my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
+my_pixel_dist = mix_normal_truncated_exponential | (parameters.pixel_σ, parameters.pixel_θ)
 
 # WARN ManipulatedFunctions do not work with Type constructors, since they would cause type instability
 observation_model(normalize_img, pixel_dist, μ, o) = ObservationModel(normalize_img, pixel_dist, μ, o)
-obs_model_fn = observation_model | (params.normalize_img, my_pixel_dist)
+obs_model_fn = observation_model | (parameters.normalize_img, my_pixel_dist)
 
 # Exponential truncated to 0.0 is problematic, invalid values of μ should be ignored
 pix_dist = my_pixel_dist(0.0f0, 0.1f0)
@@ -124,7 +126,7 @@ r_dist = [KernelNormal(), KernelNormal(), KernelNormal(), KernelNormal()]
 T = rand(rng, t_dist, 10)
 # QuatRotation takes care of normalization
 R = rand(rng, r_dist, 10)
-P = to_pose(T, R, QuatRotation)
+P = to_pose(T, R, parameters.rotation_type)
 μ_10 = render(render_context, scene, 1, P)
 @test size(μ_10) == (100, 100, 10)
 @test eltype(μ_10) == Float32
@@ -155,8 +157,8 @@ for layer_id in 1:(size(img_10_2)[3]-1)
 end
 
 # ImageModel from scene & pose
-pose_tr = to_pose(t, r, QuatRotation)
-μ_tr = render(render_context, scene, params.object_id, pose_tr)
+pose_tr = to_pose(t, r, parameters.rotation_type)
+μ_tr = render(render_context, scene, parameters.object_id, pose_tr)
 obs_model_tro = @inferred obs_model_fn(μ_tr, o)
 
 @test size(obs_model_tro.μ) == (100, 100)
@@ -187,8 +189,8 @@ t_dist = BroadcastedDistribution(KernelNormal, [0, 0, 1.5], [0.01, 0.01, 0.01])
 r_dist = BroadcastedDistribution(KernelNormal, [0, 0, 0, 0], [1.0, 1.0, 1.0, 1.0])
 T = rand(t_dist, 10)
 R = rand(r_dist, 10)
-pose_TR = to_pose(T, R, QuatRotation)
-μ_TR = render(render_context, scene, params.object_id, pose_TR)
+pose_TR = to_pose(T, R, parameters.rotation_type)
+μ_TR = render(render_context, scene, parameters.object_id, pose_TR)
 
 obs_model_TRo = @inferred obs_model_fn(μ_TR, o)
 @test size(obs_model_TRo.μ) == (100, 100, 10)
