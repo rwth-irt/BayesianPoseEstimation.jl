@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using CUDA
+using Logging
 using Random
 
 
@@ -53,7 +54,7 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 
 # Inference
 * precision: Type of the floating point precision, typically Float32 (or Float64)
-* device: :CUDA or :CPU which is used in Parameters.array_type and Parameters.rng.
+* device: :CUDA or :CPU which is used in Parameters.array_type, Parameters.rng and Parameters.cpu_rng.
 * seed: Seed of the rng
 * algorithm: Symbol of the inference algorithm
 * n_samples: Number of samples in the chain
@@ -109,15 +110,30 @@ end
 Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
 Base.getproperty(p::Parameters, ::Val{K}) where {K} = getfield(p, K)
 
-function Base.getproperty(p::Parameters, ::Val{:rng})
+function device_rng(p::Parameters)
     if p.device === :CUDA
         CUDA.default_rng()
     elseif p.device === :CPU
         Random.default_rng()
+    else
+        @warn "Unknown device: $(p.device), falling back to CPU"
+        # CPU is fallback
+        Random.default_rng()
     end
 end
-Base.getproperty(p::Parameters, ::Val{:array_type}) = array_for_rng(p.rng)
 
+function device_array_type(p::Parameters)
+    if p.device === :CUDA
+        CuArray
+    elseif p.device === :CPU
+        Array
+    else
+        @warn "Unknown device: $(p.device), falling back to CPU"
+        # CPU is fallback
+        Array
+    end
+end
+device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, dims...)
 
 Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
 Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))

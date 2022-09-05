@@ -15,6 +15,11 @@ using Random
 using SciGL
 using Test
 
+parameters = Parameters()
+parameters = @set parameters.mesh_files = ["meshes/BM067R.obj"]
+parameters = @set parameters.rotation_type = :QuatRotation
+parameters = @set parameters.device = :CUDA
+
 const PLOT = true
 if PLOT
     pyplot()
@@ -24,45 +29,45 @@ rng = Random.default_rng()
 Random.seed!(rng, 42)
 rng_model(rng, model) = RngModel(rng, model)
 cpu_model = rng_model | rng
-curng = CUDA.default_rng()
-Random.seed!(curng, 42)
+dev_rng = device_rng(parameters)
+Random.seed!(dev_rng, 42)
 
 # Parameters
 parameters = MCMCDepth.Parameters()
-render_context = RenderContext(parameters.width, parameters.height, parameters.depth, parameters.array_type)
+render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 scene = Scene(parameters, render_context)
-Random.seed!(parameters.rng, parameters.seed)
+Random.seed!(dev_rng, parameters.seed)
 CUDA.allowscalar(false)
 
 # PriorModel
 # Pose only makes sense on CPU since CUDA cannot start render calls to OpenGL
 parameters = @set parameters.mean_t = [0, 0, 1.5]
 t_model = BroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
-# TODO This is hacky, any clean implementation which avoids broadcasting over fake parameters?
 circular_uniform(::Any) = KernelCircularUniform()
 r_model = BroadcastedDistribution(circular_uniform, Array{parameters.precision}(undef, 3)) |> cpu_model
 uniform(::Any) = KernelUniform()
 # Use the rng from params
-o_model = BroadcastedDistribution(uniform, array_for_rng(parameters.rng){parameters.precision}(undef, parameters.width, parameters.height))
+o_model = BroadcastedDistribution(uniform, device_array(parameters, parameters.width, parameters.height))
 prior_model = PriorModel(t_model, r_model, o_model)
-prior_sample = @inferred rand(parameters.rng, prior_model)
+prior_sample = @inferred rand(dev_rng, prior_model)
 @test keys(variables(prior_sample)) == (:t, :r, :o)
 @test variables(prior_sample).t isa Array{parameters.precision,1}
 @test variables(prior_sample).t |> size == (3,)
 @test variables(prior_sample).r isa Array{parameters.precision,1}
 @test variables(prior_sample).r |> size == (3,)
-@test variables(prior_sample).o isa array_for_rng(parameters.rng){parameters.precision,2}
+@test variables(prior_sample).o isa device_array_type(parameters)
+@test variables(prior_sample).o |> size == (parameters.width, parameters.height)
 @test variables(prior_sample).o |> size == (parameters.width, parameters.height)
 ℓ = @inferred logdensityof(prior_model, prior_sample)
 @test ℓ isa Float32
 
-sample5 = @inferred rand(parameters.rng, prior_model, 5)
+sample5 = @inferred rand(dev_rng, prior_model, 5)
 @test keys(variables(sample5)) == (:t, :r, :o)
 @test variables(sample5).t isa Array{parameters.precision,2}
 @test variables(sample5).t |> size == (3, 5)
 @test variables(sample5).r isa Array{parameters.precision,2}
 @test variables(sample5).r |> size == (3, 5)
-@test variables(sample5).o isa array_for_rng(parameters.rng){parameters.precision,3}
+@test variables(sample5).o  isa device_array_type(parameters)
 @test variables(sample5).o |> size == (parameters.width, parameters.height, 5)
 ℓ = @inferred logdensityof(prior_model, sample5)
 @test ℓ isa Array{parameters.precision,1}
@@ -80,11 +85,10 @@ observation_model(normalize, pixel_dist, μ, o) = ObservationModel(normalize, pi
 obs_model_fn = observation_model | (parameters.normalize_img, my_pixel_dist)
 
 posterior_model = PosteriorModel(prior_model, obs_model_fn, render_context, scene, parameters.object_id, parameters.rotation_type)
-posterior_sample = @inferred rand(parameters.rng, posterior_model)
+posterior_sample = @inferred rand(dev_rng, posterior_model)
 ℓ = @inferred logdensityof(posterior_model, posterior_sample)
 maybe_plot(plot_depth_img, variables(posterior_sample).μ |> Array)
 maybe_plot(plot_depth_img, variables(posterior_sample).z |> Array)
 
-sample5 = @inferred rand(parameters.rng, posterior_model, 5)
+sample5 = @inferred rand(dev_rng, posterior_model, 5)
 ℓ5 = @inferred logdensityof(posterior_model, sample5)
-

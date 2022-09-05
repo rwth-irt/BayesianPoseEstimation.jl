@@ -78,6 +78,8 @@ export transition_probability
 # Parameters
 export Parameters
 
+export device_rng, device_array_type, device_array
+
 # RenderContext
 export RenderContext
 export render

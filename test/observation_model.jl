@@ -16,6 +16,11 @@ using Random
 using SciGL
 using Test
 
+parameters = Parameters()
+parameters = @set parameters.mesh_files = ["meshes/BM067R.obj"]
+parameters = @set parameters.rotation_type = :QuatRotation
+parameters = @set parameters.device = :CUDA
+
 const PLOT = true
 if PLOT
     pyplot()
@@ -23,17 +28,12 @@ end
 maybe_plot(fn, x...; y...) = PLOT ? fn(x...; y...) : nothing
 rng = Random.default_rng()
 Random.seed!(rng, 42)
-curng = CUDA.default_rng()
-Random.seed!(curng, 42)
+dev_rng = device_rng(parameters)
+Random.seed!(dev_rng, 42)
 CUDA.allowscalar(false)
 
 # Setup render context & scene
-parameters = MCMCDepth.Parameters()
-parameters = @set parameters.mesh_files = ["meshes/BM067R.obj"]
-parameters = @set parameters.rotation_type = :QuatRotation
-
-render_context = RenderContext(parameters.width, parameters.height, parameters.depth, CuArray)
-
+render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 # CvCamera like ROS looks down positive z
 scene = Scene(parameters, render_context)
 t = [-0.05, 0.05, 0.25]
@@ -69,7 +69,7 @@ obs_model_fn = observation_model | (parameters.normalize_img, my_pixel_dist)
 
 # Exponential truncated to 0.0 is problematic, invalid values of μ should be ignored
 pix_dist = my_pixel_dist(0.0f0, 0.1f0)
-x = rand(curng, pix_dist, 100, 100)
+x = rand(dev_rng, pix_dist, 100, 100)
 @test maximum(x) == 0
 @test minimum(x) == 0
 
@@ -79,7 +79,7 @@ x = rand(curng, pix_dist, 100, 100)
 
 # Valid μ range
 pix_dist = my_pixel_dist(0.5f0, 0.5f0)
-x = rand(curng, pix_dist, 100, 100)
+x = rand(dev_rng, pix_dist, 100, 100)
 @test minimum(x) >= 0
 maybe_plot(histogram, x |> Array |> flatten)
 
@@ -94,9 +94,9 @@ maybe_plot(histogram, x |> Array |> flatten)
 maybe_plot(histogram, ℓ |> Array |> flatten)
 
 # Single rand
-o = rand(curng, KernelUniform(0.8f0, 1.0f0), 100, 100)
+o = rand(dev_rng, KernelUniform(0.8f0, 1.0f0), 100, 100)
 obs_model = @inferred obs_model_fn(μ, o)
-img = rand(curng, obs_model)
+img = rand(dev_rng, obs_model)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
 maybe_plot(plot_depth_img, Array(img))
@@ -108,7 +108,7 @@ maybe_plot(plot_depth_img, logdensityof.(my_pixel_dist.(μ, o), img) .|> exp |> 
 maybe_plot(plot_depth_img, img .- μ |> Array; colorbar_title="depth difference [m]")
 
 # Multiple rand image model
-img_10 = rand(curng, obs_model, 10)
+img_10 = rand(dev_rng, obs_model, 10)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 10)))
@@ -136,7 +136,7 @@ end
 
 # Multiple poses & rand image model
 obs_model_10 = @inferred obs_model_fn(μ_10, o)
-img_10_2 = rand(curng, obs_model_10, 2)
+img_10_2 = rand(dev_rng, obs_model_10, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
 maybe_plot(plot_depth_img, Array(view(img_10_2, :, :, 10, 2)))
@@ -165,7 +165,7 @@ obs_model_tro = @inferred obs_model_fn(μ_tr, o)
 @test eltype(obs_model_tro.μ) == Float32
 
 # Single random noise
-img = rand(curng, obs_model_tro)
+img = rand(dev_rng, obs_model_tro)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
 maybe_plot(plot_depth_img, Array(img); clims=(0.0, 2.0))
@@ -173,7 +173,7 @@ maybe_plot(plot_depth_img, Array(img); clims=(0.0, 2.0))
 @test ℓ isa Float32
 
 # Multiple random noise
-img_10 = rand(curng, obs_model_tro, 10)
+img_10 = rand(dev_rng, obs_model_tro, 10)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
 ℓ = @inferred logdensityof(obs_model_tro, img_10)
@@ -196,7 +196,7 @@ obs_model_TRo = @inferred obs_model_fn(μ_TR, o)
 @test size(obs_model_TRo.μ) == (100, 100, 10)
 @test eltype(obs_model_TRo.μ) == Float32
 
-img_10 = rand(curng, obs_model_TRo)
+img_10 = rand(dev_rng, obs_model_TRo)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
 ℓ = @inferred logdensityof(obs_model_TRo, img_10)
@@ -208,7 +208,7 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 4)))
 
-img_10_2 = rand(curng, obs_model_TRo, 2)
+img_10_2 = rand(dev_rng, obs_model_TRo, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
 ℓ = @inferred logdensityof(obs_model_TRo, img_10_2)
@@ -228,12 +228,12 @@ for layer_id in 1:(size(img_10_2)[3]-1)
 end
 
 # Multiple associations
-O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
+O = rand(dev_rng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
 obs_model_trO = @inferred obs_model_fn(μ_tr, O)
 @test size(obs_model_trO.μ) == (100, 100)
 @test eltype(obs_model_trO.μ) == Float32
 
-img_10 = rand(curng, obs_model_trO)
+img_10 = rand(dev_rng, obs_model_trO)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
 ℓ = @inferred logdensityof(obs_model_trO, img_10)
@@ -245,7 +245,7 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 5)))
 
-img_10_2 = rand(curng, obs_model_trO, 2)
+img_10_2 = rand(dev_rng, obs_model_trO, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
 ℓ = @inferred logdensityof(obs_model_trO, img_10_2)
@@ -265,13 +265,13 @@ for layer_id in 1:(size(img_10_2)[3]-1)
 end
 
 # Multiple poses & associations
-O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 5)
+O = rand(dev_rng, KernelUniform(0.0f0, 0.9f0), 100, 100, 5)
 obs_model_TRO = @inferred obs_model_fn(μ_TR, O);
-@test_throws DimensionMismatch img_10 = rand(curng, obs_model_TRO)
+@test_throws DimensionMismatch img_10 = rand(dev_rng, obs_model_TRO)
 
-O = rand(curng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
+O = rand(dev_rng, KernelUniform(0.0f0, 0.9f0), 100, 100, 10)
 img_model_pose = @inferred obs_model_fn(μ_TR, O)
-img_10 = rand(curng, img_model_pose)
+img_10 = rand(dev_rng, img_model_pose)
 @test size(img_10) == (100, 100, 10)
 @test eltype(img_10) == Float32
 ℓ = @inferred logdensityof(img_model_pose, img_10)
@@ -283,7 +283,7 @@ for layer_id in 1:(size(img_10)[3]-1)
 end
 maybe_plot(plot_depth_img, Array(view(img_10, :, :, 8)))
 
-img_10_2 = rand(curng, img_model_pose, 2)
+img_10_2 = rand(dev_rng, img_model_pose, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
 ℓ = @inferred logdensityof(img_model_pose, img_10_2)
