@@ -76,9 +76,7 @@ export propose
 export transition_probability
 
 # Parameters
-export DepthImageParameters
-export PriorParameters
-export RandomWalkParameters
+export Parameters
 
 # RenderContext
 export RenderContext
