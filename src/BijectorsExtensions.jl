@@ -64,4 +64,12 @@ is_identity(::Bijectors.Identity) = true
 Returns true if the `bijector` is the identity, i.e. maps ℝ → ℝ
 """
 is_identity(bijector::Bijector...) = mapreduce(is_identity, &, bijector)
+is_identity(bijector::AbstractArray{<:Bijector}...) = reduce(&, mapreduce.(is_identity, &, bijector))
+
+# Wrapper
+Bijectors.bijector(rng_model::RngModel) = bijector(model(rng_model))
+
+is_identity(dist::Distribution) = is_identity(bijector(dist))
 is_identity(model::IndependentModel) = is_identity(bijector.(values(models(model)))...)
+is_identity(model::ComposedModel) = is_identity(models(model))
+is_identity(rng_model::RngModel) = is_identity(model(rng_model))
