@@ -60,8 +60,8 @@ a_sym_sample_2 = @inferred propose(Random.default_rng(), a_sym_proposal, sample,
 @test transition_probability(a_sym_proposal, a_sym_sample_2, sample) == 0
 
 # Propose multiple variables
-b_normal = ProductDistribution(fill(KernelNormal(Float32), 3))
-c_normal = VectorizedDistribution(fill(KernelNormal(Float64), 2))
+b_normal = BroadcastedDistribution(KernelNormal{Float32}, (), fill(0.0f0, 3), fill(1.0f0, 3))
+c_normal = BroadcastedDistribution(KernelNormal{Float32}, fill(0.0, 2), fill(1.0, 2))
 
 abc_sym_proposal = SymmetricProposal(IndependentModel((; a=a_normal, b=b_normal, c=c_normal)))
 # TODO test samples thoroughly for different bijectors and variable types
@@ -173,7 +173,7 @@ a_gibbs_sample = @inferred propose(Random.default_rng(), a_gibbs_proposal, sampl
 @test typeof(variables(a_gibbs_sample).a) == Float32
 @test typeof(variables(a_gibbs_sample).b) == typeof(variables(sample).b)
 @test typeof(variables(a_gibbs_sample).c) == typeof(variables(sample).c)
-@test variables(a_gibbs_sample).a == variables(sample).a
+@test variables(a_gibbs_sample).a == 42.0f0
 @test variables(a_gibbs_sample).b == variables(sample).b
 @test variables(a_gibbs_sample).c == variables(sample).c
 @test variables(a_gibbs_sample).a |> size == ()

@@ -92,13 +92,13 @@ Analytic proposals are conditioned on the other variables of the previous sample
 A subset of the variables is proposed by the internal proposal model and merged with the previous sample.
 Since sampling is analytic, `dims` solely depends on the previous sample and the `rng` is not used.
 """
-function propose(::AbstractRNG, proposal::GibbsProposal{Q}, sample::Sample, dims...) where {Q}
+function propose(::AbstractRNG, proposal::GibbsProposal, sample::Sample, dims...)
     gibbs_sample = proposal.fn(sample)
     merge(sample, gibbs_sample)
 end
 
 """
     transition_probability(proposal, new_sample, prev_sample)
-Analytic Gibbs proposals are always accepted so `Inf` is returned.
+Gibbs proposals are always accepted so `Inf` is returned.
 """
 transition_probability(::GibbsProposal, ::Sample, ::Sample) = Inf
