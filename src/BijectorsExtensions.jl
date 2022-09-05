@@ -58,13 +58,8 @@ Returns true if the bijector is the identity, i.e. maps ℝ → ℝ
 """
 is_identity(::Bijector) = false
 is_identity(::Bijectors.Identity) = true
-
-"""
-    is_identity(bijector)
-Returns true if the `bijector` is the identity, i.e. maps ℝ → ℝ
-"""
-is_identity(bijector::Bijector...) = mapreduce(is_identity, &, bijector)
-is_identity(bijector::AbstractArray{<:Bijector}...) = reduce(&, mapreduce.(is_identity, &, bijector))
+is_identity(bijector::AbstractArray{<:Bijector}) = mapreduce(is_identity, &, bijector)
+is_identity(bijectors::Union{Bijector,AbstractArray{<:Bijector}}...) = mapreduce(is_identity, &, bijectors)
 
 # Wrapper
 Bijectors.bijector(rng_model::RngModel) = bijector(model(rng_model))
