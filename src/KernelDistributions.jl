@@ -144,8 +144,9 @@ end
 Generate the correct array to be used in rand! based on the random number generator provided.
 CuArray for CUDA.RNG and Array for all other RNGs.
 """
-array_for_rng(::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = Array{T}(undef, dims...)
-array_for_rng(::CUDA.RNG, ::Type{T}, dims::Integer...) where {T} = CuArray{T}(undef, dims...)
+array_for_rng(rng::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = array_for_rng(rng){T}(undef, dims...)
+array_for_rng(::AbstractRNG) = Array
+array_for_rng(::CUDA.RNG) = CuArray
 
 # TODO Might want this to fail instead of fallback?
 """
