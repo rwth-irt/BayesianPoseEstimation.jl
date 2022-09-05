@@ -3,11 +3,10 @@
 # All rights reserved. 
 
 using CUDA
-using LinearAlgebra
-using Rotations
+using Random
+
 
 # TODO Use https://juliadynamics.github.io/DrWatson.jl/dev/save/ for reproducible experiments, make a new experiments project and dev src/MCMCDepth as described in their documentation
-
 # TODO might want to convert this to a dict for DrWatson
 
 """
@@ -98,18 +97,27 @@ Base.@kwdef struct Parameters
     proposal_σ_r = [0.05, 0.05, 0.05]
     # Inference
     precision = Float32
-    rng = CUDA.default_rng()
+    device = :CUDA
     seed = 8418387917544508114
     n_samples = 5000
     n_burn_in = 1000
     n_thinning = 2
 end
 
-array_for_rng(p::Parameters) = array_for_rng(p.rng)
 
 # Automatically convert to correct precision
 Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
 Base.getproperty(p::Parameters, ::Val{K}) where {K} = getfield(p, K)
+
+function Base.getproperty(p::Parameters, ::Val{:rng})
+    if p.device === :CUDA
+        CUDA.default_rng()
+    elseif p.device === :CPU
+        Random.default_rng()
+    end
+end
+Base.getproperty(p::Parameters, ::Val{:array_type}) = array_for_rng(p.rng)
+
 
 Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
 Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))
@@ -124,4 +132,11 @@ Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.precision.(getfield(p, :σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.precision.(getfield(p, :proposal_σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.precision.(getfield(p, :proposal_σ_r))
 
-Base.getproperty(p::Parameters, ::Val{:rotation_type}) = Base.typename(getfield(p, :rotation_type)).wrapper{p.precision} 
+function Base.getproperty(p::Parameters, ::Val{:rotation_type})
+    r = getfield(p, :rotation_type)
+    if r isa Type
+        Base.typename(r).wrapper{p.precision}
+    elseif r isa Symbol
+        eval(r){p.precision}
+    end
+end
