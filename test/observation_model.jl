@@ -59,8 +59,7 @@ function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:R
     PixelDistribution(μ, dist)
 end
 
-# WARN Anonymous functions, which are used inside ManipulatedFunctions, are not type stable in global scope. https://discourse.julialang.org/t/question-on-type-inference-with-anonymous-functions-and-broadcast/78102/2
-const my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
+my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
 
 # WARN ManipulatedFunctions do not work with Type constructors, since they would cause type instability
 observation_model(normalize_img, pixel_dist, μ, o) = ObservationModel(normalize_img, pixel_dist, μ, o)

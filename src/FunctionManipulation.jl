@@ -8,9 +8,6 @@ The idea is to use generator functions for Measures with a simple way to conditi
 Partial application of functions can be seen as a way to accomplish this.
 Given gen_f(;a,b), partial(gen_f, a=1) returns a function generator of the form gen_b(;b)
 
-WARN Anonymous functions, which are used inside ManipulatedFunctions, are not type stable in global scope.
-Defining the ManipulatedFunction as const solves the problem.
-
 Based on ideas from PartialFunctions.jl https://github.com/archermarx/PartialFunctions.jl/blob/master/src/PartialFunctions.jl
 Main difference is that mapping the kwargs to args is more flexible and possible in any step of the partial application
 """
