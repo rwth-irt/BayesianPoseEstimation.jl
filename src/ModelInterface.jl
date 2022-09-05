@@ -62,6 +62,8 @@ struct RngModel{T,U<:AbstractRNG}
     model::T
 end
 
+model(model::RngModel) = model.model
+
 """
     rand([rng=model.rng], model, dims...)
 Generate a random sample from the internal model using the rng of the model.
@@ -81,6 +83,8 @@ struct ComposedModel{T<:Tuple}
 end
 
 ComposedModel(models...) = ComposedModel(models)
+
+models(model::ComposedModel) = model.models
 
 """
     rand(rng, model, dims)
