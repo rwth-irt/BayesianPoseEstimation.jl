@@ -61,6 +61,11 @@ end
 
 # WARN Anonymous functions, which are used inside ManipulatedFunctions, are not type stable in global scope. https://discourse.julialang.org/t/question-on-type-inference-with-anonymous-functions-and-broadcast/78102/2
 const my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
+
+# WARN ManipulatedFunctions do not work with Type constructors, since they would cause type instability
+observation_model(normalize_img, pixel_dist, μ, o) = ObservationModel(normalize_img, pixel_dist, μ, o)
+obs_model_fn = observation_model | (params.normalize_img, my_pixel_dist)
+
 # Exponential truncated to 0.0 is problematic, invalid values of μ should be ignored
 pix_dist = my_pixel_dist(0.0f0, 0.1f0)
 x = rand(curng, pix_dist, 100, 100)
@@ -89,7 +94,7 @@ maybe_plot(histogram, ℓ |> Array |> flatten)
 
 # Single rand
 o = rand(curng, KernelUniform(0.8f0, 1.0f0), 100, 100)
-obs_model = @inferred ObservationModel(true, my_pixel_dist, μ, o)
+obs_model = @inferred obs_model_fn(μ, o)
 img = rand(curng, obs_model)
 @test size(img) == (100, 100)
 @test eltype(img) == Float32
@@ -129,7 +134,7 @@ for layer_id in 1:(size(μ_10)[3]-1)
 end
 
 # Multiple poses & rand image model
-obs_model_10 = @inferred ObservationModel(true, my_pixel_dist, μ_10, o)
+obs_model_10 = @inferred obs_model_fn(μ_10, o)
 img_10_2 = rand(curng, obs_model_10, 2)
 @test size(img_10_2) == (100, 100, 10, 2)
 @test eltype(img_10_2) == Float32
@@ -151,7 +156,6 @@ for layer_id in 1:(size(img_10_2)[3]-1)
 end
 
 # ImageModel from scene & pose
-const obs_model_fn(μ, o) = ObservationModel(params.normalize_img, my_pixel_dist, μ, o)
 pose_tr = to_pose(t, r, QuatRotation)
 μ_tr = render(render_context, scene, params.object_id, pose_tr)
 obs_model_tro = @inferred obs_model_fn(μ_tr, o)
