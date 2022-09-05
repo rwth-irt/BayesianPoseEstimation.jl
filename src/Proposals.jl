@@ -2,8 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO use DensityInterface and Random? Would be incompatible to logdensityof(proposal, x) and rand does not make sense semantically for Gibbs
-using Random
 
 """
     AbstractProposal
