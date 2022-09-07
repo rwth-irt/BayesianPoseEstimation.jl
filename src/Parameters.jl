@@ -156,3 +156,12 @@ function Base.getproperty(p::Parameters, ::Val{:rotation_type})
         eval(r){p.precision}
     end
 end
+
+function Base.getproperty(p::Parameters, ::Val{:association_is})
+    sym = getfield(p, :association_is) |> eval
+    (μ) -> eval(sym){p.precision}(μ, p.pixel_σ)
+end
+function Base.getproperty(p::Parameters, ::Val{:association_not})
+    sym = getfield(p, :association_not)
+    (μ) -> eval(sym){p.precision}(p.pixel_σ)
+end
