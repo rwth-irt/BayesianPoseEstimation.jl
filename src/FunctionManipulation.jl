@@ -2,6 +2,8 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using Base: Callable
+
 """
     FunctionManipulation.jl
 The idea is to use generator functions for Measures with a simple way to condition on different parameters.
@@ -48,7 +50,8 @@ kwarg_to_arg(f::Function, ::Val{S}) where {S} = (s, x...; y...) -> f(x...; (; S 
 Keep track of the original function and the arguments which are manipulated.
 Partial application using anonymous functions leads to ambiguous signatures.
 """
-struct ManipulatedFunction{F<:Function,G<:Function,T<:Tuple,U<:NamedTuple} <: Function
+struct ManipulatedFunction{F<:Function,G<:Callable,T<:Tuple,U<:NamedTuple} <: Function
+    # Do not allow Callable, since type constructors are UnionAll / Union{Function,Type}
     func::F
     # Avoid allocations to store the name as string
     original::G
@@ -79,7 +82,9 @@ ManipulatedFunction(mf::ManipulatedFunction, x) = ManipulatedFunction(mf, (x,))
 
 fn_name = String ∘ Symbol
 ManipulatedFunction(f::Function) = ManipulatedFunction(f, f, (), (;))
-ManipulatedFunction(f::Function, x) = ManipulatedFunction(ManipulatedFunction(f), x)
+# Callable support. Since constuctor can be function or type, convert to anonymous function.
+ManipulatedFunction(::Type{T}) where {T} = ManipulatedFunction((x...; y...) -> T(x..., y...), T, (), (;))
+ManipulatedFunction(f::Callable, x) = ManipulatedFunction(ManipulatedFunction(f), x)
 
 """
     mf(args, kwargs)
@@ -96,7 +101,7 @@ Base.show(io::IO, ::MIME"text/plain", pf::ManipulatedFunction) = show(io, pf)
     |(f, nt)
 Syntactic sugar for ManipulatedFunction(fn, x)
 """
-Base.:|(f::Union{Function,ManipulatedFunction}, x) = ManipulatedFunction(f, x)
+Base.:|(f::Union{Callable,ManipulatedFunction}, x) = ManipulatedFunction(f, x)
 
 """
     Function(mf)
