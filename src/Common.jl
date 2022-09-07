@@ -4,6 +4,7 @@
 
 using CoordinateTransformations
 using CUDA
+using Random
 using Rotations
 
 """
@@ -62,6 +63,8 @@ sum_and_dropdims(A; dims) = sum_and_dropdims(A, dims)
 sum_and_dropdims(A, dims::Dims) = dropdims(sum(A; dims=dims), dims=dims)
 # Case of matching dimensions → return scalar
 sum_and_dropdims(A::AbstractArray{<:Any,N}, ::Dims{N}) where {N} = sum(A)
+# Scalar case
+sum_and_dropdims(A::Number, ::Dims{N}) where {N} = A
 
 # WARN Do not try to implement reduction of Broadcasted via Base.mapreducedim!
 # LinearIndices(::Broadcasted{<:Any,<:Tuple{Any}}) only works for 1D case: https://github.com/JuliaLang/julia/blob/v1.8.0/base/broadcast.jl#L245
@@ -93,5 +96,29 @@ to_rotation(A::AbstractArray{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = 
 to_rotation(A::AbstractArray{<:Rotation}, ::Rotation) = A
 to_rotation(v::AbstractVector{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = T(v...)
 
+# GPU transfer helpers
+
 # TODO defining it in the package might lead to unexpected behaviour, move to script?
 Base.promote_rule(::Type{<:CuArray}, ::Type{<:Array}) = Array
+
+"""
+    array_for_rng(rng, T, dims...)
+Generate the correct array to be used in rand! based on the random number generator provided.
+CuArray for CUDA.RNG and Array for all other RNGs.
+"""
+array_for_rng(rng::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = array_for_rng(rng){T}(undef, dims...)
+array_for_rng(::AbstractRNG) = Array
+array_for_rng(::CUDA.RNG) = CuArray
+
+# TODO Might want this to fail instead of fallback?
+"""
+    maybe_cuda
+Transfers A to CUDA if A is a CuArray and issues a warning.
+"""
+maybe_cuda(::Any, A) = A
+function maybe_cuda(::CuArray, A::AbstractArray)
+    if !(A isa CuArray)
+        @warn "Transferring (distribution) array to GPU, avoid overhead by transferring it once."
+    end
+    CuArray(A)
+end
