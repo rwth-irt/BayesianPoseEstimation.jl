@@ -34,12 +34,12 @@ BroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistributio
 """
     BroadcastedDistribution(dist_fn, params...)
 Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
-Defaults the reduction dimensions of the first `ndims(dists)` dimensions.
+Defaults to no reduction with dims=().
 """
 function BroadcastedDistribution(dist_fn, params...)
-    # instantiate to call ndims
+    # instantiate to allow ndims & co.
     marginals = broadcasted(dist_fn, params...) |> instantiate
-    dims = (1:ndims(marginals)...,)
+    dims = ()
     BroadcastedDistribution(promote_params_eltype(params...), dims, marginals, Continuous)
 end
 
@@ -92,6 +92,9 @@ Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logden
 # <:Real Required to avoid ambiguities with Distributions.jl
 Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 
+# Scalar case for CUDA
+Distributions.logpdf(dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}}, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(materialize(marginals(dist)), x), dist.dims)
+
 # By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). BroadcastedDistribution is inherently designed for multiple samples so allow them explicitly.
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractArray) = logpdf(dist, x)
 DensityInterface.logdensityof(dist::BroadcastedDistribution, x::AbstractMatrix) = logpdf(dist, x)
@@ -109,6 +112,7 @@ function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Int
     rand!(rng, dist, A)
 end
 
+Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}}, dims::Int...) = rand(rng, materialize(marginals(dist)), dims...)
 """
     rand!(rng, dist, [dims...])
 Mutate the array `A` by sampling from `dist`.

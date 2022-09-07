@@ -54,13 +54,13 @@ dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
 X = @inferred rand(rng, dist, 2)
 @test X isa Array{Float64,3}
 ℓ = @inferred logdensityof(dist, X)
-@test ℓ isa Array{Float64,1}
+@test ℓ isa Array{Float64,3}
 
 dist = @inferred BroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
 X = @inferred rand(curng, dist, 2)
 @test X isa CuArray{Float64,3}
 ℓ = @inferred logdensityof(dist, X)
-@test ℓ isa CuArray{Float64,1}
+@test ℓ isa CuArray{Float64,3}
 
 # Type stability
 dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 50, 10))
@@ -86,7 +86,7 @@ X = @inferred rand(curng, dist);
 
 # Correct computation of logdensityof by comparing to Distributions.jl 
 # All calculations in Float64
-dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 500))
+dist = @inferred BroadcastedDistribution(mixture_fn, (1,), fill(10.0, 500))
 product = Product([MixtureModel([Exponential(2.0), Normal(10.0, 2.0)], normalize([3, 1], 1)) for i = 1:500])
 rand(product) |> flatten |> maybe_histogram
 rand(rng, dist) |> flatten |> maybe_histogram
@@ -103,8 +103,17 @@ X = rand(rng, dist, 3)
 @test logdensityof(dist, X) isa Float64
 @test logdensityof(dist, X) ≈ logpdf(product, X) |> sum
 
-# VectorizedDistribution
-dist = @inferred BroadcastedDistribution(mixture_fn, fill(10.0, 100, 10))
+# Should also work with scalars
+dist = @inferred BroadcastedDistribution(KernelExponential, Float16(10.0))
+x = @inferred rand(rng, dist)
+@test x isa Float16
+ℓ = @inferred logdensityof(dist, x)
+@test ℓ isa Float16
+X = rand(curng, dist, 3)
+@test X isa CuArray{Float16,1}
+@test size(X) == (3,)
+ℓ = @inferred logdensityof(dist, X)
+@test ℓ isa CuArray{Float16,1}
 
 # Test different sizes of the marginals and rand(..., dims)
 normal_fn(μ::T) where {T} = KernelNormal(μ, T(0.1))
@@ -187,7 +196,7 @@ M = @inferred rand(rng, dist, 3, 4);
 @test logdensityof(dist, M) isa Array{Float16,2}
 
 # TransformedDistribution
-dist = @inferred BroadcastedDistribution(KernelExponential, [Float64(i) for i = 1:100])
+dist = @inferred BroadcastedDistribution(KernelExponential, (1,), [Float64(i) for i = 1:100])
 t_dist = transformed(dist)
 product = Product([Exponential(i) for i = 1:100])
 t_product = transformed(product)
@@ -218,7 +227,7 @@ Y = rand(rng, t_dist, 3, 2, 1)
 @inferred logdensityof(t_dist, Y)
 
 # CUDA
-cudist = @inferred BroadcastedDistribution(KernelExponential, CuArray([Float64(i) for i = 1:100]))
+cudist = @inferred BroadcastedDistribution(KernelExponential, (1,), CuArray([Float64(i) for i = 1:100]))
 t_cudist = transformed(cudist)
 
 @test bijector(cudist) |> eltype <: Bijectors.Log
