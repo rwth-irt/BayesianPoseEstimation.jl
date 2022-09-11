@@ -28,7 +28,6 @@ include("ObservationModel.jl")
 include("AssociationModel.jl")
 include("PosteriorModel.jl")
 include("RenderProposal.jl")
-include("Main.jl")
 
 # Common
 export flatten
@@ -124,6 +123,7 @@ export scatter_position
 using Reexport
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
+@reexport import SciGL: Scene
 
 @reexport import DensityInterface: logdensityof
 @reexport import Random: rand!
@@ -133,12 +133,7 @@ using Reexport
 export Circular
 export is_identity
 
-# Main script
-export destroy_render_context
-export init_render_context
-export main
-export render_to_cpu
-export render_pose
-export render_pose!
+# Distributions
+@reexport import Distributions: truncated
 
 end # module

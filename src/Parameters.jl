@@ -28,14 +28,11 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 
 # Observation Model
 ## Sensor Model
-* pixel_dist: Symbol of the depth pixel distribution
 * pixel_σ: Standard deviation of the sensor noise.
 * pixel_θ: Expected value of the exponential distribution → Occlusion expected closer or further away.
 
 ## Object Association
-* analytic_o: If true calculate the pixel association probability o analytically (Gibbs)
-* association_is, association_not: Symbol of the distributions if a pixel belongs to the object or not
-* static_o: Constant mixture coefficient for the pixel to object association / probability that a pixel belongs to the object.
+* prior_o: Constant mixture coefficient for the pixel to object association / probability that a pixel belongs to the object.
 
 ## Image Model
 * normalize_img: Normalize the likelihood of an image using the number of rendered pixels
@@ -76,15 +73,11 @@ Base.@kwdef struct Parameters
     min_depth = 0.1
     max_depth = 2
     # Depth pixel model
-    pixel_dist = :DepthNormalExponentialUniform
     pixel_σ = 0.1
     pixel_θ = 1.0
     mix_exponential = 0.8
     # Pixel association
-    analytic_o = false
-    association_is = :KernelNormal
-    association_not = :KernelExponential
-    static_o = fill(0.2, 100, 100)
+    prior_o = fill(0.2, 100, 100)
     # Image Model
     normalize_img = true
     # Pose Model
@@ -92,9 +85,7 @@ Base.@kwdef struct Parameters
     mean_t = [0.0, 0.0, 2.0]
     σ_t = [0.05, 0.05, 0.05]
     # Proposal Model
-    proposal_t = :SymmetricProposal
     proposal_σ_t = [0.05, 0.05, 0.05]
-    proposal_r = :SymmetricProposal
     proposal_σ_r = [0.05, 0.05, 0.05]
     # Inference
     precision = Float32
