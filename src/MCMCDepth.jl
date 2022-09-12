@@ -33,6 +33,7 @@ include("RenderProposal.jl")
 export flatten
 export map_intersect
 export to_rotation, to_translation, to_pose
+export norm_dims, normalize_dims
 
 # Samples
 export Sample
@@ -77,7 +78,7 @@ export transition_probability
 # Parameters
 export Parameters
 
-export device_rng, device_array_type, device_array
+export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
 
 # RenderContext
 export RenderContext
