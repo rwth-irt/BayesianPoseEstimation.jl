@@ -70,7 +70,9 @@ Recursively generates a string of the distribution type (function) of the broadc
 """
 function recursive_marginals_string(marginals)
     res = "$(marginals.f) "
-    if marginals.args[1] isa Broadcasted
+    if isempty(marginals.args)
+        res
+    elseif marginals.args[1] isa Broadcasted
         res *= recursive_marginals_string(marginals.args[1])
     end
     res
@@ -113,6 +115,7 @@ function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Int
 end
 
 Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}}, dims::Int...) = rand(rng, materialize(marginals(dist)), dims...)
+
 """
     rand!(rng, dist, [dims...])
 Mutate the array `A` by sampling from `dist`.
