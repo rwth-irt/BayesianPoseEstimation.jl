@@ -101,17 +101,43 @@ end
 Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
 Base.getproperty(p::Parameters, ::Val{K}) where {K} = getfield(p, K)
 
+"""
+    cpu_rng(parameters)
+Returns the seeded random number generator for the CPU.
+"""
+function cpu_rng(p::Parameters)
+    rng = Random.default_rng()
+    Random.seed!(rng, p.seed)
+    rng
+end
+
+"""
+    cuda_rng(parameters)
+Returns the seeded random number generator for the CUDA device.
+"""
+function cuda_rng(p::Parameters)
+    rng = CUDA.default_rng()
+    Random.seed!(rng, p.seed)
+    rng
+end
+
+"""
+    device_rng(parameters)
+Returns the seeded matching random number generator for the parameters device field (:CUDA or :CPU).
+"""
 function device_rng(p::Parameters)
     if p.device === :CUDA
-        CUDA.default_rng()
+        cuda_rng(p)
     elseif p.device === :CPU
-        Random.default_rng()
+        cpu_rng(p)
     else
         @warn "Unknown device: $(p.device), falling back to CPU"
         # CPU is fallback
-        Random.default_rng()
+        cpu_rng(p)
     end
 end
+
+cpu_array(p::Parameters, dims...) = Array{p.precision}(undef, dims...)
 
 function device_array_type(p::Parameters)
     if p.device === :CUDA
