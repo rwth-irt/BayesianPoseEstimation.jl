@@ -129,15 +129,24 @@ For any iterable container A (including arrays of any dimension) of numbers (or 
 
 The p-norm is defined as
 
-\|A\|_p = \left( \sum_{i=1}^n | a_i | ^p \right)^{1/p}
+``\\|A\\|_p = \\left( \\sum_{i=1}^n | a_i | ^p \\right)^{1/p}``
 
 Compared to norm, you can specify the dims to sum over.
 """
 norm_dims(A::AbstractArray, p=2; dims=(1,)) = sum(x -> abs(x)^p, A; dims=dims) .^ inv(p)
 
 """
+    normalize_dims!(A, [p=2; dims=(1,)])
+Normalize the array A inplace so that its p-norm equals unity, i.e. norm(a, p) == 1.
+Compared to normalize, you can specify the dims to sum over.
+"""
+function normalize_dims!(A::AbstractArray, p=2; dims=(1,))
+    A .= A ./ norm_dims(A, p; dims=dims)
+end
+
+"""
     normalize_dims(A, [p=2; dims=(1,)])
 Normalize the array A so that its p-norm equals unity, i.e. norm(a, p) == 1.
 Compared to normalize, you can specify the dims to sum over.
 """
-normalize_dims(A::AbstractArray, p=2; dims=(1,)) = A ./ norm_dims(A, p; dims=dims)
+normalize_dims(A::AbstractArray, p=2; dims=(1,)) = normalize_dims!(similar(A), p; dims=dims)

@@ -17,6 +17,7 @@ include("Proposals.jl")
 include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
+include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
 # TODO include("Gibbs.jl")
@@ -30,10 +31,12 @@ include("PosteriorModel.jl")
 include("RenderProposal.jl")
 
 # Common
+export array_for_rng
 export flatten
 export map_intersect
+export norm_dims, normalize_dims!, normalize_dims
+export sum_and_dropdims
 export to_rotation, to_translation, to_pose
-export norm_dims, normalize_dims
 
 # Samples
 export Sample
@@ -46,7 +49,7 @@ export types
 export unconstrained_state
 export variables
 
-# Kernel distributions
+# Distributions
 export AbstractKernelDistribution
 export measure_theory, kernel_distribution
 export KernelBinaryMixture
@@ -54,12 +57,8 @@ export KernelCircularUniform
 export KernelExponential
 export KernelNormal
 export KernelUniform
-
-export array_for_rng
-
-# Broadcasted distribution
 export BroadcastedDistribution
-export sum_and_dropdims
+export QuaternionDistribution
 
 # ModelInterface
 export ComposedModel
