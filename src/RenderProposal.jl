@@ -7,16 +7,16 @@
 Decorator for a (proposal) `model`.
 First, a new sample is generated from the `model` and then a rendering `μ` of the pose `t` & `r` is merged into the sample.
 """
-struct RenderProposal{R<:Rotation,M,C<:RenderContext,S<:Scene} <: AbstractProposal
-    # Probabilistic model
-    model::M
+struct RenderProposal{R<:Rotation,C<:RenderContext,S<:Scene,M} <: AbstractProposal
     # Render related objects
     render_context::C
     scene::S
     object_id::Int
+    # Probabilistic model
+    model::M
 end
 
-RenderProposal(proposal::P, render_context::C, scene::S, object_id::Int, ::Type{R}) where {P,C<:RenderContext,S<:Scene,R<:Rotation} = RenderProposal{R,P,C,S}(proposal, render_context, scene, object_id)
+RenderProposal(::Type{R}, render_context::C, scene::S, object_id::Int, model::M) where {M,C<:RenderContext,S<:Scene,R<:Rotation} = RenderProposal{R,C,S,M}(render_context, scene, object_id, model)
 
 """
     rand(rng, proposal, [dims...])
