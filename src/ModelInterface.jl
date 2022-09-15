@@ -3,6 +3,8 @@
 # All rights reserved. 
 # Samples
 
+# TODO Do I want another wrapper or base all these models on AbstractModel?
+using AbstractMCMC: AbstractModel
 using DensityInterface
 using Random
 
@@ -20,7 +22,7 @@ A model could be as simple as containing only one variable.
 Model variables are assumed to be independent and sampled in order via `ModelVariable(rng, model, dims...)`.
 Does not support hierarchical models because of the one-to-one matching of the model and the variables.
 """
-struct IndependentModel{var_names,T}
+struct IndependentModel{var_names,T} <: AbstractModel
     # Wrapping NamedTuple to avoid type piracy
     models::NamedTuple{var_names,T}
 end
@@ -57,7 +59,7 @@ DensityInterface.logdensityof(model::IndependentModel, sample) = .+(promote(valu
     RngModel
 Wraps an internal `model` and allows to provide an individual RNG for this model.
 """
-struct RngModel{T,U<:AbstractRNG}
+struct RngModel{T,U<:AbstractRNG} <: AbstractModel
     rng::U
     model::T
 end
@@ -79,7 +81,7 @@ DensityInterface.logdensityof(model::RngModel, sample) = logdensityof(model.mode
     ComposedModel
 Generate Samples from several models which in turn generate samples by merging them in order.
 """
-struct ComposedModel{T<:Tuple}
+struct ComposedModel{T<:Tuple} <: AbstractModel
     models::T
 end
 
@@ -107,7 +109,7 @@ DensityInterface.logdensityof(model::ComposedModel, sample) = mapreduce(m -> log
     ConditionedModel
 Decorator for a model which conditiones the sample on the data before evaluating the logdensity.
 """
-struct ConditionedModel{T,V,M}
+struct ConditionedModel{T,V,M} <: AbstractModel
     data::NamedTuple{T,V}
     model::M
 end

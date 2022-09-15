@@ -10,9 +10,9 @@ using Random
     MetropolisHastings
 Different MetropolisHastings samplers only differ by their proposals.
 """
-struct MetropolisHastings{T<:AbstractProposal} <: AbstractMCMC.AbstractSampler
-    initial::IndependentProposal
-    proposal::T
+struct MetropolisHastings{Q,P<:AbstractProposal} <: AbstractMCMC.AbstractSampler
+    prior::Q
+    proposal::P
 end
 
 Base.show(io::IO, mh::MetropolisHastings) = print(io, "MetropolisHastings with proposal:\n$(model(proposal(mh)))")
@@ -23,6 +23,7 @@ Get the proposal model of the Sampler.
 """
 proposal(mh::MetropolisHastings) = mh.proposal
 
+# TODO required in Gibbs?
 """
     proposal(mh)
 Set the proposal model of the Sampler.
@@ -30,26 +31,14 @@ Set the proposal model of the Sampler.
 set_proposal(mh::MetropolisHastings, q::AbstractProposal) = @set mh.proposal = q
 
 """
-    propose(rng, m, s)
-Propose a sample without a previous sample for the MetropolisHastings sampler.
-"""
-propose(rng::AbstractRNG, mh::MetropolisHastings) = propose(rng, mh.initial)
-
-"""
-    propose(rng, m, s)
-Propose a new sample for the MetropolisHastings sampler.
-"""
-propose(rng::AbstractRNG, mh::MetropolisHastings, s) = propose(rng, mh.proposal, s)
-
-"""
     step(rng, model, sampler)
 Implementing the AbstractMCMC interface for the initial step.
-Proposes one sample from the initial proposal model of `mh`.
+Proposes one sample from the prior of the sampler.
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, mh::MetropolisHastings)
-    sample = propose(rng, mh)
-    # TODO Should the initial sample be corrected since it is drawn from the prior and not the unconstrained space?
-    state = @set sample.logp = transform_logdensity(model, sample)
+function AbstractMCMC.step(rng::AbstractRNG, model, mh::MetropolisHastings)
+    sample = rand(rng, mh.prior)
+    # TODO Why is conversion necessary?
+    state = @set sample.logp = logdensityof(model, sample) |> Float64
     # sample, state are the same for MH
     state, state
 end
@@ -58,24 +47,24 @@ end
     step(sample, model, sampler, state)
 Implementing the AbstractMCMC interface for steps given a state from the last step.
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::AbstractMCMC.AbstractModel, sampler::MetropolisHastings, state::Sample)
-    # old sample requires a valid log probability
-    if isinf(logp(state))
-        state = @set state.logp = transform_logdensity(model, state)
+function AbstractMCMC.step(rng::AbstractRNG, model, sampler::MetropolisHastings, state::Sample)
+    # If previous was Gibbs, it has an infinite probability to be accepted -> calulate the actual logdensity
+    if isinf(log_prob(state))
+        state = @set state.logp = logdensityof(model, state) |> Float64
     end
     # propose new sample
-    sample = propose(rng, sampler, state)
-    sample = @set sample.logp = transform_logdensity(model, sample)
+    proposed = propose(rng, sampler.proposal, state)
+    proposed = @set proposed.logp = logdensityof(model, proposed) |> Float64
     # acceptance ratio
-    α = (logp(sample) -
-         logp(state) +
-         transition_probability(proposal(sampler), state, sample) -
-         transition_probability(proposal(sampler), sample, state))
+    α = (log_prob(proposed) -
+         log_prob(state) +
+         transition_probability(proposal(sampler), state, proposed) -
+         transition_probability(proposal(sampler), proposed, state))
     if log(rand(rng)) > α
         # reject
         return state, state
     else
         # accept (always the case if difference positive since log([0,1])->[-inf,0])
-        return sample, sample
+        return proposed, proposed
     end
 end
