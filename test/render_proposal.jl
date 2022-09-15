@@ -54,7 +54,7 @@ prior_sample = @inferred rand(dev_rng, prior)
 @test variables(prior_sample).t isa Vector{parameters.precision}
 @test variables(prior_sample).r isa Vector{parameters.precision}
 
-tr_proposal = eval(parameters.proposal_t)(prior)
+tr_proposal = IndependentProposal(prior)
 Random.seed!(rng, 42)
 proposed_sample = @inferred propose(dev_rng, tr_proposal, prior_sample)
 @test variables(proposed_sample).r isa Vector{parameters.precision}
@@ -71,9 +71,18 @@ render_sample = @inferred propose(dev_rng, render_proposal, prior_sample)
 @test variables(proposed_sample).t == variables(render_sample).t
 @test variables(proposed_sample).r == variables(render_sample).r
 @test variables(render_sample).μ isa array_for_rng(dev_rng){parameters.precision,2}
-# Always zero for symmetric, so also test IndependentProposal
 @test ℓ_proposed == ℓ_rendered
 
+# Random interface to sample from models which are not proposals (independent or conditioned)
+render_sample = @inferred rand(dev_rng, render_proposal)
+ℓ_rendered = @inferred transition_probability(tr_proposal, prior_sample, render_sample)
+
+@test variables(proposed_sample).t != variables(render_sample).t
+@test variables(proposed_sample).r != variables(render_sample).r
+@test variables(render_sample).μ isa array_for_rng(dev_rng){parameters.precision,2}
+@test ℓ_proposed == ℓ_re
+
+# logdensity is always zero for symmetric, so also test IndependentProposal
 independent_tr_proposal = IndependentProposal(prior)
 Random.seed!(rng, 42)
 Random.seed!(dev_rng, 42)

@@ -2,7 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-
 """
     AbstractProposal
 Has a `model` which supports `rand(rng, model, dims...)` and `logdensityof(model, x)`.
@@ -61,13 +60,14 @@ struct IndependentProposal{T} <: AbstractProposal
     model::T
 end
 
-propose(rng::AbstractRNG, proposal::IndependentProposal, dims...) = rand(rng, model(proposal), dims...)
+# Only makes sense for IndependentProposal
+Base.rand(rng::AbstractRNG, proposal::IndependentProposal, dims::Integer...) = rand(rng, model(proposal), dims...)
 
 """
     propose(rng, proposal, sample, [dims...])
 Independent samples are just random values from the model.
 """
-propose(rng::AbstractRNG, proposal::IndependentProposal, sample::Sample, dims...) = merge(sample, propose(rng, proposal, dims...))
+propose(rng::AbstractRNG, proposal::IndependentProposal, sample::Sample, dims...) = merge(sample, rand(rng, proposal, dims...))
 
 """
     transition_probability(proposal, new_sample, prev_sample)
@@ -82,7 +82,6 @@ transition_probability(proposal::IndependentProposal, new_sample::Sample, ::Samp
 Has a function `fn(sample::Sample)` which analytically samples from a distribution conditioned on `sample`.
 """
 struct GibbsProposal{T} <: AbstractProposal
-    # TODO Do I want a named tuple of functions, or leave the logic to the function? In this case, an AbstractGibbsProposal and a NamedGibbsProposal would make more sense.
     fn::T
 end
 
@@ -102,3 +101,5 @@ end
 Gibbs proposals are always accepted so `Inf` is returned.
 """
 transition_probability(::GibbsProposal, ::Sample, ::Sample) = Inf
+
+# TODO Custom quaternion proposal: composition is the quaternion product and normalize
