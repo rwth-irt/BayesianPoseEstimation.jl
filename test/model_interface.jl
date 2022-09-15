@@ -62,3 +62,19 @@ s = @inferred rand(comp_model)
 @test variables(s).b isa Vector{Float32}
 @test variables(s).c isa Vector{Float64}
 @test logdensityof(comp_model, s) == logdensityof(ab_model, s) + logdensityof(bc_model, s) + logdensityof(c_model, s)
+
+# ConditionedModel
+a_ind = IndependentModel((; a=a_model))
+b_ind = IndependentModel((; b=b_model))
+a_sample = rand(a_ind)
+b_sample = rand(b_ind)
+con_model = ConditionedModel(a_sample, ab_model)
+
+ab_sample = @inferred rand(con_model)
+@test variables(ab_sample).a |> typeof == variables(a_sample).a |> typeof
+@test variables(ab_sample).b |> typeof == variables(b_sample).b |> typeof
+
+ℓ = @inferred logdensityof(con_model, b_sample)
+@test logdensityof(a_ind, a_sample) + logdensityof(b_ind, b_sample) == ℓ
+ℓ = @inferred logdensityof(con_model, ab_sample)
+@test logdensityof(a_ind, a_sample) + logdensityof(b_model, variables(ab_sample).b) == ℓ

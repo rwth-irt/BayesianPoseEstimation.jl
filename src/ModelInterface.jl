@@ -43,6 +43,8 @@ function Base.rand(rng::AbstractRNG, model::IndependentModel, dims::Integer...)
     Sample(var_nt, -Inf)
 end
 
+@inline DensityKind(::IndependentModel) = HasDensity()
+
 """
     logdensityof(model, sample)
 Maps `logdensityof` over models and variables with matching names.
@@ -50,8 +52,6 @@ Uses 0.0 as if the variable name is non-existent in the sample.
 Note that all variables are assumed to be independent and vectorization is accounted for by broadcasting.
 """
 DensityInterface.logdensityof(model::IndependentModel, sample) = .+(promote(values(map_intersect(logdensityof, model.models, variables(sample)))...)...)
-
-# .+(promote(values(map_intersect(logdensityof, model.models, variables(sample))))...)
 
 """
     RngModel
@@ -72,6 +72,7 @@ Ignores the rng argument.
 Base.rand(::AbstractRNG, model::RngModel, dims::Integer...) = rand(model.rng, model.model, dims...)
 Base.rand(model::RngModel, dims::Integer...) = rand(model.rng, model, dims...)
 
+@inline DensityKind(::RngModel) = HasDensity()
 DensityInterface.logdensityof(model::RngModel, sample) = logdensityof(model.model, sample)
 
 """
@@ -94,7 +95,34 @@ However, duplicates must be avoided, because they cannot be mapped to a unique m
 """
 Base.rand(rng::AbstractRNG, model::ComposedModel, dims...) = mapreduce(m -> rand(rng, m, dims...), merge, model.models)
 
+@inline DensityKind(::ComposedModel) = HasDensity()
 
+"""
+    logdensityof(model, sample)
+Calculates logdensity of each inner model and sums up these individual logdensities.
+"""
 DensityInterface.logdensityof(model::ComposedModel, sample) = mapreduce(m -> logdensityof(m, sample), +, model.models)
 
-# TODO If I would require Gibbs sampling where the variables are not independent I would probably implement a new GibbsModel.
+"""
+    ConditionedModel
+Decorator for a model which conditiones the sample on the data before evaluating the logdensity.
+"""
+struct ConditionedModel{T,V,M}
+    data::NamedTuple{T,V}
+    model::M
+end
+
+ConditionedModel(sample::Sample, model) = ConditionedModel(sample.variables, model)
+
+Base.rand(rng::AbstractRNG, model::ConditionedModel, dims...) = rand(rng, model.model, dims...)
+
+@inline DensityKind(::ConditionedModel) = HasDensity()
+
+"""
+    logdensityof(model, sample)
+Calculates logdensity of each inner model and sums up these individual logdensities.
+"""
+function DensityInterface.logdensityof(model::ConditionedModel, sample)
+    conditioned_sample = merge(sample, model.data)
+    logdensityof(model.model, conditioned_sample)
+end

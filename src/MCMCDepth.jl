@@ -62,6 +62,7 @@ export QuaternionDistribution
 
 # ModelInterface
 export ComposedModel
+export ConditionedModel
 export IndependentModel
 export RngModel
 
