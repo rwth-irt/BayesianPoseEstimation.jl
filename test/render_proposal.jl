@@ -62,7 +62,7 @@ proposed_sample = @inferred propose(dev_rng, tr_proposal, prior_sample)
 ℓ_proposed = @inferred transition_probability(tr_proposal, prior_sample, proposed_sample)
 
 # RenderProposal
-render_proposal = @inferred RenderProposal(tr_proposal, render_context, scene, parameters.object_id, parameters.rotation_type)
+render_proposal = @inferred RenderProposal(parameters.rotation_type, render_context, scene, parameters.object_id, tr_proposal)
 Random.seed!(rng, 42)
 Random.seed!(dev_rng, 42)
 render_sample = @inferred propose(dev_rng, render_proposal, prior_sample)
@@ -80,7 +80,7 @@ render_sample = @inferred rand(dev_rng, render_proposal)
 @test variables(proposed_sample).t != variables(render_sample).t
 @test variables(proposed_sample).r != variables(render_sample).r
 @test variables(render_sample).μ isa array_for_rng(dev_rng){parameters.precision,2}
-@test ℓ_proposed == ℓ_re
+@test ℓ_proposed == ℓ_rendered
 
 # logdensity is always zero for symmetric, so also test IndependentProposal
 independent_tr_proposal = IndependentProposal(prior)
@@ -89,7 +89,7 @@ Random.seed!(dev_rng, 42)
 independent_proposed_sample = @inferred propose(dev_rng, independent_tr_proposal, prior_sample)
 ℓ_independent_proposed = @inferred transition_probability(independent_tr_proposal, prior_sample, independent_proposed_sample)
 
-independent_render_proposal = @inferred RenderProposal(independent_tr_proposal, render_context, scene, parameters.object_id, parameters.rotation_type)
+independent_render_proposal = @inferred RenderProposal(parameters.rotation_type, render_context, scene, parameters.object_id, independent_tr_proposal)
 Random.seed!(rng, 42)
 Random.seed!(dev_rng, 42)
 independent_rendered_sample = @inferred propose(dev_rng, independent_render_proposal, prior_sample)

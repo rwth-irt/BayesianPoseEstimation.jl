@@ -67,7 +67,7 @@ sample5 = @inferred rand(dev_rng, prior_model, 5)
 @test variables(sample5).t |> size == (3, 5)
 @test variables(sample5).r isa Array{parameters.precision,2}
 @test variables(sample5).r |> size == (3, 5)
-@test variables(sample5).o  isa device_array_type(parameters)
+@test variables(sample5).o isa device_array_type(parameters)
 @test variables(sample5).o |> size == (parameters.width, parameters.height, 5)
 ℓ = @inferred logdensityof(prior_model, sample5)
 @test ℓ isa Array{parameters.precision,1}

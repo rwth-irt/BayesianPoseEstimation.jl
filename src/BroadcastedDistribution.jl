@@ -34,14 +34,15 @@ BroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistributio
 """
     BroadcastedDistribution(dist_fn, params...)
 Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
-Defaults to no reduction with dims=().
+Defaults the reduction dimensions of the first `ndims(dists)` dimensions.
 """
 function BroadcastedDistribution(dist_fn, params...)
     # instantiate to allow ndims & co.
     marginals = broadcasted(dist_fn, params...) |> instantiate
-    dims = ()
+    dims = marginals isa Broadcasted{<:Broadcast.DefaultArrayStyle{0}} ? () : (1:ndims(marginals)...,)
     BroadcastedDistribution(promote_params_eltype(params...), dims, marginals, Continuous)
 end
+
 
 """
     DiscreteBroadcastedDistribution(dist_fn, dims, params...)

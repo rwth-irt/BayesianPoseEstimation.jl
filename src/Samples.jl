@@ -39,7 +39,7 @@ variables(s::Sample) = s.variables
 
 """
     log_prob(sample)
-Jacobian-corrected posterior log probability of the sample.
+Posterior log probability of the sample.
 """
 log_prob(sample::Sample) = sample.logp
 
