@@ -100,7 +100,7 @@ Random.rand!(rng::AbstractRNG, dist::KernelOrTransformedKernel, A::AbstractArray
 Internal inplace random function which allows dispatching based on the RNG and output array.
 Keeping dist as Any  allows more flexibility, for example passing a Broadcasted to avoid allocations.
 """
-function _rand!(rng::AbstractRNG, dist, A::Array)
+function _rand!(rng::AbstractRNG, dist, A::AbstractArray)
     # Avoid endless recursions for rand(rng, dist::KernelOrTransformedKernel)
     @. A = rand(rng, dist)
 end
@@ -109,8 +109,7 @@ end
 
 # Currently only the CUDA.RNG is supported in Kernels.
 function _rand!(rng::CUDA.RNG, dist, A::CuArray)
-    d = maybe_cuda(A, dist)
-    _rand_cuda_rng(d, A, rng.seed, rng.counter)
+    _rand_cuda_rng!(dist, A, rng.seed, rng.counter)
     new_counter = Int64(rng.counter) + length(A)
     overflow, remainder = fldmod(new_counter, typemax(UInt32))
     rng.seed += overflow
@@ -121,7 +120,7 @@ end
 # Function barrier for CUDA.RNG which is not isbits.
 # Wrapping rng in Tuple for broadcasting does not work → anonymous function is the workaround 
 # Thanks vchuravy https://github.com/JuliaGPU/CUDA.jl/issues/1480#issuecomment-1102245813
-function _rand_cuda_rng(dist, A, seed, counter)
+function _rand_cuda_rng!(dist, A, seed, counter)
     A .= (x -> rand(device_rng(seed, counter), x)).(dist)
 end
 

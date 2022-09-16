@@ -6,7 +6,8 @@ __precompile__()
 
 module MCMCDepth
 
-# Common functions on Base types
+# Common functions on Base & CUDA types
+include("Hijack.jl")
 include("Common.jl")
 # Model primitives
 include("Samples.jl")
