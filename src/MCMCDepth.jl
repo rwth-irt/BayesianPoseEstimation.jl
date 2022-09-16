@@ -58,8 +58,11 @@ export KernelCircularUniform
 export KernelExponential
 export KernelNormal
 export KernelUniform
-export BroadcastedDistribution
 export QuaternionDistribution
+
+export ProductBroadcastedDistribution
+export BroadcastedDistribution
+export DiscreteBroadcastedDistribution
 
 # ModelInterface
 export ComposedModel

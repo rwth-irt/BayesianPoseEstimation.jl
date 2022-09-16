@@ -42,12 +42,12 @@ CUDA.allowscalar(false)
 # PriorModel
 # Pose only makes sense on CPU since CUDA cannot start render calls to OpenGL
 parameters = @set parameters.mean_t = [0, 0, 1.5]
-t_model = BroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
+t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
 circular_uniform(::Any) = KernelCircularUniform()
-r_model = BroadcastedDistribution(circular_uniform, Array{parameters.precision}(undef, 3)) |> cpu_model
+r_model = ProductBroadcastedDistribution(circular_uniform, Array{parameters.precision}(undef, 3)) |> cpu_model
 uniform(::Any) = KernelUniform()
 # Use the rng from params
-o_model = BroadcastedDistribution(uniform, device_array(parameters, parameters.width, parameters.height))
+o_model = ProductBroadcastedDistribution(uniform, device_array(parameters, parameters.width, parameters.height))
 prior_model = PriorModel(t_model, r_model, o_model)
 prior_sample = @inferred rand(dev_rng, prior_model)
 @test keys(variables(prior_sample)) == (:t, :r, :o)

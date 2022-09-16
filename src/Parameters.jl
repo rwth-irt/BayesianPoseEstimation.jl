@@ -72,7 +72,7 @@ Base.@kwdef struct Parameters
     min_depth = 0.1
     max_depth = 2
     # Depth pixel model
-    pixel_σ = 0.1
+    pixel_σ = 0.005
     pixel_θ = 1.0
     mix_exponential = 0.8
     # Pixel association

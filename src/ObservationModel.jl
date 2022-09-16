@@ -27,7 +27,7 @@ end
     ObservationModel(normalize_img, pixel_dist, μ, o)
 Generates a `BroadcastedDistribution` of dim (1,2) from the `pix_dist`, expected depth `μ` and the association probability `o`.
 """
-function ObservationModel(normalize_img::Bool, pixel_dist, μ::AbstractArray, o::AbstractArray)
+function ObservationModel(normalize_img::Bool, pixel_dist, μ::AbstractArray, o)
     broadcasted_dist = BroadcastedDistribution(pixel_dist, Dims(ObservationModel), μ, o)
     ObservationModel(normalize_img, broadcasted_dist, μ)
 end

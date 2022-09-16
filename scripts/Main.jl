@@ -28,22 +28,20 @@ dev_model = RngModel | dev_rng
 # Prior
 
 # Pose models on CPU to be able to call OpenGL
-t_model = BroadcastedDistribution(KernelNormal, (1,), parameters.mean_t, parameters.σ_t) |> cpu_model
+t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
 
 # TODO sample transformed dist by default?
 # circular_uniform(::Any) = transformed(KernelCircularUniform())
-r_model = BroadcastedDistribution((x) -> KernelCircularUniform(), (1,), cpu_array(parameters, 3)) |> cpu_model
+r_model = ProductBroadcastedDistribution((x) -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
 
 # Association on GPU since we render there
-uniform(::Any) = KernelUniform()
-o_model = BroadcastedDistribution(uniform, device_array(parameters, parameters.width, parameters.height)) |> dev_model
+o_model = KernelUniform() |> cpu_model
 
 prior_model = PriorModel(t_model, r_model, o_model)
 
 # Likelihood
 
 function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}
-    # TODO should these generators be part of experiment specific scripts or should I provide some default ones?
     # TODO Compare whether truncated even makes a difference
     # WARN does not work with o ∈ ℝ, expect o ∈ [0,1]
     dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
@@ -94,9 +92,15 @@ s2 = @inferred rand(dev_rng, posterior_model)
 
 # Sampling algorithm
 mh = MetropolisHastings(render_propsal(prior_model), render_propsal(proposal_model))
-# TODO PosteriorModel must be conditioned on the observation
 s1, _ = @inferred AbstractMCMC.step(rng, conditioned_posterior, mh)
 # WARN random acceptance needs to be calculated on CPU, thus  CPU rng
-s2 = @inferred AbstractMCMC.step(rng, conditioned_posterior, mh, s1)
+s2, _ = @inferred AbstractMCMC.step(rng, conditioned_posterior, mh, s1)
 
 chain = sample(rng, conditioned_posterior, mh, 50000);
+
+# TODO separate evaluation from experiments, i.e. save & load
+using Plots
+plotly()
+density_variable(chain, :t, 20)
+density_variable(chain, :r, 20)
+polar_density_variable(chain, :r, 20)

@@ -8,8 +8,8 @@ using Random
 using Test
 
 a_model = KernelExponential(Float16(2.0))
-b_model = BroadcastedDistribution(Exponential, [2.0f0, 1.0f0, 0.5f0])
-c_model = BroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
+b_model = ProductBroadcastedDistribution(Exponential, [2.0f0, 1.0f0, 0.5f0])
+c_model = ProductBroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 
 abc_model = IndependentModel((; a=a_model, b=b_model, c=c_model))
 

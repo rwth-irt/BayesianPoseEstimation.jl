@@ -29,20 +29,8 @@ BroadcastedDistribution(::Type{T}, dims::Dims{N}, marginals::M, ::Type{S}) where
 Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
 The `dims` of the distribution which are reduced are set manually so they can differ from the dims of the parameters.
 """
-BroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...), Continuous)
-
-"""
-    BroadcastedDistribution(dist_fn, params...)
-Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
-Defaults the reduction dimensions of the first `ndims(dists)` dimensions.
-"""
-function BroadcastedDistribution(dist_fn, params...)
-    # instantiate to allow ndims & co.
-    marginals = broadcasted(dist_fn, params...) |> instantiate
-    dims = marginals isa Broadcasted{<:Broadcast.DefaultArrayStyle{0}} ? () : (1:ndims(marginals)...,)
-    BroadcastedDistribution(promote_params_eltype(params...), dims, marginals, Continuous)
-end
-
+BroadcastedDistribution(dist_fn, dims::Dims, params...) =
+    BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...), Continuous)
 
 """
     DiscreteBroadcastedDistribution(dist_fn, dims, params...)
@@ -51,11 +39,31 @@ The `dims` of the distribution which are reduced are set manually so they can di
 """
 DiscreteBroadcastedDistribution(dist_fn, dims::Dims, params...) = BroadcastedDistribution(promote_params_eltype(params...), dims, broadcasted(dist_fn, params...), Discrete)
 
+# WARN needs a different name because the params... cause problems with infering the correct method when compiling
+"""
+    ProductBroadcastedDistribution(dist_fn, params...)
+Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
+Automatically reduces all dimensions of the parameters, like a product distribution.
+"""
+ProductBroadcastedDistribution(dist_fn, params::Union{Number,AbstractArray}...) = BroadcastedDistribution(promote_params_eltype(params...), param_dims(params...), broadcasted(dist_fn, params...), Continuous)
+
 """
     promote_params_eltype(params...)
 Promote the types of the elements in params to get the minimal common type.
 """
 promote_params_eltype(params...) = promote_type(eltype.(params)...)
+
+"""
+    n_param_dims(params...)
+Finds the maximum ndims of the parameters.
+"""
+n_param_dims(params...) = maximum(ndims.(params))
+
+"""
+    param_dims(params...)
+Finds the maximum possible Dims of the parameters.
+"""
+param_dims(params...) = (1:n_param_dims(params...)...,)
 
 """
     marginals(dist)

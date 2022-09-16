@@ -14,7 +14,7 @@ using Test
 # Prepare a sample
 a_model = KernelExponential(Float16(2.0))
 b_model = BroadcastedDistribution(Exponential, (1,), [2.0f0, 1.0f0, 0.5f0])
-c_model = BroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
+c_model = ProductBroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 
 abc_model = IndependentModel((; a=a_model, b=b_model, c=c_model))
 sample = rand(Random.default_rng(), abc_model)
@@ -61,7 +61,7 @@ a_sym_sample_2 = @inferred propose(Random.default_rng(), a_sym_proposal, sample,
 
 # Propose multiple variables
 b_normal = BroadcastedDistribution(KernelNormal{Float32}, (), fill(0.0f0, 3), fill(1.0f0, 3))
-c_normal = BroadcastedDistribution(KernelNormal{Float32}, fill(0.0, 2), fill(1.0, 2))
+c_normal = ProductBroadcastedDistribution(KernelNormal{Float32}, fill(0.0, 2), fill(1.0, 2))
 
 abc_sym_proposal = SymmetricProposal(IndependentModel((; a=a_normal, b=b_normal, c=c_normal)))
 # TODO test samples thoroughly for different bijectors and variable types

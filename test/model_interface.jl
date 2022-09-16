@@ -13,8 +13,8 @@ using Random
 using Test
 
 a_model = KernelExponential(Float16(2.0))
-b_model = BroadcastedDistribution(Exponential, [2.0f0, 1.0f0, 0.5f0])
-c_model = BroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
+b_model = ProductBroadcastedDistribution(Exponential, [2.0f0, 1.0f0, 0.5f0])
+c_model = ProductBroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 
 ab_model = IndependentModel((; a=a_model, b=b_model))
 ac_model = IndependentModel((; a=a_model, c=c_model))
@@ -55,7 +55,7 @@ s2 = rand(xoshiro, rng_model)
 @test logdensityof(rng_model, s1) == logdensityof(abc_model, s2)
 
 # ComposedModel
-c_model = IndependentModel((; c=BroadcastedDistribution(KernelExponential, fill(2.0, 2))))
+c_model = IndependentModel((; c=ProductBroadcastedDistribution(KernelExponential, fill(2.0, 2))))
 comp_model = @inferred ComposedModel(ab_model, bc_model, c_model)
 s = @inferred rand(comp_model)
 @test variables(s).a isa Float16

@@ -46,8 +46,8 @@ maybe_plot(plot_depth_img, Array(μ))
 @test maximum(μ) > 0
 
 # Proposal model
-t_model = RngModel(rng, BroadcastedDistribution(KernelNormal, zeros(parameters.precision, 3), parameters.precision.(parameters.proposal_σ_t)))
-r_model = RngModel(rng, BroadcastedDistribution(KernelNormal, zeros(parameters.precision, 3), parameters.precision.(parameters.proposal_σ_r)))
+t_model = RngModel(rng, ProductBroadcastedDistribution(KernelNormal, zeros(parameters.precision, 3), parameters.precision.(parameters.proposal_σ_t)))
+r_model = RngModel(rng, ProductBroadcastedDistribution(KernelNormal, zeros(parameters.precision, 3), parameters.precision.(parameters.proposal_σ_r)))
 
 prior = IndependentModel((; t=t_model, r=r_model))
 prior_sample = @inferred rand(dev_rng, prior)
