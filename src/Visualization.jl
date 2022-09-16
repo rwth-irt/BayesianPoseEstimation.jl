@@ -51,7 +51,7 @@ plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probabi
   convert(Matrix, chain, var_name::Symbol, step = 1)
 Converts the chain to a column matrix of the variable `var_name`.
 """
-Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1) = hcat([state(chain[i])[var_name] for i in 1:step:length(chain)]...)
+Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1) = hcat([variables(chain[i])[var_name] for i in 1:step:length(chain)]...)
 
 """
   convert(Matrix, chain, var_name::Symbol, step = 1)
@@ -109,7 +109,7 @@ function polar_histogram_variable(chains, var_name, step=1, nbins=90, palette=:t
 end
 
 """
-  polar_histogram_variable(chains, var_name, step, nbins, palette)
+  polar_variable(chains, var_name, step, nbins, palette)
 Line plot of the variable.
 """
 function plot_variable(chains, var_name, step=1, palette=:tol_bright, label=["x" "y" "z"])
@@ -121,7 +121,7 @@ end
   mean_prob_image(chain, var_name)
 Creates an image of the mean of the given variable.
 """
-mean_image(chain::AbstractVector{<:Sample}, var_name) = mean(x -> state(x)[var_name], chain)
+mean_image(chain::AbstractVector{<:Sample}, var_name) = mean(x -> variables(x)[var_name], chain)
 
 """
   mean_prob_image(chain, var_name)
