@@ -15,7 +15,6 @@ c_model = ProductBroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 nta = (; zip((:a, :b), fill(0.5f0, 2))...)
 # Broadcasted addition of multiple variables
 ntb = (; zip((:b, :c), fill([1.0, 1.0], 2))...)
-# TODO implement bijectors for ModelInterface
 sa = Sample(nta, 0.0)
 sb = Sample(ntb, 0.0)
 @test log_prob(sa) == 0

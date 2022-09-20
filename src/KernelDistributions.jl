@@ -146,7 +146,6 @@ struct KernelNormal{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     μ::T
     σ::T
 end
-# TEST
 KernelNormal(μ, σ) = KernelNormal(promote(μ, σ)...)
 KernelNormal(::Type{T}=Float32) where {T} = KernelNormal{T}(0.0, 1.0)
 
@@ -205,7 +204,6 @@ struct KernelUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     min::T
     max::T
 end
-# TEST
 KernelUniform(min, max) = KernelUniform(promote(min, max)...)
 KernelUniform(::Type{T}=Float32) where {T} = KernelUniform{T}(0.0, 1.0)
 

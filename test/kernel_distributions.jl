@@ -46,6 +46,11 @@ CUDA.allowscalar(false)
 @test rand!(CUDA.RNG(), KernelNormal(), CuArray{Float16}(undef, 100, 100)) isa CuArray{Float16}
 
 # KernelNormal
+d = @inferred KernelNormal(1, 2.0)
+@test d isa KernelNormal{Float64}
+d = @inferred KernelNormal(1.0f0, 2)
+@test d isa KernelNormal{Float32}
+
 M = @inferred rand(curng, KernelNormal(Float64), 100, 100)
 @test eltype(M) == Float64
 M = @inferred rand(curng, KernelNormal(Float32), 100, 100)
@@ -136,6 +141,11 @@ logdensity_tge_M(tge, M) = logdensityof.(tge, M)
 @test logdensityof(tge, 2.1) == logdensityof(te, 2.1)
 
 # KernelUniform
+d = @inferred KernelUniform(1, 2.0)
+@test d isa KernelUniform{Float64}
+d = @inferred KernelUniform(1.0f0, 2)
+@test d isa KernelUniform{Float32}
+
 M = @inferred rand(curng, KernelUniform(Float64), 100, 100)
 @test eltype(M) == Float64
 M = @inferred rand(curng, KernelUniform(Float32), 100, 100)

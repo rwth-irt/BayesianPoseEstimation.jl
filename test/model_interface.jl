@@ -48,7 +48,6 @@ ts = @inferred rand(tabc_model)
 vars, logjac = @inferred variables_with_logjac(ts, abc_bijectors)
 ℓ = @inferred logdensityof(tabc_model, ts)
 @test logdensityof(abc_model, @set ts.variables = vars) + logjac ≈ ℓ
-# TODO test what happens if I only apply a subset of the bijectors
 
 # RngModel
 xoshiro = Xoshiro()

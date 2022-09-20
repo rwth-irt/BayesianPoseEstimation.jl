@@ -73,7 +73,6 @@ dist = @inferred ProductBroadcastedDistribution(mixture_fn, fill(Float16(10), 50
 X = @inferred rand(rng, dist);
 @test X isa Array{Float16,2}
 
-# TODO CUDA.RNG also requires CUDA parameters. Will be tricky to use the correct RNG for the correct device. Probably use the correct rng based on the parameters.
 dist = @inferred ProductBroadcastedDistribution(mixture_fn, CUDA.fill(10.0, 50, 10))
 X = @inferred rand(curng, dist);
 @test X isa CuArray{Float64,2}

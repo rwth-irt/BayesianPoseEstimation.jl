@@ -64,7 +64,6 @@ b_normal = BroadcastedDistribution(KernelNormal{Float32}, (), fill(0.0f0, 3), fi
 c_normal = ProductBroadcastedDistribution(KernelNormal{Float32}, fill(0.0, 2), fill(1.0, 2))
 
 abc_sym_proposal = SymmetricProposal(IndependentModel((; a=a_normal, b=b_normal, c=c_normal)))
-# TODO test samples thoroughly for different bijectors and variable types
 # WARN does it matter? https://bkamins.github.io/julialang/2021/01/08/typestable.html
 abc_sym_sample = @inferred propose(Random.default_rng(), abc_sym_proposal, sample)
 @test variables(abc_sym_sample).a |> size == ()

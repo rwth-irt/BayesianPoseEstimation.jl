@@ -3,7 +3,6 @@
 # All rights reserved. 
 
 
-# TODO
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
