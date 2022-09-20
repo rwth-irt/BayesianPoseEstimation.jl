@@ -135,6 +135,7 @@ using Reexport
 
 # Bijectors
 @reexport import Bijectors: bijector, link, invlink, with_logabsdet_jacobian, transformed
+export BroadcastedBijector
 export Circular
 export is_identity
 

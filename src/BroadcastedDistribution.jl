@@ -134,7 +134,7 @@ Random.rand!(rng::AbstractRNG, dist::BroadcastedDistribution, A::AbstractArray{<
 # Bijectors
 
 # Each entry might have an individual parameterization of the bijector, also helps with correct device
-Bijectors.bijector(dist::BroadcastedDistribution) = dist |> marginals .|> bijector
+Bijectors.bijector(dist::BroadcastedDistribution) = BroadcastedBijector(dist.dims, broadcasted(bijector, dist.marginals))
 
 """
     transformed(dist)

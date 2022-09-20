@@ -201,7 +201,7 @@ t_dist = transformed(dist)
 product = Product([Exponential(i) for i = 1:100])
 t_product = transformed(product)
 
-@test bijector(dist) |> eltype <: Bijectors.Log
+@test Broadcast.materialize(bijector(dist)).bijectors |> eltype <: Bijectors.Log
 
 # correct calculation
 Y = @inferred rand(rng, t_dist, 3, 2, 2)
@@ -226,15 +226,30 @@ Y = rand(rng, t_dist, 3, 2)
 Y = rand(rng, t_dist, 3, 2, 1)
 @inferred logdensityof(t_dist, Y)
 
+X_invlink = @inferred invlink(dist, Y)
+b = @inferred inverse(bijector(dist))
+X, logjac = @inferred with_logabsdet_jacobian(b, Y)
+@test X_invlink == X
+@test logjac == logabsdetjac(b, Y)
+@test logdensityof(t_dist, Y) ≈ logdensityof(dist, X) + logjac
+
 # CUDA
 cudist = @inferred ProductBroadcastedDistribution(KernelExponential, CuArray([Float64(i) for i = 1:100]))
 t_cudist = transformed(cudist)
 
-@test bijector(cudist) |> eltype <: Bijectors.Log
+@test Broadcast.materialize(bijector(cudist)).bijectors |> eltype <: Bijectors.Log
 
 # correct calculation
 Y = @inferred rand(curng, t_cudist, 3, 2, 2)
 @test logpdf(t_product, Array(Y)) ≈ logdensityof(t_cudist, Y) |> Array
+
+# Bijector on CUDA
+X_invlink = @inferred invlink(cudist, Y)
+b = @inferred inverse(bijector(cudist))
+X, logjac = @inferred with_logabsdet_jacobian(b, Y)
+@test X_invlink == X
+@test logjac == logabsdetjac(b, Y)
+@test logdensityof(t_cudist, Y) ≈ logdensityof(cudist, X) + logjac
 
 # WARN for invlink, we need to keep the original distribution around. So use transformed(dist) inside the acceptance step
 @test minimum(Y) < 0

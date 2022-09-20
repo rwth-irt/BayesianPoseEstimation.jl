@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using Bijectors
+using Base.Broadcast: broadcasted, materialize
 
 """
     Circular
@@ -31,6 +32,52 @@ Thus, the log Jacobian is always 0.
 Bijectors.logabsdetjac(::Circular, x) = zero(x)
 Bijectors.logabsdetjac(::Inverse{<:Circular}, y) = zero(y)
 
+# Custom reduction like BroadcastedDistribution
+"""
+    BroadcastedBijector
+Uses broadcasting to enable bijectors over multiple dimensions.
+Moreover reduction dims can be specified which are applied when calculating the logabsdetjac correction.
+"""
+struct BroadcastedBijector{N,B} <: Bijector{N}
+    dims::Dims{N}
+    bijectors::B
+end
+
+"""
+    (::BroadcastedBijector)(x)
+Applies the internal bijectors via broadcasting.
+"""
+(b::BroadcastedBijector)(x) = x .|> b.bijectors
+
+"""
+    inverse(b::BroadcastedBijector)
+Lazily applies inverse to the internal bijectors.
+"""
+Bijectors.inverse(b::BroadcastedBijector) = BroadcastedBijector(b.dims, broadcasted(inverse, b.bijectors))
+
+"""
+    materialize(b::BroadcastedBijector)
+Materialize the possibly broadcasted internal bijectors.
+Bijectors are usually required to transform the priors domain, which does not change.
+"""
+Broadcast.materialize(b::BroadcastedBijector) = BroadcastedBijector(b.dims, materialize(b.bijectors))
+
+"""
+    logabsdetjac(b::BroadcastedBijector, x)
+Calculate the logabsdetjac correction an reduce the `b.dims` by summing them up.
+"""
+Bijectors.logabsdetjac(b::BroadcastedBijector, x) = sum_and_dropdims(logabsdetjac.(b.bijectors, x), b.dims)
+
+"""
+    with_logabsdet_jacobian(b::BroadcastedBijector, x)
+Calculate the transformed variables with the logabsdetjac correction in an optimized fashion.
+The logabsdetjac correction is reduced by summing up `b.dims`.
+"""
+function Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector, x)
+    with_logjac = with_logabsdet_jacobian.(b.bijectors, x)
+    y, logjacs = first.(with_logjac), last.(with_logjac)
+    y, sum_and_dropdims(logjacs, b.dims)
+end
 
 """
     is_identity(::Bijector)
@@ -39,9 +86,12 @@ Returns true if the bijector is the identity, i.e. maps ℝ → ℝ
 is_identity(::Bijector) = false
 is_identity(::Bijectors.Identity) = true
 is_identity(bijector::AbstractArray{<:Bijector}) = mapreduce(is_identity, &, bijector)
+is_identity(bijector::BroadcastedBijector) = is_identity(materialize(bijector.bijectors))
 is_identity(bijectors::Union{Bijector,AbstractArray{<:Bijector}}...) = mapreduce(is_identity, &, bijectors)
 
+
 # Wrapper
+
 Bijectors.bijector(rng_model::RngModel) = bijector(model(rng_model))
 
 is_identity(dist::Distribution) = is_identity(bijector(dist))
