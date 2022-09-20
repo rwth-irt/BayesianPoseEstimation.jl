@@ -5,6 +5,8 @@
 
 # TODO Do I want another wrapper or base all these models on AbstractModel?
 using AbstractMCMC: AbstractModel
+using Accessors
+using Bijectors
 using DensityInterface
 using Random
 
@@ -55,6 +57,9 @@ Note that all variables are assumed to be independent and vectorization is accou
 """
 DensityInterface.logdensityof(model::IndependentModel, sample) = .+(promote(values(map_intersect(logdensityof, model.models, variables(sample)))...)...)
 
+Bijectors.bijector(model::IndependentModel) = map(bijector, models(model))
+Bijectors.transformed(model::IndependentModel) = IndependentModel(map(transformed, models(model)))
+
 """
     RngModel
 Wraps an internal `model` and allows to provide an individual RNG for this model.
@@ -76,6 +81,9 @@ Base.rand(model::RngModel, dims::Integer...) = rand(model.rng, model, dims...)
 
 @inline DensityKind(::RngModel) = HasDensity()
 DensityInterface.logdensityof(model::RngModel, sample) = logdensityof(model.model, sample)
+
+Bijectors.bijector(model::RngModel) = bijector(model.model)
+Bijectors.transformed(model::RngModel) = @set model.model = transformed(model.model)
 
 """
     ComposedModel
@@ -105,6 +113,9 @@ Calculates logdensity of each inner model and sums up these individual logdensit
 """
 DensityInterface.logdensityof(model::ComposedModel, sample) = mapreduce(m -> logdensityof(m, sample), +, model.models)
 
+Bijectors.bijector(model::ComposedModel) = merge(bijector.(model.models)...)
+Bijectors.transformed(model::ComposedModel) = @set model.models = transformed.(model.models)
+
 """
     ConditionedModel
 Decorator for a model which conditiones the sample on the data before evaluating the logdensity.
@@ -116,7 +127,10 @@ end
 
 ConditionedModel(sample::Sample, model) = ConditionedModel(sample.variables, model)
 
-Base.rand(rng::AbstractRNG, model::ConditionedModel, dims...) = rand(rng, model.model, dims...)
+function Base.rand(rng::AbstractRNG, model::ConditionedModel, dims...)
+    sample = rand(rng, model.model, dims...)
+    merge(sample, model.data)
+end
 
 @inline DensityKind(::ConditionedModel) = HasDensity()
 
@@ -128,3 +142,35 @@ function DensityInterface.logdensityof(model::ConditionedModel, sample)
     conditioned_sample = merge(sample, model.data)
     logdensityof(model.model, conditioned_sample)
 end
+
+Bijectors.bijector(model::ConditionedModel) = Base.structdiff(bijector(model.model), model.data)
+Bijectors.transformed(model::ConditionedModel) = TransformedConditionedModel(model.data, model.model)
+
+# TODO workaround - is there a cleaner possibilty without making any assumptions about the model? e.g. that each variable is only defined once, model is one of these model or a distribution...?
+
+struct TransformedConditionedModel{T,V,M} <: AbstractModel
+    data::NamedTuple{T,V}
+    model::M
+end
+
+TransformedConditionedModel(sample::Sample, model) = TransformedConditionedModel(sample.variables, model)
+
+function Base.rand(rng::AbstractRNG, model::TransformedConditionedModel, dims...)
+    sample = rand(rng, model.model, dims...)
+    merged = merge(sample, model.data)
+    # Transform everything except data
+    @set merged.variables = variables(merged, bijector(model))
+end
+
+@inline DensityKind(::TransformedConditionedModel) = HasDensity()
+
+function DensityInterface.logdensityof(model::TransformedConditionedModel, sample)
+    # Transform sample back to model domain
+    vars, logjac = variables_with_logjac(sample, bijector(model))
+    transformed_sample = @set sample.variables = vars
+    conditioned_sample = merge(transformed_sample, model.data)
+    logdensityof(model.model, conditioned_sample) + logjac
+end
+
+Bijectors.bijector(model::TransformedConditionedModel) = Base.structdiff(bijector(model.model), model.data)
+Bijectors.transformed(model::TransformedConditionedModel) = ConditionedModel(model.data, model.model) 

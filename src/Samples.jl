@@ -19,40 +19,58 @@ end
 Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(log_prob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
-    names(Sample)
+    names(sample)
 Returns a tuple of the variable names.
 """
 names(::Sample{T}) where {T} = T
 
 """
-    types(Sample)
+    types(sample)
 Returns a tuple of the variable types.
 """
 types(::Sample{<:Any,V}) where {V} = V
 
 """
-    variables(Sample)
-Returns a named tuple of the variables.
-getproperty has been implemented so that the variables can easily be accessed by the dot syntax.
+    variables(sample)
+Returns a named tuple of the raw variables ∈ ℝⁿ.
 """
 variables(s::Sample) = s.variables
 
 """
+    variables(sample, bijectors)
+Returns a named tuple of the variables in the model domain by using the inverse transform of the provided bijectors.
+"""
+variables(s::Sample, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) = map_intersect((b, v) -> b(v), map(inverse, bijectors), variables(s))
+
+"""
+    variables_with_logjac(sample)
+Returns a named tuple of the variables in the model domain by using the inverse transform of the provided bijectors.
+The logjac correction is also calculated in the same kernel.
+Returns (variables, logabsdetjac)
+"""
+function variables_with_logjac(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) where {T}
+    with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(b, v), map(inverse, bijectors), variables(s))
+    vars = map(first, with_logjac)
+    logjac = reduce(.+, values(map(last, with_logjac)))
+    vars, logjac
+end
+
+"""
     log_prob(sample)
-Posterior log probability of the sample.
+(Logjac corrected) posterior log probability of the sample.
 """
 log_prob(sample::Sample) = sample.logp
 
 """
     +(a, b)
-Add the sample `b` to the sample `a`.
+Add the raw states (unconstrained domain) of two samples.
 The returned sample is of the same type as `a`.
 """
 Base.:+(a::Sample, b::Sample) = merge(a, a + variables(b))
 
 """
     +(a, b)
-Add a NamedTuple `b` to the sample `a`.
+Add a NamedTuple `b` to the raw values of sample `a`.
 """
 function Base.:+(a::Sample, b::NamedTuple)
     sum_nt = map_intersect(.+, variables(a), b)
@@ -68,7 +86,7 @@ Base.:-(a::Sample, b::Sample) = merge(a, a - variables(b))
 
 """
     -(a, b)
-Subtract a NamedTuple `b` from the sample `a`.
+Subtract a NamedTuple `b` from the raw values of sample `a`.
 """
 function Base.:-(a::Sample, b::NamedTuple)
     sum_nt = map_intersect(.-, variables(a), b)
@@ -81,7 +99,7 @@ Left-to-Right merges the samples.
 This means the the rightmost variables are kept.
 Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
 """
-Base.merge(a::Sample, b::Sample...) = merge(a, map(variables, b)...)
+Base.merge(a::Sample, b::Sample...) = merge(a, variables.(b)...)
 
 function Base.merge(a::Sample, b::NamedTuple...)
     merged_variables = merge(variables(a), b...)
@@ -105,6 +123,6 @@ function AbstractMCMC.bundle_samples(
     step=1
 )
     # TODO make sure only to use relevant variables, for example only the ones specified by the variable names of the NamedTuple of the prior.
-    variables = map(variables, samples)
+    variables = variables.(samples)
     TupleVector(variables[start:step:end])
 end

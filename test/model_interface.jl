@@ -7,6 +7,8 @@
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
+using Accessors
+using Bijectors
 using Distributions
 using MCMCDepth
 using Random
@@ -39,6 +41,14 @@ s = @inferred rand(Random.default_rng(), abc_model, 3)
 @inferred logdensityof(ac_model, s)
 @inferred logdensityof(bc_model, s)
 @inferred logdensityof(abc_model, s)
+# Bijectors
+abc_bijectors = @inferred bijector(abc_model)
+tabc_model = @inferred transformed(abc_model)
+ts = @inferred rand(tabc_model)
+vars, logjac = @inferred variables_with_logjac(ts, abc_bijectors)
+ℓ = @inferred logdensityof(tabc_model, ts)
+@test logdensityof(abc_model, @set ts.variables = vars) + logjac ≈ ℓ
+# TODO test what happens if I only apply a subset of the bijectors
 
 # RngModel
 xoshiro = Xoshiro()
@@ -53,6 +63,13 @@ s2 = rand(xoshiro, rng_model)
 @test variables(s1).c == variables(s2).c
 @test logdensityof(rng_model, s1) == logdensityof(rng_model, s2)
 @test logdensityof(rng_model, s1) == logdensityof(abc_model, s2)
+# Bijectors
+rng_bijectors = @inferred bijector(rng_model)
+rng_tmodel = @inferred transformed(rng_model)
+rng_ts = @inferred rand(rng_tmodel)
+rng_vars, rng_logjac = @inferred variables_with_logjac(rng_ts, abc_bijectors)
+rng_ℓ = @inferred logdensityof(rng_tmodel, rng_ts)
+@test logdensityof(rng_model, @set rng_ts.variables = rng_vars) + rng_logjac ≈ rng_ℓ
 
 # ComposedModel
 c_model = IndependentModel((; c=ProductBroadcastedDistribution(KernelExponential, fill(2.0, 2))))
@@ -62,6 +79,19 @@ s = @inferred rand(comp_model)
 @test variables(s).b isa Vector{Float32}
 @test variables(s).c isa Vector{Float64}
 @test logdensityof(comp_model, s) == logdensityof(ab_model, s) + logdensityof(bc_model, s) + logdensityof(c_model, s)
+# Bijectors
+# Logjac correction must be applied for every prior dist, however multiple priors for same variable do not make sense
+comp_model = @inferred ComposedModel(ab_model, c_model)
+comp_bijectors = @inferred bijector(comp_model)
+@test comp_bijectors.a isa Bijector
+@test comp_bijectors.b isa Bijector
+@test comp_bijectors.c isa Bijector
+comp_tmodel = @inferred transformed(comp_model)
+comp_ts = @inferred rand(comp_tmodel)
+comp_vars, comp_logjac = @inferred variables_with_logjac(comp_ts, comp_bijectors)
+comp_ℓ = @inferred logdensityof(comp_tmodel, comp_ts)
+comp_s = @set comp_ts.variables = comp_vars
+@test isapprox(logdensityof(comp_model, comp_s) + comp_logjac, comp_ℓ, rtol=eps(Float16))
 
 # ConditionedModel
 a_ind = IndependentModel((; a=a_model))
@@ -73,8 +103,21 @@ con_model = ConditionedModel(a_sample, ab_model)
 ab_sample = @inferred rand(con_model)
 @test variables(ab_sample).a |> typeof == variables(a_sample).a |> typeof
 @test variables(ab_sample).b |> typeof == variables(b_sample).b |> typeof
+@test variables(ab_sample).a == variables(a_sample).a
+@test variables(ab_sample).b != variables(b_sample).b
 
 ℓ = @inferred logdensityof(con_model, b_sample)
 @test logdensityof(a_ind, a_sample) + logdensityof(b_ind, b_sample) == ℓ
 ℓ = @inferred logdensityof(con_model, ab_sample)
 @test logdensityof(a_ind, a_sample) + logdensityof(b_model, variables(ab_sample).b) == ℓ
+
+# Bijectors
+con_bijectors = @inferred bijector(con_model)
+@test_throws Exception con_bijectors.a
+@test con_bijectors.b isa Bijector
+con_tmodel = @inferred transformed(con_model)
+con_ts = @inferred rand(con_tmodel)
+con_vars, con_logjac = @inferred variables_with_logjac(con_ts, con_bijectors)
+con_ℓ = @inferred logdensityof(con_tmodel, con_ts)
+con_s = @set con_ts.variables = con_vars
+@test logdensityof(con_model, con_s) + con_logjac == con_ℓ

@@ -11,12 +11,11 @@ a_model = KernelExponential(Float16(2.0))
 b_model = ProductBroadcastedDistribution(Exponential, [2.0f0, 1.0f0, 0.5f0])
 c_model = ProductBroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 
-abc_model = IndependentModel((; a=a_model, b=b_model, c=c_model))
-
 # Sample
 nta = (; zip((:a, :b), fill(0.5f0, 2))...)
 # Broadcasted addition of multiple variables
 ntb = (; zip((:b, :c), fill([1.0, 1.0], 2))...)
+# TODO implement bijectors for ModelInterface
 sa = Sample(nta, 0.0)
 sb = Sample(ntb, 0.0)
 @test log_prob(sa) == 0
@@ -35,3 +34,16 @@ diff_ab = @inferred sa - sb
 @test variables(diff_ab).a isa Float32
 @test variables(diff_ab).b == [-0.5, -0.5]
 @test variables(diff_ab).b isa Vector{Float64}
+
+# Bijectors
+ab_model = IndependentModel((; a=a_model, b=b_model))
+ab_bijectors = @inferred map(Broadcast.materialize, bijector(ab_model))
+tab_model = @inferred transformed(ab_model)
+tab_sample = rand(tab_model)
+raw_vars = @inferred variables(tab_sample)
+vars = @inferred variables(tab_sample, ab_bijectors)
+@test vars.a == invlink(a_model, raw_vars.a)
+@test vars.b == invlink(a_model, raw_vars.b)
+w_vars, logjac = @inferred variables_with_logjac(tab_sample, ab_bijectors)
+@test vars == w_vars
+@test logjac + logdensityof(a_model, vars.a) + logdensityof(b_model, vars.b) ≈ logdensityof(tab_model, tab_sample)

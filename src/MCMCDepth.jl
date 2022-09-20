@@ -49,6 +49,7 @@ export names
 export types
 export unconstrained_state
 export variables
+export variables_with_logjac
 
 # Distributions
 export AbstractKernelDistribution
@@ -134,7 +135,7 @@ using Reexport
 @reexport import Random: rand!
 
 # Bijectors
-@reexport import Bijectors: bijector, link, invlink, with_logabsdet_jacobian, transformed
+@reexport import Bijectors: bijector, inverse, link, invlink, with_logabsdet_jacobian, transformed
 export BroadcastedBijector
 export Circular
 export is_identity
