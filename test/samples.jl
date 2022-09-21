@@ -46,3 +46,22 @@ vars = @inferred variables(tab_sample, ab_bijectors)
 w_vars, logjac = @inferred variables_with_logjac(tab_sample, ab_bijectors)
 @test vars == w_vars
 @test logjac + logdensityof(a_model, vars.a) + logdensityof(b_model, vars.b) ≈ logdensityof(tab_model, tab_sample)
+
+# Partial bijectors
+a_bijector = (; a=bijector(a_model))
+w_vars, logjac = @inferred variables_with_logjac(tab_sample, a_bijector)
+@test w_vars.a == vars.a
+@test w_vars.b != vars.b
+@test w_vars.b == variables(tab_sample).b
+t_vars = variables(tab_sample, a_bijector)
+@test w_vars.a == t_vars.a
+@test w_vars.b == t_vars.b
+
+# Empty bijectors
+w_vars, logjac = @inferred variables_with_logjac(tab_sample, (;))
+@test w_vars.a != vars.a
+@test w_vars.b != vars.b
+@test w_vars.b == variables(tab_sample).b
+t_vars = variables(tab_sample, (;))
+@test w_vars.a == t_vars.a
+@test w_vars.b == t_vars.b

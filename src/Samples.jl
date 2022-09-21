@@ -36,11 +36,12 @@ Returns a named tuple of the raw variables ∈ ℝⁿ.
 """
 variables(s::Sample) = s.variables
 
+# TEST merging of partially transformed smaple
 """
     variables(sample, bijectors)
 Returns a named tuple of the variables in the model domain by using the inverse transform of the provided bijectors.
 """
-variables(s::Sample, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) = map_intersect((b, v) -> b(v), map(inverse, bijectors), variables(s))
+variables(s::Sample, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) = merge(variables(s), map_intersect((b, v) -> b(v), map(inverse, bijectors), variables(s)))
 
 """
     variables_with_logjac(sample)
@@ -50,9 +51,9 @@ Returns (variables, logabsdetjac)
 """
 function variables_with_logjac(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) where {T}
     with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(b, v), map(inverse, bijectors), variables(s))
-    vars = map(first, with_logjac)
-    logjac = reduce(.+, values(map(last, with_logjac)))
-    vars, logjac
+    tr_vars = map(first, with_logjac)
+    logjac = reduce(.+, values(map(last, with_logjac)); init=0)
+    merge(variables(s), tr_vars), logjac
 end
 
 """
