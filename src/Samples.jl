@@ -36,7 +36,6 @@ Returns a named tuple of the raw variables ∈ ℝⁿ.
 """
 variables(s::Sample) = s.variables
 
-# TEST merging of partially transformed smaple
 """
     variables(sample, bijectors)
 Returns a named tuple of the variables in the model domain by using the inverse transform of the provided bijectors.
@@ -54,6 +53,12 @@ function variables_with_logjac(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple
     tr_vars = map(first, with_logjac)
     logjac = reduce(.+, values(map(last, with_logjac)); init=0)
     merge(variables(s), tr_vars), logjac
+end
+
+transform(s::Sample, bijectors) = @set s.variables = variables(s, bijectors)
+function transform_with_logjac(s::Sample, bijectors)
+    vars, logjac = variables_with_logjac(s, bijectors)
+    (@set s.variables = vars), logjac
 end
 
 """
