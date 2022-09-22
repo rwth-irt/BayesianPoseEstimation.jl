@@ -138,6 +138,7 @@ using Reexport
 @reexport import Bijectors: bijector, inverse, link, invlink, with_logabsdet_jacobian, transformed
 export BroadcastedBijector
 export Circular
+export ZeroIdentity
 export is_identity
 
 # Distributions

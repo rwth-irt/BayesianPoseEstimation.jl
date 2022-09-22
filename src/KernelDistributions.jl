@@ -163,7 +163,7 @@ Base.rand(rng::AbstractRNG, dist::KernelNormal{T}) where {T} = dist.σ * randn(r
 
 Base.maximum(::KernelNormal{T}) where {T} = typemax(T)
 Base.minimum(::KernelNormal{T}) where {T} = typemin(T)
-Bijectors.bijector(::KernelNormal) = Bijectors.Identity{0}()
+Bijectors.bijector(::KernelNormal) = ZeroIdentity()
 Distributions.insupport(::KernelNormal, ::Real) = true
 
 # Support Truncated{KernelNormal}

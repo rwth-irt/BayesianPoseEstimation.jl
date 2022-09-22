@@ -68,7 +68,7 @@ gn = KernelNormal(10.0, 2.0)
 @test insupport(KernelNormal(Float16), 0)
 @test insupport(KernelNormal(Float16), Inf)
 @test insupport(KernelNormal(Float16), -Inf)
-@test bijector(KernelNormal()) == bijector(Normal())
+@test bijector(KernelNormal()) isa ZeroIdentity
 
 M = rand(rng, gn, 100, 100)
 maybe_histogram(flatten(M))

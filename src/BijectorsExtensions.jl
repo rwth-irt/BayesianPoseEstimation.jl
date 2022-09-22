@@ -32,6 +32,17 @@ Thus, the log Jacobian is always 0.
 Bijectors.logabsdetjac(::Circular, x) = zero(x)
 Bijectors.logabsdetjac(::Inverse{<:Circular}, y) = zero(y)
 
+"""
+    ZeroIdentity
+Identity bijector without any allocations.
+"""
+struct ZeroIdentity <: Bijector{0} end
+(::ZeroIdentity)(x) = x
+Bijectors.inverse(b::ZeroIdentity) = b
+
+Bijectors.logabsdetjac(::ZeroIdentity, x) = zero(eltype(x))
+Bijectors.logabsdetjac(::Inverse{<:ZeroIdentity}, x) = zero(eltype(x))
+
 # Custom reduction like BroadcastedDistribution
 """
     BroadcastedBijector
@@ -85,6 +96,7 @@ Returns true if the bijector is the identity, i.e. maps ℝ → ℝ
 """
 is_identity(::Bijector) = false
 is_identity(::Bijectors.Identity) = true
+is_identity(::ZeroIdentity) = true
 is_identity(bijector::AbstractArray{<:Bijector}) = mapreduce(is_identity, &, bijector)
 is_identity(bijector::BroadcastedBijector) = is_identity(materialize(bijector.bijectors))
 is_identity(bijectors::Union{Bijector,AbstractArray{<:Bijector}}...) = mapreduce(is_identity, &, bijectors)
