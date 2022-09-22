@@ -16,7 +16,7 @@ Each pixel is assumed to be independent and the measurement can be described by 
 `μ` is the expected value and `o` is the object association probability.
 Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
 """
-struct ObservationModel{T,N,B<:BroadcastedDistribution{T,N},U<:AbstractArray{T}}
+struct ObservationModel{T,B<:BroadcastedDistribution{T},U<:AbstractArray{T}}
     normalize_img::Bool
     broadcasted_dist::B
     # For the calculation of the normalization constant

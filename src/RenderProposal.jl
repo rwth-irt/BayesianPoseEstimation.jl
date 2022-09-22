@@ -55,3 +55,8 @@ end
 Rendering is determinstic, thus the probability is the one of the decorated proposal model.
 """
 transition_probability(proposal::RenderProposal, new_sample, prev_sample) = transition_probability(proposal.model, new_sample, prev_sample)
+
+is_constrained(proposal::RenderProposal) = is_constrained(proposal.model)
+
+Bijectors.bijector(proposal::RenderProposal) = bijector(proposal.model)
+# transformed is tricky since we need the parameters in the model domain to render

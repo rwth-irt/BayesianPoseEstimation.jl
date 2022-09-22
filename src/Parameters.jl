@@ -77,6 +77,7 @@ Base.@kwdef struct Parameters
     mix_exponential = 0.8
     # Pixel association
     prior_o = fill(0.2, 100, 100)
+    proposal_σ_o = 0.01 
     # Image Model
     normalize_img = true
     # Pose Model
@@ -84,7 +85,7 @@ Base.@kwdef struct Parameters
     mean_t = [0.0, 0.0, 2.0]
     σ_t = [0.05, 0.05, 0.05]
     # Proposal Model
-    proposal_σ_t = [0.05, 0.05, 0.05]
+    proposal_σ_t = [0.01, 0.01, 0.01]
     proposal_σ_r = [0.05, 0.05, 0.05]
     # Inference
     precision = Float32
@@ -154,7 +155,8 @@ device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, 
 Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
 Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))
 
-Base.getproperty(p::Parameters, ::Val{:static_o}) = p.precision.(getfield(p, :static_o))
+Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.precision.(getfield(p, :prior_o))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.precision.(getfield(p, :proposal_σ_o))
 Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.precision.(getfield(p, :pixel_σ))
 Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.precision.(getfield(p, :pixel_θ))
 Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.precision.(getfield(p, :mix_exponential))

@@ -166,7 +166,7 @@ end
 
 function DensityInterface.logdensityof(model::TransformedConditionedModel, sample)
     # Transform sample back to model domain
-    vars, logjac = variables_with_logjac(sample, bijector(model))
+    vars, logjac = to_model_domain(sample, bijector(model))
     transformed_sample = @set sample.variables = vars
     conditioned_sample = merge(transformed_sample, model.data)
     logdensityof(model.model, conditioned_sample) + logjac

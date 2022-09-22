@@ -9,6 +9,7 @@ using .MCMCDepth
 using AbstractMCMC
 using Accessors
 using CUDA
+using Distributions
 using MCMCDepth
 using Random
 # TODO remove
@@ -26,40 +27,33 @@ cpu_model = RngModel | rng
 dev_model = RngModel | dev_rng
 
 # Prior
-
 # Pose models on CPU to be able to call OpenGL
 t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
-
-# TODO sample transformed dist by default?
-# circular_uniform(::Any) = transformed(KernelCircularUniform())
-r_model = ProductBroadcastedDistribution((x) -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
-
-# Association on GPU since we render there
+r_model = ProductBroadcastedDistribution((_) -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
+# Scalar prior
 o_model = KernelUniform() |> cpu_model
-
 prior_model = PriorModel(t_model, r_model, o_model)
 
 # Likelihood
-
 function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}
     # TODO Compare whether truncated even makes a difference
-    # WARN does not work with o ∈ ℝ, expect o ∈ [0,1]
     dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
     PixelDistribution(μ, dist)
 end
 pixel_dist = mix_normal_truncated_exponential | (parameters.pixel_σ, parameters.pixel_θ)
 
 # Proposals
-# TODO Transformed distributions for SymmetricProposal
-proposal_model = IndependentProposal(prior_model)
+t_proposal = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_t) |> cpu_model
+r_proposal = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_r) |> cpu_model
+# Scalar prior
+o_proposal = KernelNormal(0, parameters.proposal_σ_o) |> cpu_model
+# WARN if using Dirac for o, do not propose new o
+symmetric_proposal = SymmetricProposal(IndependentModel((; t=t_proposal, r=r_proposal, o=o_proposal)))
+independent_proposal = IndependentProposal(prior_model)
 
-# TODO Do I want to pass pixel_dist as parameter or implement them in a PixelDistributions.jl and eval them from Parameters
+
+# TODO Do I want to pass pixel_dist as parameter in a main function or implement them in a PixelDistributions.jl and eval them from Parameters? Do I even want a main method with a plethora of parameters?
 # https://bkamins.github.io/julialang/2022/07/15/main.html
-"""
-    main()
-The main inference script which will cause compilation instead of running in the global scope.
-"""
-# function main(parameters::Parameters, t_model, r_model, o_model, pixel_dist)
 
 # Device
 if parameters.device === :CUDA
@@ -77,30 +71,26 @@ observation = render(render_context, scene, parameters.object_id, to_pose(parame
 # Assemble PosteriorModel
 # WARN use manipulated function since it forces evaluation of parameters to make it type stable
 observation_model = ObservationModel | (parameters.normalize_img, pixel_dist)
-
-# TODO transformed if using SymmetricProposal
 posterior_model = PosteriorModel(prior_model, observation_model, render_context, scene, parameters.object_id, parameters.rotation_type)
 conditioned_posterior = ConditionedModel((; z=observation), posterior_model)
 
-s = @inferred rand(dev_rng, posterior_model)
-s2 = @inferred rand(dev_rng, posterior_model)
-ℓ = @inferred logdensityof(posterior_model, s)
-
-# true, false
-@test s.variables.μ == s2.variables.μ
-@test s.variables.t != s2.variables.t
-
 # Sampling algorithm
-mh = MetropolisHastings(render_propsal(prior_model), render_propsal(proposal_model))
+mh = MetropolisHastings(render_propsal(prior_model), render_propsal(symmetric_proposal))
 s1, _ = @inferred AbstractMCMC.step(rng, conditioned_posterior, mh)
-# WARN random acceptance needs to be calculated on CPU, thus  CPU rng
 s2, _ = @inferred AbstractMCMC.step(rng, conditioned_posterior, mh, s1)
 
-chain = sample(rng, conditioned_posterior, mh, 50000);
+# WARN random acceptance needs to be calculated on CPU, thus  CPU rng
+chain = sample(rng, conditioned_posterior, mh, 10000; discard_initial=250, thinning=2);
 
 # TODO separate evaluation from experiments, i.e. save & load
 using Plots
 plotly()
-density_variable(chain, :t, 20)
-density_variable(chain, :r, 20)
-polar_density_variable(chain, :r, 20)
+model_chain = map(chain) do sample
+    s, _ = to_model_domain(sample, mh.bijectors)
+    s
+end
+density_variable(model_chain, :t, 20)
+density_variable(model_chain, :r, 20)
+# TEST should be approximately n_pixels_rendered / n_pixels
+density_variable(model_chain, :o, 20)
+polar_histogram_variable(model_chain, :r, 20)

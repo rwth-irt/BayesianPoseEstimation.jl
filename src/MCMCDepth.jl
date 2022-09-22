@@ -72,7 +72,6 @@ export IndependentModel
 export RngModel
 
 # Proposals
-export GibbsProposal
 export IndependentProposal
 export Proposal
 export SymmetricProposal

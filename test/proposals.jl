@@ -162,22 +162,22 @@ abc_ind_sample_2 = @inferred propose(Random.default_rng(), abc_ind_proposal, sam
 @test transition_probability(abc_ind_proposal, abc_ind_sample_2, sample) == logdensityof(a_model, variables(abc_ind_sample_2).a) .+ logdensityof(b_model, variables(abc_ind_sample_2).b) .+ logdensityof(c_model, variables(abc_ind_sample_2).c)
 
 
-# Gibbs
+# TODO move to sampler tests # Gibbs
 
-# Simple function that only changes the type of the variable which allows to test the merge inside the Gibbs proposal
-a_gibbs_fn(sample) = Sample((; a=42.0f0), 42.0)
-a_gibbs_proposal = GibbsProposal(a_gibbs_fn)
-a_gibbs_sample = @inferred propose(Random.default_rng(), a_gibbs_proposal, sample)
-@test variables(a_gibbs_sample).a == 42
-@test typeof(variables(a_gibbs_sample).a) == Float32
-@test typeof(variables(a_gibbs_sample).b) == typeof(variables(sample).b)
-@test typeof(variables(a_gibbs_sample).c) == typeof(variables(sample).c)
-@test variables(a_gibbs_sample).a == 42.0f0
-@test variables(a_gibbs_sample).b == variables(sample).b
-@test variables(a_gibbs_sample).c == variables(sample).c
-@test variables(a_gibbs_sample).a |> size == ()
-@test variables(a_gibbs_sample).b |> size == (3,)
-@test variables(a_gibbs_sample).c |> size == (2,)
-# Logdensity of independent components is the sum of all the components
-@inferred transition_probability(a_gibbs_proposal, a_gibbs_sample, sample)
-@test isinf(transition_probability(a_gibbs_proposal, a_gibbs_sample, sample))
+# # Simple function that only changes the type of the variable which allows to test the merge inside the Gibbs proposal
+# a_gibbs_fn(sample) = Sample((; a=42.0f0), 42.0)
+# a_gibbs_proposal = GibbsProposal(a_gibbs_fn)
+# a_gibbs_sample = @inferred propose(Random.default_rng(), a_gibbs_proposal, sample)
+# @test variables(a_gibbs_sample).a == 42
+# @test typeof(variables(a_gibbs_sample).a) == Float32
+# @test typeof(variables(a_gibbs_sample).b) == typeof(variables(sample).b)
+# @test typeof(variables(a_gibbs_sample).c) == typeof(variables(sample).c)
+# @test variables(a_gibbs_sample).a == 42.0f0
+# @test variables(a_gibbs_sample).b == variables(sample).b
+# @test variables(a_gibbs_sample).c == variables(sample).c
+# @test variables(a_gibbs_sample).a |> size == ()
+# @test variables(a_gibbs_sample).b |> size == (3,)
+# @test variables(a_gibbs_sample).c |> size == (2,)
+# # Logdensity of independent components is the sum of all the components
+# @inferred transition_probability(a_gibbs_proposal, a_gibbs_sample, sample)
+# @test isinf(transition_probability(a_gibbs_proposal, a_gibbs_sample, sample))
