@@ -2,6 +2,7 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using Bijectors
 using Distributions
 using MCMCDepth
 using Random
@@ -17,18 +18,18 @@ nta = (; zip((:a, :b), fill(0.5f0, 2))...)
 ntb = (; zip((:b, :c), fill([1.0, 1.0], 2))...)
 sa = Sample(nta, 0.0)
 sb = Sample(ntb, 0.0)
-@test log_prob(sa) == 0
-@test log_prob(sb) == 0
+@test logprob(sa) == 0
+@test logprob(sb) == 0
 
 sum_ab = @inferred sa + sb
-@test log_prob(sum_ab) == -Inf
+@test logprob(sum_ab) == -Inf
 @test variables(sum_ab).a == 0.5
 @test variables(sum_ab).a isa Float32
 @test variables(sum_ab).b == [1.5, 1.5]
 @test variables(sum_ab).b isa Vector{Float64}
 
 diff_ab = @inferred sa - sb
-@test log_prob(diff_ab) == -Inf
+@test logprob(diff_ab) == -Inf
 @test variables(diff_ab).a == 0.5
 @test variables(diff_ab).a isa Float32
 @test variables(diff_ab).b == [-0.5, -0.5]
@@ -40,48 +41,26 @@ ab_bijectors = @inferred map(Broadcast.materialize, bijector(ab_model))
 tab_model = @inferred transformed(ab_model)
 tab_sample = rand(tab_model)
 raw_vars = @inferred variables(tab_sample)
-vars = @inferred variables(tab_sample, ab_bijectors)
-@test vars.a == invlink(a_model, raw_vars.a)
-@test vars.b == invlink(a_model, raw_vars.b)
-w_vars, logjac = @inferred variables_with_logjac(tab_sample, ab_bijectors)
-@test vars == w_vars
-@test logjac + logdensityof(a_model, vars.a) + logdensityof(b_model, vars.b) ≈ logdensityof(tab_model, tab_sample)
-t_s, s_l = transform_with_logjac(tab_sample, ab_bijectors)
-@test variables(t_s).a == vars.a
-@test variables(t_s).b == vars.b
-@test s_l == logjac
-t_s = transform(tab_sample, ab_bijectors)
-@test variables(t_s).a == vars.a
-@test variables(t_s).b == vars.b
+mab_sample, logjac = @inferred to_model_domain(tab_sample, ab_bijectors)
+@test variables(mab_sample).a == invlink(a_model, raw_vars.a)
+@test variables(mab_sample).b == invlink(a_model, raw_vars.b)
+@test logjac + logdensityof(ab_model, mab_sample) ≈ logdensityof(tab_model, tab_sample)
+uab_sample = to_unconstrained_domain(mab_sample, ab_bijectors)
+@test mapreduce(≈, &, variables(uab_sample), variables(tab_sample))
 
 # Partial bijectors
 a_bijector = (; a=bijector(a_model))
-w_vars, logjac = @inferred variables_with_logjac(tab_sample, a_bijector)
-@test w_vars.a == vars.a
-@test w_vars.b != vars.b
-@test w_vars.b == variables(tab_sample).b
-t_vars = variables(tab_sample, a_bijector)
-@test w_vars.a == t_vars.a
-@test w_vars.b == t_vars.b
-t_s, s_l = transform_with_logjac(tab_sample, a_bijector)
-@test variables(t_s).a == vars.a
-@test variables(t_s).b == variables(tab_sample).b
-@test s_l == logjac
-t_s = transform(tab_sample, a_bijector)
-@test variables(t_s).a == vars.a
-@test variables(t_s).b == variables(tab_sample).b
+ma_sample, logjac = @inferred to_model_domain(tab_sample, a_bijector)
+@test variables(ma_sample).a == invlink(a_model, raw_vars.a)
+@test variables(ma_sample).b == variables(tab_sample).b
+@test logjac == logabsdetjacinv(a_bijector.a, variables(tab_sample).a)
+ua_sample = to_unconstrained_domain(ma_sample, a_bijector)
+@test mapreduce(≈, &, variables(ua_sample), variables(tab_sample))
 
 # Empty bijectors
-w_vars, logjac = @inferred variables_with_logjac(tab_sample, (;))
-@test w_vars.a == variables(tab_sample).a
-@test w_vars.b == variables(tab_sample).b
-t_vars = variables(tab_sample, (;))
-@test w_vars.a == t_vars.a
-@test w_vars.b == t_vars.b
-t_s, s_l = transform_with_logjac(tab_sample, (;))
-@test variables(t_s).a == variables(tab_sample).a
-@test variables(t_s).b == variables(tab_sample).b
-@test s_l == logjac
-t_s = transform(tab_sample, (;))
-@test variables(t_s).a == variables(tab_sample).a
-@test variables(t_s).b == variables(tab_sample).b
+m_sample, logjac = @inferred to_model_domain(tab_sample, (;))
+@test variables(m_sample).a == variables(tab_sample).a
+@test variables(m_sample).b == variables(tab_sample).b
+@test logjac == 0
+u_sample = to_unconstrained_domain(m_sample, (;))
+@test mapreduce(≈, &, variables(u_sample), variables(tab_sample))

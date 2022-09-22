@@ -42,14 +42,14 @@ export to_rotation, to_translation, to_pose
 # Samples
 export Sample
 
-export flatten
-export log_prob
+export logprob
 export merge
 export names
+export to_model_domain
+export to_unconstrained_domain
+export transform
 export types
-export unconstrained_state
 export variables
-export variables_with_logjac
 
 # Distributions
 export AbstractKernelDistribution

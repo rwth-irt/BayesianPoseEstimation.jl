@@ -16,7 +16,7 @@ struct Sample{T,V}
     logp::Float64
 end
 
-Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(log_prob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logprob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
     names(sample)
@@ -37,35 +37,33 @@ Returns a named tuple of the raw variables ∈ ℝⁿ.
 variables(s::Sample) = s.variables
 
 """
-    variables(sample, bijectors)
-Returns a named tuple of the variables in the model domain by using the inverse transform of the provided bijectors.
-"""
-variables(s::Sample, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) = merge(variables(s), map_intersect((b, v) -> b(v), map(inverse, bijectors), variables(s)))
-
-"""
-    variables_with_logjac(sample)
-Returns a named tuple of the variables in the model domain by using the inverse transform of the provided bijectors.
-The logjac correction is also calculated in the same kernel.
+    to_model_domain(sample, bijectors)
+Transforms the sample to the model domain by using the inverse transform of the provided bijectors.
+The logjac correction is calculated in the same kernel.
 Returns (variables, logabsdetjac)
 """
-function variables_with_logjac(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) where {T}
+function to_model_domain(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) where {T}
     with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(b, v), map(inverse, bijectors), variables(s))
     tr_vars = map(first, with_logjac)
+    model_sample = @set s.variables = merge(s.variables, tr_vars)
     logjac = reduce(.+, values(map(last, with_logjac)); init=0)
-    merge(variables(s), tr_vars), logjac
-end
-
-transform(s::Sample, bijectors) = @set s.variables = variables(s, bijectors)
-function transform_with_logjac(s::Sample, bijectors)
-    vars, logjac = variables_with_logjac(s, bijectors)
-    (@set s.variables = vars), logjac
+    model_sample, logjac
 end
 
 """
-    log_prob(sample)
+    to_unconstrained_domain(sample, bijector)
+Transform the sample to ℝⁿ by transforming the (some) variables of the sample using the bijectors.
+"""
+function to_unconstrained_domain(sample::Sample, bijectors::NamedTuple)
+    tr_variables = merge(variables(sample), map_intersect((b, v) -> b(v), bijectors, variables(sample)))
+    Sample(tr_variables, logprob(sample))
+end
+
+"""
+    logprob(sample)
 (Logjac corrected) posterior log probability of the sample.
 """
-log_prob(sample::Sample) = sample.logp
+logprob(sample::Sample) = sample.logp
 
 """
     +(a, b)
