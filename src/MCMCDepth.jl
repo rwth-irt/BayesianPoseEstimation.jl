@@ -117,6 +117,7 @@ export Gibbs
 
 # Visualization
 export density_variable
+export histogram_variable
 export mean_image
 export plot_depth_img, plot_prob_img
 export polar_density_variable

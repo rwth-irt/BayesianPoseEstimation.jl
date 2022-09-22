@@ -79,9 +79,18 @@ scatter_position(chains::AbstractVector, step=1, c_grad=:viridis) = scatter_posi
   density_variable(chains, var_name, step, palette)
 Creates a density plot for the given variable.
 """
+function histogram_variable(chains, var_name, step=1, palette=:tol_bright)
+  M = convert(Matrix, chains, var_name, step)
+  histogram(transpose(M), fill=true, fillalpha=0.4, palette=palette)
+end
+
+"""
+  density_variable(chains, var_name, step, palette)
+Creates a density plot for the given variable.
+"""
 function density_variable(chains, var_name, step=1, palette=:tol_bright)
   M = convert(Matrix, chains, var_name, step)
-  density(transpose(M), fill=true, fillalpha=0.4, palette=palette)
+  density(transpose(M), fill=true, fillalpha=0.4, palette=palette, trim=true)
 end
 
 """
@@ -90,7 +99,7 @@ Creates a density plot in polar coordinates for the given variable.
 """
 function polar_density_variable(chains, var_name, step=1, palette=:tol_bright)
   M = convert(Matrix, chains, var_name, step)
-  stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=palette)
+  stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=palette, trim=true)
 end
 
 """
