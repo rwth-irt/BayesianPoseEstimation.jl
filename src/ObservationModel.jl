@@ -47,7 +47,8 @@ function DensityInterface.logdensityof(model::ObservationModel, x)
     if model.normalize_img
         # Normalization: divide by the number of rendered pixels
         rendered_pixels = sum_and_dropdims(model.μ .> 0; dims=Dims(model))
-        return log_p ./ rendered_pixels
+        # WARN document in Diss log(p/rendered_pixels) = log(p) - log(rendered_pixels)
+        return log_p - log(rendered_pixels)
     end
     # no normalization = raw sum of the pixel likelihoods
     log_p
