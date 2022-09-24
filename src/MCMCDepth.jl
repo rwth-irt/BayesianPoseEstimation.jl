@@ -122,6 +122,7 @@ export histogram_variable
 export mean_image
 export plot_depth_img, plot_prob_img
 export polar_density_variable
+export plot_logprob
 export plot_variable
 export polar_histogram_variable
 export scatter_position

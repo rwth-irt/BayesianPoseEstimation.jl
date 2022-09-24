@@ -127,6 +127,15 @@ function plot_variable(chains, var_name, step=1, palette=:tol_bright, label=["x"
 end
 
 """
+  plot_logprob(chains, var_name, step, nbins, palette)
+Plot of the logdensity over the samples.
+"""
+function plot_logprob(chains, step=1, palette=:tol_bright)
+  logprobs = hcat([logprob(chains[i]) for i in 1:step:length(chains)]...)
+  scatter(transpose(logprobs); palette=palette, markersize=2, label="logprob")
+end
+
+"""
   mean_prob_image(chain, var_name)
 Creates an image of the mean of the given variable.
 """
