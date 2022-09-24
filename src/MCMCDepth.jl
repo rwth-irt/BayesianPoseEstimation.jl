@@ -89,8 +89,8 @@ export RenderContext
 export render
 
 # Models
-export PixelDistribution
 export ObservationModel
+export ValidPixel
 
 export PixelAssociation
 export ImageAssociation
@@ -98,6 +98,7 @@ export ImageAssociation
 export mix_normal_exponential, mix_normal_truncated_exponential
 
 export image_association
+export nonzero_pixels
 export pixel_association
 export pose_depth_model
 export preprocess

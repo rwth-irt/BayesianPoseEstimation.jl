@@ -52,6 +52,8 @@ RenderContext(params::Parameters, T::Type{<:AbstractArray}) = RenderContext(para
 
 Base.show(io::IO, context::RenderContext{T}) where {T} = print(io, "RenderContext{$(T)}\n$(context.framebuffer)\nRender Data: $(typeof(context.render_data))")
 
+Base.size(render_context::RenderContext) = size(render_context.render_data)
+
 """
     render(render_context, scene, object_id, pose, layer_id)
 Render the scene with the given pose for the object to the layer of the framebuffer of the context.

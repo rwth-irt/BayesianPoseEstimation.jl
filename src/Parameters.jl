@@ -70,23 +70,23 @@ Base.@kwdef struct Parameters
     c_x = 50
     c_y = 50
     min_depth = 0.1
-    max_depth = 2
+    max_depth = 3
     # Depth pixel model
-    pixel_σ = 0.005
+    pixel_σ = 0.01
     pixel_θ = 1.0
     mix_exponential = 0.8
     # Pixel association
     prior_o = fill(0.2, 100, 100)
-    proposal_σ_o = 0.01 
+    proposal_σ_o = 0.05 
     # Image Model
     normalize_img = true
     # Pose Model
     rotation_type = :RotXYZ
     mean_t = [0.0, 0.0, 2.0]
-    σ_t = [0.05, 0.05, 0.05]
+    σ_t = [0.1, 0.1, 0.1]
     # Proposal Model
-    proposal_σ_t = [0.01, 0.01, 0.01]
-    proposal_σ_r = [0.05, 0.05, 0.05]
+    proposal_σ_t = [0.1, 0.1, 0.1]
+    proposal_σ_r = [1, 1, 1]
     # Inference
     precision = Float32
     device = :CUDA

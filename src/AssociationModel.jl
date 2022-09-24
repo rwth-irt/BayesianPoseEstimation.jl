@@ -26,7 +26,7 @@ Moreover, a prior `prior` is required for the association probability.
 Typically both distributions are conditioned on the expected depth μ of the pixel.
 The logpdf is calculated analytically by marginalizing the two distributions.
 """
-struct PixelAssociation{T,I<:PixelDistribution,N<:PixelDistribution} <: AbstractKernelDistribution{T,Continuous}
+struct PixelAssociation{T,I<:ValidPixel,N<:ValidPixel} <: AbstractKernelDistribution{T,Continuous}
     prior::T
     dist_is::I
     dist_not::N
