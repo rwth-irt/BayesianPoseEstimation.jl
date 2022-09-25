@@ -29,7 +29,7 @@ include("RenderContext.jl")
 include("ObservationModel.jl")
 include("AssociationModel.jl")
 include("PosteriorModel.jl")
-include("RenderProposal.jl")
+include("RenderModel.jl")
 
 # Common
 export array_for_rng
