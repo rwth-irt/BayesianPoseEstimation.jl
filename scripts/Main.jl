@@ -3,8 +3,8 @@
 # All rights reserved.
 
 # WARN Do not run this if you want Revise to work
-# include("../src/MCMCDepth.jl")
-# using .MCMCDepth
+include("../src/MCMCDepth.jl")
+using .MCMCDepth
 
 using AbstractMCMC
 using Accessors
@@ -55,7 +55,7 @@ independent_proposal = IndependentProposal(prior_model)
 # Render context
 render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 scene = Scene(parameters, render_context)
-render_proposal = RenderProposal | (parameters.rotation_type, render_context, scene, parameters.object_id)
+render_proposal = RenderModel | (parameters.rotation_type, render_context, scene, parameters.object_id)
 
 # Fake observation
 obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj"]
@@ -136,6 +136,7 @@ posterior_sample = rand(dev_rng, normalized_posterior)
 plot_depth_img(posterior_sample.variables.z |> Array)
 
 # Sampling algorithm
+# conditioned_posterior = ConditionedModel((; z=observation), explicit_posterior)
 conditioned_posterior = ConditionedModel((; z=observation), normalized_posterior)
 mh = MetropolisHastings(render_proposal(prior_model), render_proposal(symmetric_proposal))
 # mh = MetropolisHastings(render_propsal(prior_model), render_propsal(independent_proposal))

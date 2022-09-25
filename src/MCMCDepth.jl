@@ -107,7 +107,7 @@ export random_walk_proposal
 
 export PriorModel
 export PosteriorModel
-export RenderProposal
+export RenderModel
 
 # MetropolisHastings
 export MetropolisHastings
