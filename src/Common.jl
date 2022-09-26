@@ -6,6 +6,7 @@ using CoordinateTransformations
 using CUDA
 using Random
 using Rotations
+using StaticArrays
 
 """
     flatten(x)
@@ -83,9 +84,9 @@ to_pose(t::AbstractVector, r::AbstractVector, rot_type=RotXYZ) = Pose(to_transla
     to_translation(A)
 Convert an array to a vector of `Translation` column wise.
 """
-to_translation(A::AbstractArray{<:Number}) = [Translation(t) for t in eachcol(A)]
+to_translation(A::AbstractArray{<:Number}) = [to_translation(t) for t in eachcol(A)]
 to_translation(A::AbstractArray{<:Translation}) = A
-to_translation(v::AbstractVector{<:Number}) = Translation(v)
+to_translation(v::AbstractVector{<:Number}) = Translation(SVector{3}(v))
 
 """
     to_rotation(A, [T=RotXYZ])
