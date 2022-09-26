@@ -1,7 +1,7 @@
 name = "MCMCDepth"
 uuid = "ea9e20e3-5ec9-4a18-b9a5-f98be19e20e6"
 authors = ["Tim Redick <t.redick@irt.rwth-aachen.de>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
@@ -29,6 +29,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 SciGL = "e33cfb9f-2574-42f7-bc46-3c25fa028886"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"

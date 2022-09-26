@@ -30,6 +30,7 @@ include("ObservationModel.jl")
 include("AssociationModel.jl")
 include("PosteriorModel.jl")
 include("RenderModel.jl")
+include("Inference.jl")
 
 # Common
 export array_for_rng
@@ -112,9 +113,10 @@ export RenderModel
 # MetropolisHastings
 export MetropolisHastings
 
-# Gibbs
-export AnalyticGibbs
-export Gibbs
+# Inference
+export expected_pixel_count
+export pixel_explicit
+export pixel_mixture
 
 # Visualization
 export density_variable
@@ -131,7 +133,7 @@ export scatter_position
 using Reexport
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
-@reexport import SciGL: Scene
+@reexport import SciGL: Scale, Scene
 
 @reexport import DensityInterface: logdensityof
 @reexport import Random: rand!

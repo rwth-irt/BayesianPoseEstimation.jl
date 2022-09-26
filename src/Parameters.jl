@@ -34,7 +34,8 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * prior_o: Constant mixture coefficient for the pixel to object association / probability that a pixel belongs to the object.
 
 ## Image Model
-* normalize_img: Normalize the likelihood of an image using the number of rendered pixels
+* normalize_img: Normalize the likelihood of an image using the number of rendered pixels. Uses the ValidPixel wrapper.
+* n_normalization_samples: Number of samples to calculate the normalization constant from the expected number of visible pixels.
 
 # Pose Model
 * rotation_type: Representation of rotations, e.g. :RotXYZ [x,y,z] or :QuatRotation [w,x,y,z] 
@@ -77,9 +78,11 @@ Base.@kwdef struct Parameters
     mix_exponential = 0.8
     # Pixel association
     prior_o = fill(0.2, 100, 100)
-    proposal_σ_o = 0.05 
+    proposal_σ_o = 0.05
     # Image Model
     normalize_img = true
+    n_normalization_samples = 20_000
+
     # Pose Model
     rotation_type = :RotXYZ
     mean_t = [0.0, 0.0, 2.0]
