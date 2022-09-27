@@ -8,13 +8,7 @@ using Random
 """
     MetropolisHastings
 Different MetropolisHastings samplers only differ by their proposals.
-
-    MetropolisHastings(prior, proposal::AbstractProposal)
-Generally, proposals require the prior to be transformed to ℝⁿ and account for the logjac correction.
-
-    MetropolisHastings(prior, proposal::IndependentProposal)
-The proposal must be in the model domain of the prior and is typically the prior itself.
-    
+By convention, proposals live in ℝⁿ, which requires a logjac adjustment when evaluating the prior.    
 """
 struct MetropolisHastings{Q,B<:NamedTuple{<:Any,<:Tuple{Vararg{<:Bijector}}},P<:AbstractProposal} <: AbstractMCMC.AbstractSampler
     prior::Q
@@ -22,24 +16,12 @@ struct MetropolisHastings{Q,B<:NamedTuple{<:Any,<:Tuple{Vararg{<:Bijector}}},P<:
     proposal::P
 end
 
-function MetropolisHastings(prior, proposal::AbstractProposal)
-    if is_constrained(proposal)
-        MetropolisHastings(prior, (;), proposal)
-    else
-        # Bijectors if unconstrained
-        MetropolisHastings(prior, map_materialize(bijector(prior)), proposal)
-    end
-end
+MetropolisHastings(prior, proposal::AbstractProposal) = MetropolisHastings(prior, map_materialize(bijector(prior)), proposal)
 
-"""
-    map_materialize(bijectors)
-Maps Broadcast.materialize over a collection of bijectors.
-Falls back to materialize without map for non-collections.
-"""
-map_materialize(bijector) = Broadcast.materialize(bijector)
-map_materialize(bijectors::Union{NamedTuple,Tuple,AbstractArray}) = map(Broadcast.materialize, bijectors)
+Base.show(io::IO, mh::MetropolisHastings) = print(io, "MetropolisHastings(bijectors for $(keys(mh.bijectors)))")
 
-Base.show(io::IO, mh::MetropolisHastings) = print(io, "MetropolisHastings with bijectors for $(keys(mh.bijectors))")
+Bijectors.bijector(mh::MetropolisHastings) = mh.bijectors
+prior(mh::MetropolisHastings) = mh.prior
 
 """
     proposal(mh)
@@ -79,8 +61,8 @@ function AbstractMCMC.step(rng::AbstractRNG, model, sampler::MetropolisHastings,
         state = Sample(variables(state), Float64(logprob(model, sampler, state)))
     end
     # propose new sample after calculating the logdensity of the previous one since the render buffer is overwritten
-    sample = propose(rng, sampler.proposal, state)
-    sample = Sample(variables(sample), Float64(logprob(model, sampler, sample)))
+    proposed = propose(rng, sampler.proposal, state)
+    sample = Sample(variables(proposed), Float64(logprob(model, sampler, proposed)))
     # acceptance ratio
     α = (logprob(sample) -
          logprob(state) +

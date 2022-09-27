@@ -55,6 +55,14 @@ function map_intersect(f, a::NamedTuple{A}, b::NamedTuple{B}) where {A,B}
 end
 
 """
+    map_materialize(b)
+Maps Broadcast.materialize over a collection.
+Falls back to materialize without map for non-collections.
+"""
+map_materialize(b) = Broadcast.materialize(b)
+map_materialize(b::Union{NamedTuple,Tuple,AbstractArray}) = map(Broadcast.materialize, b)
+
+"""
     sum_and_dropdims(A,[;] dims)
 Sum the matrix A over the given dimensions and drop the very same dimensions afterwards.
 In case of a matching number of dimensions, a scalar is returned

@@ -89,15 +89,15 @@ obs = rand(dev_rng, explicit_observation(obs_μ, 0.8f0))
 plot_depth_img(Array(obs))
 
 # Sampling algorithm
-# conditioned_posterior = ConditionedModel((; z=observation), explicit_posterior)
-conditioned_posterior = ConditionedModel((; z=observation), normalized_posterior)
-mh = MetropolisHastings(render_proposal(prior_model), render_proposal(symmetric_proposal))
-# mh = MetropolisHastings(render_propsal(prior_model), render_propsal(independent_proposal))
+# conditioned_posterior = ConditionedModel((; z=obs), explicit_posterior)
+conditioned_posterior = ConditionedModel((; z=obs), normalized_posterior)
+# mh = MetropolisHastings(render_proposal(prior_model), render_proposal(symmetric_proposal))
+mh = MetropolisHastings(render_proposal(prior_model), render_proposal(independent_proposal))
 
 # TODO random walk takes longer to converge to correct orientation
 # WARN random acceptance needs to be calculated on CPU, thus  CPU rng
 # WARN Bad initial sample diverges
-chain = sample(rng, conditioned_posterior, mh, 20000; discard_initial=0, thinning=8);
+chain = sample(rng, conditioned_posterior, mh, 20000; discard_initial=0, thinning=3);
 
 # TODO separate evaluation from experiments, i.e. save & load
 using Plots

@@ -112,7 +112,7 @@ a_ind_sample = @inferred propose(Random.default_rng(), a_ind_proposal, sample)
 @test variables(a_ind_sample).c |> size == (2,)
 # Logdensity of independent components is the sum of all the components
 @inferred transition_probability(a_ind_proposal, a_ind_sample, sample)
-@test transition_probability(a_ind_proposal, a_ind_sample, sample) == logdensityof(a_model, variables(a_ind_sample).a)
+@test transition_probability(a_ind_proposal, a_ind_sample, sample) == logdensityof(transformed(a_model), variables(a_ind_sample).a)
 
 # Propose single variable multiple times
 a_ind_sample_2 = @inferred propose(Random.default_rng(), a_ind_proposal, sample, 2)
@@ -127,7 +127,7 @@ a_ind_sample_2 = @inferred propose(Random.default_rng(), a_ind_proposal, sample,
 @test variables(a_ind_sample_2).c |> size == (2,)
 # Logdensity of independent components is the sum of all the components
 @inferred transition_probability(a_ind_proposal, a_ind_sample_2, sample)
-@test transition_probability(a_ind_proposal, a_ind_sample_2, sample) == logdensityof(a_model, variables(a_ind_sample_2).a)
+@test transition_probability(a_ind_proposal, a_ind_sample_2, sample) == logdensityof.(transformed(a_model), variables(a_ind_sample_2).a)
 
 # Propose multiple variables
 abc_ind_proposal = IndependentProposal(IndependentModel((; a=a_model, b=b_model, c=c_model)))
@@ -144,7 +144,7 @@ abc_ind_sample = @inferred propose(Random.default_rng(), abc_ind_proposal, sampl
 @test variables(abc_ind_sample).c |> size == (2,)
 # Logdensity of independent components is the sum of all the components
 @inferred transition_probability(abc_ind_proposal, abc_ind_sample, sample)
-@test transition_probability(abc_ind_proposal, abc_ind_sample, sample) == logdensityof(a_model, variables(abc_ind_sample).a) .+ logdensityof(b_model, variables(abc_ind_sample).b) .+ logdensityof(c_model, variables(abc_ind_sample).c)
+@test transition_probability(abc_ind_proposal, abc_ind_sample, sample) ≈ logdensityof(transformed(a_model), variables(abc_ind_sample).a) .+ logdensityof(transformed(b_model), variables(abc_ind_sample).b) .+ logdensityof(transformed(c_model), variables(abc_ind_sample).c)
 
 # Propose multiple variables multiple times
 abc_ind_sample_2 = @inferred propose(Random.default_rng(), abc_ind_proposal, sample, 2)
@@ -159,7 +159,7 @@ abc_ind_sample_2 = @inferred propose(Random.default_rng(), abc_ind_proposal, sam
 @test variables(abc_ind_sample_2).c |> size == (2, 2)
 # Logdensity of independent components is the sum of all the components
 @inferred transition_probability(abc_ind_proposal, abc_ind_sample_2, sample)
-@test transition_probability(abc_ind_proposal, abc_ind_sample_2, sample) == logdensityof(a_model, variables(abc_ind_sample_2).a) .+ logdensityof(b_model, variables(abc_ind_sample_2).b) .+ logdensityof(c_model, variables(abc_ind_sample_2).c)
+@test transition_probability(abc_ind_proposal, abc_ind_sample_2, sample) ≈ logdensityof.(transformed(a_model), variables(abc_ind_sample_2).a) .+ logdensityof(transformed(b_model), variables(abc_ind_sample_2).b) .+ logdensityof(transformed(c_model), variables(abc_ind_sample_2).c)
 
 
 # TODO move to sampler tests # Gibbs
