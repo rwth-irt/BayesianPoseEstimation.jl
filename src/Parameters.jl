@@ -88,8 +88,8 @@ Base.@kwdef struct Parameters
     mean_t = [0.0, 0.0, 2.0]
     σ_t = [0.1, 0.1, 0.1]
     # Proposal Model
-    proposal_σ_t = [0.1, 0.1, 0.1]
-    proposal_σ_r = [1, 1, 1]
+    proposal_σ_t = [0.05, 0.05, 0.05]
+    proposal_σ_r = [0.1, 0.1, 0.1]
     # Inference
     precision = Float32
     device = :CUDA

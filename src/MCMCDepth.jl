@@ -18,9 +18,9 @@ include("Proposals.jl")
 include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
-include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
+include("ComposedSampler.jl")
 # TODO include("Gibbs.jl")
 include("Visualization.jl")
 # Plumbing together the depth image based pose estimator
@@ -110,7 +110,8 @@ export PriorModel
 export PosteriorModel
 export RenderModel
 
-# MetropolisHastings
+# Samplers
+export ComposedSampler
 export MetropolisHastings
 
 # Inference
