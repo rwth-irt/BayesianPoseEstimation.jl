@@ -36,23 +36,28 @@ model = IndependentModel((; z=Gamma(3.0, 1.0)))
 # Requires adjustment of prior
 sym_proposal = SymmetricProposal(IndependentModel((; z=Normal(0, 0.1))))
 sym_mh = MetropolisHastings(prior, sym_proposal)
-sym_chain = sample(rng, model, sym_mh, 20000; discard_initial=0, thinning=0);
+sym_chain = sample(rng, model, sym_mh, 50_000; discard_initial=0, thinning=0);
 plot_result_z((0, 15), sym_chain, bijector(prior), target)
 
 # Requires adjustment of prior
 ind_proposal = IndependentProposal(IndependentModel((; z=Normal())))
 ind_mh = MetropolisHastings(prior, ind_proposal)
-ind_chain = sample(rng, model, ind_mh, 50000; discard_initial=0, thinning=0);
+ind_chain = sample(rng, model, ind_mh, 50_000; discard_initial=0, thinning=0);
 plot_result_z((0, 15), ind_chain, bijector(prior), target)
 
 # Requires adjustment of prior & proposal
 ind_proposal = IndependentProposal(IndependentModel((; z=Uniform())))
 ind_mh = MetropolisHastings(prior, ind_proposal)
-ind_chain = sample(rng, model, ind_mh, 50000; discard_initial=0, thinning=0);
+ind_chain = sample(rng, model, ind_mh, 50_000; discard_initial=0, thinning=0);
 plot_result_z((0, 15), ind_chain, bijector(prior), target)
 
 # Requires adjustment of prior & proposal
 ind_proposal = IndependentProposal(IndependentModel((; z=Exponential())))
 ind_mh = MetropolisHastings(prior, ind_proposal)
-ind_chain = sample(rng, model, ind_mh, 50000; discard_initial=0, thinning=0);
+ind_chain = sample(rng, model, ind_mh, 50_000; discard_initial=0, thinning=0);
+plot_result_z((0, 15), ind_chain, bijector(prior), target)
+
+# Test whether the combination of the two samplers works
+com_sampler = ComposedSampler(sym_mh, ind_mh)
+ind_chain = sample(rng, model, com_sampler, 50_000; discard_initial=0, thinning=0);
 plot_result_z((0, 15), ind_chain, bijector(prior), target)
