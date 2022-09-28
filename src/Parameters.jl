@@ -78,7 +78,7 @@ Base.@kwdef struct Parameters
     mix_exponential = 0.8
     # Pixel association
     prior_o = fill(0.2, 100, 100)
-    proposal_σ_o = 0.05
+    proposal_σ_o = 0.01
     # Image Model
     normalize_img = true
     n_normalization_samples = 20_000
@@ -88,7 +88,7 @@ Base.@kwdef struct Parameters
     mean_t = [0.0, 0.0, 2.0]
     σ_t = [0.1, 0.1, 0.1]
     # Proposal Model
-    proposal_σ_t = [0.05, 0.05, 0.05]
+    proposal_σ_t = [0.01, 0.01, 0.01]
     proposal_σ_r = [0.1, 0.1, 0.1]
     # Inference
     precision = Float32

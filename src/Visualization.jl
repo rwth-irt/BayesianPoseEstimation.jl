@@ -106,7 +106,7 @@ end
   polar_histogram_variable(chains, var_name, step, nbins, palette)
 Creates a histogram plot in polar coordinates for the given variable.
 """
-function polar_histogram_variable(chains, var_name, step=1, nbins=90, palette=:tol_bright)
+function polar_histogram_variable(chains, var_name; step=1, nbins=90, palette=:tol_bright)
   M = convert(Matrix, chains, var_name, step)
   bins = range(0, 2π, length=nbins)
   pl = plot(palette=palette)

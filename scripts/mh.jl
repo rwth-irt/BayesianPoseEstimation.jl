@@ -57,7 +57,9 @@ scene = Scene(parameters, render_context)
 render_proposal = RenderModel | (parameters.rotation_type, render_context, scene, parameters.object_id)
 
 # Normalize the img likelihood to the expected number of rendered expected depth pixels.
-normalization_constant = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
+# normalization_constant = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
+# TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
+normalization_constant = parameters.precision(10)
 
 # Pixel models
 # Does not handle invalid μ → ValidPixel & normalization in observation_model
@@ -91,8 +93,8 @@ plot_depth_img(Array(obs))
 # Sampling algorithm
 # conditioned_posterior = ConditionedModel((; z=obs), explicit_posterior)
 conditioned_posterior = ConditionedModel((; z=obs), normalized_posterior)
-# mh = MetropolisHastings(render_proposal(prior_model), render_proposal(symmetric_proposal))
-mh = MetropolisHastings(render_proposal(prior_model), render_proposal(independent_proposal))
+mh = MetropolisHastings(render_proposal(prior_model), render_proposal(symmetric_proposal))
+# mh = MetropolisHastings(render_proposal(prior_model), render_proposal(independent_proposal))
 
 # TODO random walk takes longer to converge to correct orientation
 # WARN random acceptance needs to be calculated on CPU, thus  CPU rng
