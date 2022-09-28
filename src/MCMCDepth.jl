@@ -9,6 +9,7 @@ module MCMCDepth
 # Common functions on Base & CUDA types
 include("Hijack.jl")
 include("Common.jl")
+include("QuaternionDistribution.jl")
 # Model primitives
 include("Samples.jl")
 include("FunctionManipulation.jl")
