@@ -5,6 +5,7 @@
 # bundle_samples for the Sample type
 using AbstractMCMC, TupleVectors
 using Accessors
+using Bijectors
 
 """
     Sample{T,V}(variables, logp)

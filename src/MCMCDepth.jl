@@ -9,7 +9,6 @@ module MCMCDepth
 # Common functions on Base & CUDA types
 include("Hijack.jl")
 include("Common.jl")
-include("QuaternionDistribution.jl")
 # Model primitives
 include("Samples.jl")
 include("FunctionManipulation.jl")
@@ -17,8 +16,10 @@ include("ModelInterface.jl")
 include("Proposals.jl")
 # Extensions
 include("BijectorsExtensions.jl")
+# Distributions
 include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
+include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
@@ -113,6 +114,7 @@ export RenderModel
 
 # Samplers
 export ComposedSampler
+export Gibbs
 export MetropolisHastings
 
 # Inference

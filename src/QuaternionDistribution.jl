@@ -9,59 +9,81 @@
 # http://corysimon.github.io/articles/uniformdistn-on-sphere/
 # https://mathworld.wolfram.com/SpherePointPicking.html
 
-# Perturbations
-# [1] J. Sola, „Quaternion kinematics for the error-state KF“, Laboratoire dAnalyse et dArchitecture des Systemes-Centre national de la recherche scientifique (LAAS-CNRS), Toulouse, France, Tech. Rep, 2012.
-
 # Implementations Rotations.jl uses Quaternion.jl and I think I use Rotations.jl in SciGL
 # https://github.com/JuliaGeometry/Quaternions.jl/blob/master/src/Quaternion.jl
 
 using Bijectors
 using DensityInterface
 using Distributions
+using LinearAlgebra
+using Quaternions
 using Random
 
-struct QuaternionDistribution{T} <: Distribution{ArrayLikeVariate{1},Continuous} end
+"""
+    robust_normalize(q)
+Compared to the implementation in Quaternions.jl, this implementation takes care of the re-normalization and avoiding divisions by zero as described by J. Sola in „Quaternion kinematics for the error-state KF“
+"""
+function robust_normalize(q::Quaternion{T}) where {T}
+    a = abs(q)
+    if iszero(a)
+        Quaternion(one(T), zero(T), zero(T), zero(T), true)
+    else
+        q = q / a
+        Quaternion(q.s, q.v1, q.v2, q.v3, true)
+    end
+end
+
+"""
+    QuaternionDistribution
+Allows true uniform sampling of 3D rotations.
+Normalization requires scalar indexing, thus CUDA is not supported.
+"""
+struct QuaternionDistribution{T} <: AbstractKernelDistribution{Quaternion{T},Continuous} end
 
 QuaternionDistribution(::Type{T}=Float32) where {T} = QuaternionDistribution{T}()
 
+# Quaternions lie on the surface of a 4D hypersphere with radius 1. Due to to the duality of quaternions, it is only the surface of the half sphere.
+# https://marc-b-reynolds.github.io/quaternions/2017/11/10/AveRandomRot.html 
 const quat_logp = -log(π^2)
 
-function Distributions.logpdf(::QuaternionDistribution{T}, x::AbstractArray{<:Real}) where {T}
-    _, s... = size(x)
-    res = similar(x, T, s)
-    # Quaternions lie on the surface of a 4D hypersphere. Due to to the duality of quaternions, it is only the surface of the half sphere.
-    # https://marc-b-reynolds.github.io/quaternions/2017/11/10/AveRandomRot.html 
-    fill!(res, T(quat_logp))
-end
-
-Distributions.logpdf(::QuaternionDistribution{T}, x::AbstractVector{<:Real}) where {T} = T(quat_logp)
-
-# By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). BroadcastedDistribution is inherently designed for multiple samples so allow them explicitly.
-DensityInterface.logdensityof(dist::QuaternionDistribution, x) = logpdf(dist, x)
-DensityInterface.logdensityof(dist::QuaternionDistribution, x::AbstractMatrix) = logpdf(dist, x)
+Distributions.logpdf(::QuaternionDistribution{T}, x::Quaternion) where {T} = T(quat_logp)
 
 # Random Interface
 
-"""
-    rand(rng, dist, [dims...])
-Sample an array from `dist` of size `(size(marginals)..., dims...)`.
-The array type is based on the `rng` and the parameter type of the distribution.
-"""
-function Base.rand(rng::AbstractRNG, dist::QuaternionDistribution{T}, dims::Int...) where {T}
-    # could probably be generalized by implementing Base.eltype(AbstractVectorizedDistribution)
-    A = array_for_rng(rng, T, 4, dims...)
-    rand!(rng, dist, A)
-end
-
-"""
-    rand!(rng, dist, [dims...])
-Mutate the array `A` by sampling from `dist`.
-"""
-function Random.rand!(rng::AbstractRNG, ::QuaternionDistribution{T}, A::AbstractArray{<:Real}) where {T}
-    # Draw from standard normal distribution and normalize components https://imois.in/posts/random-vectors-and-rotations-in-3d/
-    rand!(rng, KernelNormal(T), A)
-    normalize_dims!(A)
-end
+Base.rand(rng::AbstractRNG, ::QuaternionDistribution{T}) where {T} = Quaternion(randn(rng, T), randn(rng, T), randn(rng, T), randn(rng, T)) |> robust_normalize
 
 # Bijectors
-Bijectors.bijector(dist::QuaternionDistribution) = Bijectors.Identity{0}()
+Bijectors.bijector(::QuaternionDistribution) = Bijectors.Identity{0}()
+
+
+# # J. Sola, „Quaternion kinematics for the error-state KF“, Laboratoire dAnalyse et dArchitecture des Systemes-Centre national de la recherche scientifique (LAAS-CNRS), Toulouse, France, Tech. Rep, 2012.
+
+struct QuaternionPerturbation{T} <: AbstractKernelDistribution{Quaternion{T},Continuous}
+    σ_x::T
+    σ_y::T
+    σ_z::T
+end
+
+QuaternionPerturbation(σ=0.01f0::Real) = QuaternionPerturbation(σ, σ, σ)
+
+Distributions.logpdf(dist::QuaternionPerturbation{T}, x::Quaternion) where {T} = logpdf(KernelNormal(zero(T), dist.σ_x), 2 * x.v1) + logpdf(KernelNormal(zero(T), dist.σ_y), 2 * x.v2) + logpdf(KernelNormal(zero(T), dist.σ_z), 2 * x.v2)
+
+Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = Quaternion(1, rand(rng, KernelNormal(0, dist.σ_x)) / 2, rand(rng, KernelNormal(0, dist.σ_y)) / 2, rand(rng, KernelNormal(0, dist.σ_z)) / 2) |> robust_normalize
+
+# Bijectors
+Bijectors.bijector(::QuaternionPerturbation) = Bijectors.Identity{0}()
+
+# SymmetricProposal for Quaternion
+
+"""
+    QuaternionProposal
+TODO
+"""
+struct QuaternionProposal{var_names,T<:Tuple{Vararg{QuaternionPerturbation}}} <: AbstractProposal
+    models::IndependentModel{var_names,T}
+end
+
+propose(rng::AbstractRNG, proposal::QuaternionProposal, sample::Sample, dims...) = map_merge((a, b) -> robust_normalize.(a .* b), sample, rand(rng, proposal.models, dims...))
+
+transition_probability(proposal::QuaternionProposal, new_sample::Sample, ::Sample) = 0.0
+

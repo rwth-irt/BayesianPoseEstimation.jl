@@ -54,6 +54,11 @@ Get the parameter type of the distribution, e.g. Float16
 Base.eltype(::Type{<:AbstractKernelDistribution{T}}) where {T} = T
 Base.eltype(::Type{<:UnivariateTransformed{T}}) where {T} = eltype(T)
 
+# Make KernelDistributions extendable by allowing to override it for custom distributions
+array_for_rng(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Integer...) = array_for_rng(rng, eltype(dist), dims...)
+array_for_rng(rng::AbstractRNG, ::AbstractArray{T}, dims::Integer...) where {T<:KernelOrTransformedKernel} = array_for_rng(rng, eltype(T), dims...)
+
+
 # By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). KernelDistributions should be inherently allowing multiple samples.
 DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractArray) = logpdf.(dist, x)
 DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractMatrix) = logpdf.(dist, x)
@@ -65,8 +70,8 @@ DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractMatri
 Sample an Array from `dist` of size `dims`.
 """
 function Base.rand(rng::AbstractRNG, dist::KernelOrTransformedKernel, dims::Int64...)
-    A = array_for_rng(rng, eltype(dist), dims...)
-    _rand!(rng, dist, A)
+    A = array_for_rng(rng, dist, dims...)
+    rand!(rng, dist, A)
 end
 
 # Avoid recursions of the above
@@ -81,9 +86,9 @@ Base.rand(rng::AbstractRNG, dist::Truncated{<:AbstractKernelDistribution{T}}) wh
     rand(rng, dist, [dims...])
 Sample an Array from `dists` of size `dims`.
 """
-function Base.rand(rng::AbstractRNG, dists::AbstractArray{T}, dims::Integer...) where {T<:KernelOrKernelArray}
-    A = array_for_rng(rng, eltype(T), size(dists)..., dims...)
-    _rand!(rng, dists, A)
+function Base.rand(rng::AbstractRNG, dists::AbstractArray{<:KernelOrTransformedKernel}, dims::Integer...)
+    A = array_for_rng(rng, dists, size(dists)..., dims...)
+    rand!(rng, dists, A)
 end
 
 """
@@ -91,6 +96,8 @@ end
 Mutate the array A by sampling from `dist`.
 """
 Random.rand!(rng::AbstractRNG, dist::AbstractArray{<:KernelOrTransformedKernel}, A::AbstractArray) = _rand!(rng, dist, A)
+Random.rand!(rng::AbstractRNG, dist::KernelOrTransformedKernel, A::AbstractArray) = _rand!(rng, dist, A)
+# Resolve ambiguities with Distributions.jl
 Random.rand!(rng::AbstractRNG, dist::KernelOrTransformedKernel, A::AbstractArray{<:Real}) = _rand!(rng, dist, A)
 
 # CPU implementation

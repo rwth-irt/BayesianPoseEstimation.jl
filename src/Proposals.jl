@@ -40,7 +40,7 @@ end
 
 """
     SymmetricProposal
-Propose samples from the previous one by using a symmetric proposal distribution.
+Propose a new sample from the previous one by using a symmetric proposal distribution.
 """
 struct SymmetricProposal{T} <: AbstractProposal
     model::T
