@@ -66,49 +66,44 @@ end
 logprob(sample::Sample) = sample.logp
 
 """
+    merge(a, b)
+Left-to-Right merges the samples.
+This means the the rightmost variables are kept.
+Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
+"""
+function Base.merge(a::Sample, b::NamedTuple)
+    vars = merge(variables(a), b)
+    Sample(vars, -Inf)
+end
+Base.merge(a::Sample, b::Sample) = merge(a, variables(b))
+
+"""
+    merge(a, b)
+Left-to-Right merges the samples by mapping f(variables(a), variables(b)).
+This means the the rightmost variables are kept.
+Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
+"""
+function map_merge(f, a::Sample, b::NamedTuple)
+    vars = map_intersect(f, variables(a), b)
+    Sample(merge(a.variables, vars), -Inf)
+end
+map_merge(f, a::Sample, b::Sample) = map_merge(f, a, variables(b))
+
+"""
     +(a, b)
 Add the raw states (unconstrained domain) of two samples.
 The returned sample is of the same type as `a`.
 """
-Base.:+(a::Sample, b::Sample) = merge(a, a + variables(b))
-
-"""
-    +(a, b)
-Add a NamedTuple `b` to the raw values of sample `a`.
-"""
-function Base.:+(a::Sample, b::NamedTuple)
-    sum_nt = map_intersect(.+, variables(a), b)
-    @set a.variables = merge(a.variables, sum_nt)
-end
+Base.:+(a::Sample, b::NamedTuple) = map_merge(.+, a, b)
+Base.:+(a::Sample, b::Sample) = a + variables(b)
 
 """
     -(a, b)
 Subtract the raw states (unconstrained domain) of two samples.
 Only same type is supported to prevent surprises in the return type.
 """
-Base.:-(a::Sample, b::Sample) = merge(a, a - variables(b))
-
-"""
-    -(a, b)
-Subtract a NamedTuple `b` from the raw values of sample `a`.
-"""
-function Base.:-(a::Sample, b::NamedTuple)
-    sum_nt = map_intersect(.-, variables(a), b)
-    @set a.variables = merge(a.variables, sum_nt)
-end
-
-"""
-    merge(a, b...)
-Left-to-Right merges the samples.
-This means the the rightmost variables are kept.
-Merging the log probabilities does not make sense without evaluating against the overall model, thus it is -Inf
-"""
-Base.merge(a::Sample, b::Sample...) = merge(a, variables.(b)...)
-
-function Base.merge(a::Sample, b::NamedTuple...)
-    merged_variables = merge(variables(a), b...)
-    Sample(merged_variables, -Inf)
-end
+Base.:-(a::Sample, b::NamedTuple) = map_merge(.-, a, b)
+Base.:-(a::Sample, b::Sample) = a - variables(b)
 
 """
     bundle_samples(samples, model, sampler, state, chain_type[; kwargs...])
