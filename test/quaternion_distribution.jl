@@ -9,8 +9,8 @@ using .MCMCDepth
 using CUDA
 using LinearAlgebra
 using MCMCDepth
-using Rotations
 using Plots
+using Quaternions
 using Random
 using Test
 
@@ -25,7 +25,7 @@ dist = QuaternionDistribution(Float64)
 
 # Single
 q = @inferred rand(rng, dist)
-@test q isa Vector{Float64}
+@test q isa Quaternion{Float64}
 @test norm(q) ≈ 1
 ℓ = @inferred logdensityof(dist, q)
 @test ℓ isa Float64
@@ -33,9 +33,9 @@ q = @inferred rand(rng, dist)
 
 # Multiple
 Q = @inferred rand(rng, dist, 3, 2)
-@test Q isa Array{Float64}
-@test size(Q) == (4, 3, 2)
-@test reduce(&, norm_dims(Q) .≈ 1)
+@test Q isa Array{Quaternion{Float64},2}
+@test size(Q) == (3, 2)
+@test reduce(&, norm.(Q) .≈ 1)
 ℓ = @inferred logdensityof(dist, Q)
 @test ℓ isa Array{Float64}
 @test size(ℓ) == (3, 2)
@@ -43,7 +43,7 @@ Q = @inferred rand(rng, dist, 3, 2)
 
 # CUDA
 Q = @inferred rand(curng, dist, 100)
-@test Q isa CuMatrix{Float64}
+@test Q isa CuArray{Quaternion{Float64},1}
 ℓ = @inferred logdensityof(dist, Q)
 @test ℓ isa CuVector{Float64}
 @test reduce(&, ℓ .== log(1 / π^2))
@@ -65,7 +65,6 @@ if PLOT
     vecs = aa_rot .* ([0, 1, 0],)
     z_angles = atan.(getindex.(vecs, 1), getindex.(vecs, 2))
     histogram(z_angles; proj=:polar, fill=true, nbins=90)
-    # density(z_angles, proj=:polar, fill=true, fillalpha=0.4, trim=true)
 end
 
 # Compare with uniformly sampled Euler angles
@@ -86,5 +85,4 @@ if PLOT
     vecs = aa_rot .* ([0, 1, 0],)
     z_angles = atan.(getindex.(vecs, 1), getindex.(vecs, 2))
     histogram(z_angles; proj=:polar, fill=true, nbins=90)
-    # density(z_angles, proj=:polar, fill=true, fillalpha=0.4, trim=true)
 end

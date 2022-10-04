@@ -104,6 +104,12 @@ to_rotation(A::AbstractArray{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = 
 # SciGL will take care of conversion to affine transformation matrix
 to_rotation(A::AbstractArray{<:Rotation}, ::Rotation) = A
 to_rotation(v::AbstractVector{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = T(v...)
+"""
+    to_rotation(A, [T=RotXYZ])
+Convert an array of Quaternions to an array of `Rotation` column wise, optionally specifying the orientation representation `T`.
+"""
+to_rotation(Q::Array{<:Quaternion}, ::Type{T}=RotXYZ) where {T<:Rotation} = T.(Q)
+
 
 """
     array_for_rng(rng, T, dims...)
