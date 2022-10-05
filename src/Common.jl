@@ -83,11 +83,14 @@ sum_and_dropdims(A::Number, ::Dims{N}) where {N} = A
 # Base.has_fast_linear_indexing(bc::Broadcast.Broadcasted{<:Broadcast.BroadcastStyle,<:Tuple}) = false
 
 """
-    pose_vector(t, r, [rot_type=RotXYZ])
+    pose_vector(t, r)
 Convert and broadcast positions and orientations to a vector of `Pose`.
 """
-to_pose(t, r, rot_type=RotXYZ) = Pose.(to_translation(t), to_rotation(r, rot_type))
-to_pose(t::AbstractVector, r::AbstractVector, rot_type=RotXYZ) = Pose(to_translation(t), to_rotation(r, rot_type))
+to_pose(t, r) = to_pose(to_translation(t), to_rotation(r))
+to_pose(t::Translation, r::Rotation) = Pose(t, r)
+to_pose(t::AbstractArray{<:Translation}, r) = Pose.(t, to_rotation(r))
+to_pose(t, r::AbstractArray{<:Rotation}) = Pose.(to_translation(t), r)
+to_pose(t::AbstractArray{<:Translation}, r::AbstractArray{<:Rotation}) = Pose.(t, r)
 
 """
     to_translation(A)
@@ -97,19 +100,26 @@ to_translation(A::AbstractArray{<:Number}) = [to_translation(t) for t in eachcol
 to_translation(A::AbstractArray{<:Translation}) = A
 to_translation(v::AbstractVector{<:Number}) = Translation(SVector{3}(v))
 
+# Identity if already Translation
+to_translation(t::Translation) = t
+
 """
     to_rotation(A, [T=RotXYZ])
 Convert an array to a vector of `Rotation` column wise, optionally specifying the orientation representation `T`.
 """
-to_rotation(A::AbstractArray{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = [T(r...) for r in eachcol(A)]
+to_rotation(A::AbstractArray{T}) where {T<:Number} = [RotXYZ(r...) for r in eachcol(A)]
 # SciGL will take care of conversion to affine transformation matrix
-to_rotation(A::AbstractArray{<:Rotation}, ::Rotation) = A
-to_rotation(v::AbstractVector{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} = T(v...)
+to_rotation(v::AbstractVector{T}) where {T<:Number,} = RotXYZ(v...)
+
+# Identity if already rotation
+to_rotation(A::AbstractArray{<:Rotation}) = A
+
 """
     to_rotation(A, [T=RotXYZ])
 Convert an array of Quaternions to an array of `Rotation` column wise, optionally specifying the orientation representation `T`.
 """
-to_rotation(Q::Array{<:Quaternion}, ::Type{T}=RotXYZ) where {T<:Rotation} = Q .|> QuatRotation .|> T
+to_rotation(Q::Array{<:Quaternion}) = QuatRotation.(Q)
+to_rotation(q::Quaternion) = QuatRotation(q)
 
 
 """

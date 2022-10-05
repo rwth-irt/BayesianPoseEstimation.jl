@@ -62,7 +62,6 @@ export KernelCircularUniform
 export KernelExponential
 export KernelNormal
 export KernelUniform
-export QuaternionDistribution
 
 export ProductBroadcastedDistribution
 export BroadcastedDistribution
@@ -81,6 +80,11 @@ export SymmetricProposal
 
 export propose
 export transition_probability
+
+# Quaternions
+export QuaternionDistribution
+export QuaternionPerturbation
+export QuaternionProposal
 
 # Parameters
 export Parameters
@@ -137,6 +141,7 @@ export sphere_scatter
 
 # Extensions and Reexports
 using Reexport
+@reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
 @reexport import SciGL: Scale, Scene

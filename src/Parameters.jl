@@ -38,7 +38,6 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * n_normalization_samples: Number of samples to calculate the normalization constant from the expected number of visible pixels.
 
 # Pose Model
-* rotation_type: Representation of rotations, e.g. :RotXYZ [x,y,z] or :QuatRotation [w,x,y,z] 
 * mean_t: Mean of the RFID measurement
 * σ_t: Standard deviation of RFID measurement, assumes independent x,y,z components
 ## TODO Different rotation models?
@@ -84,7 +83,6 @@ Base.@kwdef struct Parameters
     n_normalization_samples = 20_000
 
     # Pose Model
-    rotation_type = :RotXYZ
     mean_t = [0.0, 0.0, 2.0]
     σ_t = [0.1, 0.1, 0.1]
     # Proposal Model
@@ -168,15 +166,6 @@ Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.precision.(getfield(p, :mean
 Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.precision.(getfield(p, :σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.precision.(getfield(p, :proposal_σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.precision.(getfield(p, :proposal_σ_r))
-
-function Base.getproperty(p::Parameters, ::Val{:rotation_type})
-    r = getfield(p, :rotation_type)
-    if r isa Type
-        Base.typename(r).wrapper{p.precision}
-    elseif r isa Symbol
-        eval(r){p.precision}
-    end
-end
 
 function Base.getproperty(p::Parameters, ::Val{:association_is})
     sym = getfield(p, :association_is) |> eval

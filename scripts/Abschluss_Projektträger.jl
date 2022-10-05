@@ -22,7 +22,7 @@ function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:R
     # TODO should these generators be part of experiment specific scripts or should I provide some default ones?
     # TODO Compare whether truncated even makes a difference
     dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
-    PixelDistribution(μ, dist)
+    ValidPixel(μ, dist)
 end
 my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 1.0f0)
 
@@ -30,7 +30,7 @@ my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 1.0f0)
 scene = Scene(params, render_context)
 t = [-0.05, 0.05, 0.25]
 r = [1, 1, 0]
-p = to_pose(t, r, RotXYZ)
+p = to_pose(t, r)
 μ = copy(render(render_context, scene, 1, p))
 plot_depth_img(μ)
 
@@ -39,7 +39,7 @@ obs_scene = Scene(obs_params, render_context)
 obs_scene = @set obs_scene.meshes[2].pose.t = [-0.5, 0.5, 0.6]
 obs_t = [-0.05, 0.048, 0.25]
 obs_r = [1, 1.03, 0]
-obs_p = to_pose(obs_t, obs_r, RotXYZ)
+obs_p = to_pose(obs_t, obs_r)
 obs_μ = copy(render(render_context, obs_scene, 1, obs_p))
 plot_depth_img(obs_μ)
 
@@ -54,8 +54,8 @@ plot_depth_img(logdensityof.(my_pixel_dist.(μ, o), img) .|> exp; colorbar_title
 # Shorter differences should result in higher logdensity. Keep in mind the mixture.
 
 
-dist_is(μ) = PixelDistribution(μ, KernelNormal(μ, 0.1f0))
-dist_not(μ) = PixelDistribution(μ, truncated(KernelExponential(1.0f0), nothing, μ))
+dist_is(μ) = ValidPixel(μ, KernelNormal(μ, 0.1f0))
+dist_not(μ) = ValidPixel(μ, truncated(KernelExponential(1.0f0), nothing, μ))
 ia = ImageAssociation(dist_is, dist_not, fill(0.5f0, 100, 100), μ)
 ℓ = logdensityof(ia, img)
 plot_prob_img(ℓ, colorbar_title="association probability")

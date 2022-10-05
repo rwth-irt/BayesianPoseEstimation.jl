@@ -45,9 +45,9 @@ s = @inferred rand(Random.default_rng(), abc_model, 3)
 abc_bijectors = @inferred bijector(abc_model)
 tabc_model = @inferred transformed(abc_model)
 ts = @inferred rand(tabc_model)
-vars, logjac = @inferred variables_with_logjac(ts, abc_bijectors)
+ms, logjac = @inferred to_model_domain(ts, abc_bijectors)
 ℓ = @inferred logdensityof(tabc_model, ts)
-@test logdensityof(abc_model, @set ts.variables = vars) + logjac ≈ ℓ
+@test logdensityof(abc_model, ms) + logjac ≈ ℓ
 
 # RngModel
 xoshiro = Xoshiro()
@@ -66,9 +66,9 @@ s2 = rand(xoshiro, rng_model)
 rng_bijectors = @inferred bijector(rng_model)
 rng_tmodel = @inferred transformed(rng_model)
 rng_ts = @inferred rand(rng_tmodel)
-rng_vars, rng_logjac = @inferred variables_with_logjac(rng_ts, abc_bijectors)
+rng_ms, rng_logjac = @inferred to_model_domain(rng_ts, abc_bijectors)
 rng_ℓ = @inferred logdensityof(rng_tmodel, rng_ts)
-@test logdensityof(rng_model, @set rng_ts.variables = rng_vars) + rng_logjac ≈ rng_ℓ
+@test logdensityof(rng_model, rng_ms) + rng_logjac ≈ rng_ℓ
 
 # ComposedModel
 c_model = IndependentModel((; c=ProductBroadcastedDistribution(KernelExponential, fill(2.0, 2))))
@@ -87,10 +87,9 @@ comp_bijectors = @inferred bijector(comp_model)
 @test comp_bijectors.c isa Bijector
 comp_tmodel = @inferred transformed(comp_model)
 comp_ts = @inferred rand(comp_tmodel)
-comp_vars, comp_logjac = @inferred variables_with_logjac(comp_ts, comp_bijectors)
+comp_ms, comp_logjac = @inferred to_model_domain(comp_ts, comp_bijectors)
 comp_ℓ = @inferred logdensityof(comp_tmodel, comp_ts)
-comp_s = @set comp_ts.variables = comp_vars
-@test isapprox(logdensityof(comp_model, comp_s) + comp_logjac, comp_ℓ, rtol=eps(Float16))
+@test isapprox(logdensityof(comp_model, comp_ms) + comp_logjac, comp_ℓ, rtol=eps(Float16))
 
 # ConditionedModel
 a_ind = IndependentModel((; a=a_model))
@@ -116,7 +115,6 @@ con_bijectors = @inferred bijector(con_model)
 @test con_bijectors.b isa Bijector
 con_tmodel = @inferred transformed(con_model)
 con_ts = @inferred rand(con_tmodel)
-con_vars, con_logjac = @inferred variables_with_logjac(con_ts, con_bijectors)
+con_ms, con_logjac = @inferred to_model_domain(con_ts, con_bijectors)
 con_ℓ = @inferred logdensityof(con_tmodel, con_ts)
-con_s = @set con_ts.variables = con_vars
-@test logdensityof(con_model, con_s) + con_logjac == con_ℓ
+@test logdensityof(con_model, con_ms) + con_logjac == con_ℓ

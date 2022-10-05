@@ -18,7 +18,6 @@ using Test
 
 parameters = Parameters()
 parameters = @set parameters.mesh_files = ["meshes/BM067R.obj"]
-parameters = @set parameters.rotation_type = :RotXYZ
 parameters = @set parameters.device = :CUDA
 
 const PLOT = true
@@ -38,7 +37,7 @@ render_context = RenderContext(parameters.width, parameters.height, parameters.d
 scene = Scene(parameters, render_context)
 t = [-0.05, 0.05, 0.25]
 r = normalize([1, 1, 0])
-p = to_pose(t, r, parameters.rotation_type)
+p = to_pose(t, r)
 μ = @inferred render(render_context, scene, 1, p)
 maybe_plot(plot_depth_img, Array(μ))
 @test size(μ) == (100, 100)
@@ -61,8 +60,8 @@ proposed_sample = @inferred propose(dev_rng, tr_proposal, prior_sample)
 @test variables(proposed_sample).t isa Vector{parameters.precision}
 ℓ_proposed = @inferred transition_probability(tr_proposal, prior_sample, proposed_sample)
 
-# RenderProposal
-render_proposal = @inferred RenderProposal(parameters.rotation_type, render_context, scene, parameters.object_id, tr_proposal)
+# RenderModel
+render_proposal = @inferred RenderModel(render_context, scene, parameters.object_id, tr_proposal)
 Random.seed!(rng, 42)
 Random.seed!(dev_rng, 42)
 render_sample = @inferred propose(dev_rng, render_proposal, prior_sample)
@@ -89,7 +88,7 @@ Random.seed!(dev_rng, 42)
 independent_proposed_sample = @inferred propose(dev_rng, independent_tr_proposal, prior_sample)
 ℓ_independent_proposed = @inferred transition_probability(independent_tr_proposal, prior_sample, independent_proposed_sample)
 
-independent_render_proposal = @inferred RenderProposal(parameters.rotation_type, render_context, scene, parameters.object_id, independent_tr_proposal)
+independent_render_proposal = @inferred RenderModel(render_context, scene, parameters.object_id, independent_tr_proposal)
 Random.seed!(rng, 42)
 Random.seed!(dev_rng, 42)
 independent_rendered_sample = @inferred propose(dev_rng, independent_render_proposal, prior_sample)

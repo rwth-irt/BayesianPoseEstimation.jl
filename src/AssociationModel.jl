@@ -33,7 +33,7 @@ struct PixelAssociation{T,I<:ValidPixel,N<:ValidPixel} <: AbstractKernelDistribu
 end
 
 function Distributions.logpdf(dist::PixelAssociation, x)
-    # Internal PixelDistributions handle outliers by returning 1.0 as probability which will result in the prior q without too much overhead
+    # Internal ValidPixels handle outliers by returning 1.0 as probability which will result in the prior q without too much overhead
     p_is = pdf(dist.dist_is, x)
     p_not = pdf(dist.dist_not, x)
     nominator = dist.prior * p_is
@@ -52,6 +52,6 @@ end
 # The support of a mixture is the union of the support of its components
 Base.maximum(dist::PixelAssociation) = max(maximum(dist.dist_is), maximum(dist.dist_not))
 Base.minimum(dist::PixelAssociation) = min(minimum(dist.dist_is), minimum(dist.dist_not))
-# logpdf of the PixelDistributions explicitly handles outliers, so no transformation is desired
+# logpdf of the ValidPixels explicitly handles outliers, so no transformation is desired
 Bijectors.bijector(::PixelAssociation) = Bijectors.Identity{0}()
 Distributions.insupport(dist::PixelAssociation, x::Real) = minimum(dist) < x < maximum(dist)

@@ -69,7 +69,7 @@ function DensityInterface.logdensityof(model::ObservationModel, x)
     if model.normalize_img
         # Normalization: divide by the number of rendered pixels
         n_pixel = nonzero_pixels(model.μ, Dims(model))
-        return model.normalization_constant / n_pixel * log_p
+        return model.normalization_constant ./ n_pixel .* log_p
     end
     # no normalization = raw sum of the pixel likelihoods
     log_p
@@ -99,7 +99,7 @@ function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
         # If the expected value is invalid, it does not provide any information
         zero(T)
     else
-        logdensityof(dist.model, x)
+        logdensityof(dist.model, clamp(x, minimum(dist), maximum(dist)))
     end
 end
 
@@ -109,7 +109,7 @@ function Base.rand(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
     else
         depth = rand(rng, dist.model)
         # maximum is inf
-        depth > minimum(dist) ? depth : minimum(dist)
+        clamp(depth, minimum(dist), maximum(dist))
     end
 end
 

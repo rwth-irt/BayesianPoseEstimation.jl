@@ -31,16 +31,16 @@ params = MCMCDepth.Parameters()
 render_context = RenderContext(params.width, params.height, params.depth, CuArray)
 scene = Scene(params, render_context)
 t = [0, 0, 1.5]
-r = normalize!([1, 0, 0, 0])
-p = to_pose(t, r, QuatRotation)
+r = Quaternion(1, 0, 0, 0) |> normalize
+p = to_pose(t, r)
 
 # WARN 0.01 quickly leads to 0 probability
 const σ = 0.1f0
 const θ = 1.0f0
-dist_is(σ, μ) = PixelDistribution(μ, KernelNormal(μ, σ))
+dist_is(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
 my_dist_is = dist_is | (σ)
 # TEST a truncated dist_not should really help to estimate the association
-dist_not(θ, μ) = PixelDistribution(μ, truncated(KernelExponential(θ), nothing, μ))
+dist_not(θ, μ) = ValidPixel(μ, truncated(KernelExponential(θ), nothing, μ))
 my_dist_not = dist_not | (θ)
 
 # PixelAssociation
@@ -48,10 +48,10 @@ my_dist_not = dist_not | (θ)
 prior = 0.3f0
 pa = PixelAssociation(prior, my_dist_is(μ), my_dist_not(μ))
 
-samples = @inferred rand(rng, pa, 10000)
+samples = @inferred rand(rng, pa, 10_000)
 @test samples isa Vector{Float32}
-@test size(samples) == (10000,)
-maybe_plot(histogram, samples)
+@test size(samples) == (10_000,)
+maybe_plot(histogram, samples; nbins=30)
 
 ℓ = @inferred logdensityof(pa, samples)
 @test ℓ isa Vector{Float32}
@@ -67,9 +67,9 @@ pa = PixelAssociation(prior, my_dist_is(μ), my_dist_not(μ))
 values = @inferred rand(rng, pa, 10000)
 @test isapprox(mean(logdensityof(pa, values)), prior; atol=0.01)
 
-# Invalid depth values should return prior
-@test logdensityof(pa, -eps(μ)) == prior
-@test logdensityof(pa, 0) == prior
+# Invalid depth values are clamped and should result in a low association probability
+@test logdensityof(pa, -eps(μ)) < 1e-10
+@test logdensityof(pa, -eps(μ)) == logdensityof(pa, 0)
 @test logdensityof(pa, eps(Float32)) != prior
 # Values out of support of dist_not should return 1
 @test logdensityof(pa, μ) != 1

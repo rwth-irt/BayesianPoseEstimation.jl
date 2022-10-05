@@ -24,7 +24,7 @@ render_context = RenderContext(params.width, params.height, params.depth, Array)
 scene = Scene(params, render_context)
 t = [-0.05, 0.05, 0.25]
 r = [1, 1, 0]
-p = to_pose(t, r, RotXYZ)
+p = to_pose(t, r)
 μ = render(render_context, scene, 1, p)
 
 # Plot depth images and override some plot parameters

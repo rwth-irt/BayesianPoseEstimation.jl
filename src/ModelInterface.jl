@@ -159,15 +159,14 @@ function Base.rand(rng::AbstractRNG, model::TransformedConditionedModel, dims...
     sample = rand(rng, model.model, dims...)
     merged = merge(sample, model.data)
     # Transform everything except data
-    @set merged.variables = variables(merged, bijector(model))
+    to_unconstrained_domain(merged, bijector(model))
 end
 
 @inline DensityKind(::TransformedConditionedModel) = HasDensity()
 
 function DensityInterface.logdensityof(model::TransformedConditionedModel, sample)
     # Transform sample back to model domain
-    vars, logjac = to_model_domain(sample, bijector(model))
-    transformed_sample = @set sample.variables = vars
+    transformed_sample, logjac = to_model_domain(sample, bijector(model))
     conditioned_sample = merge(transformed_sample, model.data)
     logdensityof(model.model, conditioned_sample) + logjac
 end

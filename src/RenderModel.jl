@@ -7,7 +7,7 @@
 Decorator for a (proposal) `model`.
 First, a new sample is generated from the `model` and then a rendering `μ` of the pose `t` & `r` is merged into the sample.
 """
-struct RenderModel{R<:Rotation,C<:RenderContext,S<:Scene,M} <: AbstractProposal
+struct RenderModel{C<:RenderContext,S<:Scene,M} <: AbstractProposal
     # Render related objects
     render_context::C
     scene::S
@@ -15,8 +15,6 @@ struct RenderModel{R<:Rotation,C<:RenderContext,S<:Scene,M} <: AbstractProposal
     # Probabilistic model
     model::M
 end
-
-RenderModel(::Type{R}, render_context::C, scene::S, object_id::Int, model::M) where {M,C<:RenderContext,S<:Scene,R<:Rotation} = RenderModel{R,C,S,M}(render_context, scene, object_id, model)
 
 """
     rand(rng, proposal, [dims...])
@@ -43,8 +41,8 @@ end
 Converts the translation `t` and rotational `r` component to poses and renders these.
 Afterwards a new sample with the rendering `μ` is returned. 
 """
-function render(proposal::RenderModel{R}, sample::Sample) where {R}
-    p = to_pose(variables(sample).t, variables(sample).r, R)
+function render(proposal::RenderModel, sample::Sample)
+    p = to_pose(variables(sample).t, variables(sample).r)
     # μ is only a view of the render_data. Storing it in every sample is cheap.
     μ = render(proposal.render_context, proposal.scene, proposal.object_id, p)
     merge(sample, (; μ=μ))
@@ -55,6 +53,9 @@ end
 Rendering is determinstic, thus the probability is the one of the decorated proposal model.
 """
 transition_probability(proposal::RenderModel, new_sample, prev_sample) = transition_probability(proposal.model, new_sample, prev_sample)
+
+@inline DensityKind(::RenderModel) = HasDensity()
+DensityInterface.logdensityof(proposal::RenderModel, x) = logdensityof(proposal.model, x)
 
 Bijectors.bijector(proposal::RenderModel) = bijector(proposal.model)
 # transformed is tricky since we need the parameters in the model domain to render

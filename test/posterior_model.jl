@@ -17,7 +17,6 @@ using Test
 
 parameters = Parameters()
 parameters = @set parameters.mesh_files = ["meshes/BM067R.obj"]
-parameters = @set parameters.rotation_type = :QuatRotation
 parameters = @set parameters.device = :CUDA
 
 const PLOT = true
@@ -78,13 +77,12 @@ function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:R
     # TODO should these generators be part of experiment specific scripts or should I provide some default ones?
     # TODO Compare whether truncated even makes a difference
     dist = KernelBinaryMixture(KernelNormal(μ, σ), truncated(KernelExponential(θ), nothing, μ), o, one(o) - o)
-    PixelDistribution(μ, dist)
+    ValidPixel(μ, dist)
 end
 my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
-observation_model(normalize, pixel_dist, μ, o) = ObservationModel(normalize, pixel_dist, μ, o)
-obs_model_fn = observation_model | (parameters.normalize_img, my_pixel_dist)
+obs_model_fn = ObservationModel | (10f0, my_pixel_dist)
 
-posterior_model = PosteriorModel(prior_model, obs_model_fn, render_context, scene, parameters.object_id, parameters.rotation_type)
+posterior_model = PosteriorModel(prior_model, obs_model_fn, render_context, scene, parameters.object_id)
 posterior_sample = @inferred rand(dev_rng, posterior_model)
 ℓ = @inferred logdensityof(posterior_model, posterior_sample)
 maybe_plot(plot_depth_img, variables(posterior_sample).μ |> Array)

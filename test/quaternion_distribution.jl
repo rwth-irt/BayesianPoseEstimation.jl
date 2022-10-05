@@ -17,7 +17,7 @@ using StaticArrays
 using Test
 
 const PLOT = true
-const N_SAMPLES = 20_000
+const N_SAMPLES = 50_000
 
 # Yup 42 is bad style
 curng = CUDA.RNG(42)
@@ -55,9 +55,10 @@ Q = @inferred rand(curng, dist, 100)
 if PLOT
     plotly()
     Q = @inferred rand(rng, dist, N_SAMPLES)
-    Q_rot = to_rotation(Q, QuatRotation)
-    sphere_scatter(Q_rot) |> display
-    sphere_density((Q_rot)) |> display
+    Q_rot = to_rotation(Q)
+    display(sphere_scatter(Q_rot))
+    display(sphere_density((Q_rot)))
+    # MCMCDepth.angleaxis_scatter((Q_rot)) |> display
 end
 
 # Compare with uniformly sampled Euler angles
@@ -66,6 +67,7 @@ if PLOT
     circ_dist = ProductBroadcastedDistribution(_ -> KernelCircularUniform(), Vector{Float32}(undef, 3))
     Q = @inferred rand(rng, circ_dist, N_SAMPLES)
     Q_rot = to_rotation(Q)
-    sphere_scatter(Q_rot) |> display
-    sphere_density(Q_rot) |> display
+    display(sphere_scatter(Q_rot, [1, 0, 0]))
+    display(sphere_density(Q_rot, [1, 0, 0]))
+    # MCMCDepth.angleaxis_scatter(Q_rot) |> display
 end

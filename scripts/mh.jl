@@ -32,11 +32,16 @@ dev_rng = device_rng(parameters)
 cpu_model = RngModel | rng
 dev_model = RngModel | dev_rng
 
+# Render context
+render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
+scene = Scene(parameters, render_context)
+render_model = RenderModel | (render_context, scene, parameters.object_id)
+
 # Pose models on CPU to be able to call OpenGL
 t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
 t_proposal = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_t) |> cpu_model
 
-r_model = ProductBroadcastedDistribution((_) -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
+r_model = ProductBroadcastedDistribution(_ -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
 r_proposal = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_r)
 
 # WARN sampling o with MH seems unstable most of the time
@@ -46,15 +51,10 @@ o_model = Dirac(parameters.precision(0.6))
 o_proposal = KernelNormal(0, parameters.proposal_σ_o)
 
 # Assemble models
-prior_model = PriorModel(t_model, r_model, o_model)
+prior_model = PriorModel(render_context, scene, parameters.object_id, t_model, r_model, o_model)
 # TODO symmetric_proposal = SymmetricProposal(IndependentModel((; t=t_proposal, r=r_proposal, o=o_proposal)))
 symmetric_proposal = SymmetricProposal(IndependentModel((; t=t_proposal, r=r_proposal)))
 independent_proposal = IndependentProposal(prior_model)
-
-# Render context
-render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
-scene = Scene(parameters, render_context)
-render_proposal = RenderModel | (parameters.rotation_type, render_context, scene, parameters.object_id)
 
 # Normalize the img likelihood to the expected number of rendered expected depth pixels.
 # normalization_constant = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
@@ -66,12 +66,12 @@ normalization_constant = parameters.precision(10)
 pixel_mix = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
 normalized_observation = ObservationModel | (normalization_constant, pixel_mix)
 # TEST normalized_posterior actually seems better in a few trials
-normalized_posterior = PosteriorModel(prior_model, normalized_observation, render_context, scene, parameters.object_id, parameters.rotation_type)
+normalized_posterior = PosteriorModel(prior_model, normalized_observation)
 
 # Explicitly handles invalid μ → no normalization
 pixel_expl = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
 explicit_observation = ObservationModel | (pixel_expl)
-explicit_posterior = PosteriorModel(prior_model, explicit_observation, render_context, scene, parameters.object_id, parameters.rotation_type)
+explicit_posterior = PosteriorModel(prior_model, explicit_observation)
 
 # Assemble PosteriorModel
 # WARN use manipulated function since it forces evaluation of parameters to make it type stable
@@ -93,8 +93,8 @@ plot_depth_img(Array(obs))
 # Sampling algorithm
 # conditioned_posterior = ConditionedModel((; z=obs), explicit_posterior)
 conditioned_posterior = ConditionedModel((; z=obs), normalized_posterior)
-mh = MetropolisHastings(render_proposal(prior_model), render_proposal(symmetric_proposal))
-# mh = MetropolisHastings(render_proposal(prior_model), render_proposal(independent_proposal))
+mh = MetropolisHastings(prior_model, render_model(symmetric_proposal))
+# mh = MetropolisHastings(render_model(prior_model), render_model(independent_proposal))
 
 # TODO random walk takes longer to converge to correct orientation
 # WARN random acceptance needs to be calculated on CPU, thus  CPU rng
@@ -115,7 +115,7 @@ plot_logprob(model_chain, 100)
 density_variable(model_chain, :t, 20)
 # # TEST should be approximately n_pixels_rendered / n_pixels
 density_variable(model_chain, :o, 20)
-polar_histogram_variable(model_chain, :r, 20)
+polar_histogram_variable(model_chain, :r; nbins=20)
 
 # mean(getproperty.(variables.(model_chain), (:t)))
 plot_depth_img(render(render_context, scene, parameters.object_id, to_pose(model_chain[end].variables.t, model_chain[end].variables.r)) |> Array)

@@ -2,15 +2,12 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# Resources:
 # Quaternion from Bivectors
 # https://probablydance.com/2017/08/05/intuitive-quaternions/
-
 # Sphere sampling
 # http://corysimon.github.io/articles/uniformdistn-on-sphere/
 # https://mathworld.wolfram.com/SpherePointPicking.html
-
-# Implementations Rotations.jl uses Quaternion.jl and I think I use Rotations.jl in SciGL
-# https://github.com/JuliaGeometry/Quaternions.jl/blob/master/src/Quaternion.jl
 
 using Bijectors
 using DensityInterface
@@ -21,13 +18,14 @@ using Random
 
 """
     robust_normalize(q)
-Compared to the implementation in Quaternions.jl, this implementation takes care of the re-normalization and avoiding divisions by zero as described by J. Sola in „Quaternion kinematics for the error-state KF“
+Compared to the implementation in Quaternions.jl, this implementation takes care of the re-normalization and avoiding divisions by zero as described by J. Sola in „Quaternion kinematics for the error-state KF“.
 """
 function robust_normalize(q::Quaternion{T}) where {T}
     a = abs(q)
     if iszero(a)
         Quaternion(one(T), zero(T), zero(T), zero(T), true)
     else
+        # Rotations.jl likes normalized quaternions → do not ignore small deviations from 1
         q = q / a
         Quaternion(q.s, q.v1, q.v2, q.v3, true)
     end
@@ -56,8 +54,12 @@ Base.rand(rng::AbstractRNG, ::QuaternionDistribution{T}) where {T} = Quaternion(
 Bijectors.bijector(::QuaternionDistribution) = Bijectors.Identity{0}()
 
 
-# # J. Sola, „Quaternion kinematics for the error-state KF“, Laboratoire dAnalyse et dArchitecture des Systemes-Centre national de la recherche scientifique (LAAS-CNRS), Toulouse, France, Tech. Rep, 2012.
-
+#TEST
+"""
+    QuaternionPerturbation
+Taylor approximation for small perturbation as described in:
+J. Sola, „Quaternion kinematics for the error-state KF“, Laboratoire dAnalyse et dArchitecture des Systemes-Centre national de la recherche scientifique (LAAS-CNRS), Toulouse, France, Tech. Rep, 2012.
+"""
 struct QuaternionPerturbation{T} <: AbstractKernelDistribution{Quaternion{T},Continuous}
     σ_x::T
     σ_y::T
@@ -73,17 +75,22 @@ Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = Quatern
 # Bijectors
 Bijectors.bijector(::QuaternionPerturbation) = Bijectors.Identity{0}()
 
-# SymmetricProposal for Quaternion
 
+# TEST
 """
     QuaternionProposal
-TODO
+SymmtericPropsal for quaternions: Uses Hamiltonian product instead of sum and normalizes the result.
 """
 struct QuaternionProposal{var_names,T<:Tuple{Vararg{QuaternionPerturbation}}} <: AbstractProposal
     models::IndependentModel{var_names,T}
 end
 
+"""
+    propose(rng, proposal::QuaternionProposal, sample, dims...)
+Inspired by EKFs for IMUs, the perturbation is assumed to be defined in the local frame.
+Together with the Hamiltonian convention, the perturbation is a right side multiplication.
+"""
 propose(rng::AbstractRNG, proposal::QuaternionProposal, sample::Sample, dims...) = map_merge((a, b) -> robust_normalize.(a .* b), sample, rand(rng, proposal.models, dims...))
 
+# symmetric proposal, can be neglected
 transition_probability(proposal::QuaternionProposal, new_sample::Sample, ::Sample) = 0.0
-
