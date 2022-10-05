@@ -132,6 +132,8 @@ export plot_logprob
 export plot_variable
 export polar_histogram_variable
 export scatter_position
+export sphere_density
+export sphere_scatter
 
 # Extensions and Reexports
 using Reexport

@@ -3,11 +3,15 @@
 # All rights reserved. 
 
 using ColorSchemes
+using CoordinateTransformations: SphericalFromCartesian
 using Images
+using IterTools: partition
 using Plots
 using Plots.PlotMeasures
 using StatsBase
 import StatsPlots: density as stats_density
+
+const RWTH_blue = colorant"#00549f"
 
 """
    value_or_typemax(x, [value=zero(x)])
@@ -152,3 +156,47 @@ mean_image(chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name) = mean(
 Returns a discretized version of the color palette.
 """
 discrete_palette(cscheme=:viridis, length::Int64=3) = get(colorschemes[cscheme], range(0.0, 1.0, length=length))
+
+"""
+  sphere_density(rotations, [point]; [n_θ, n_ϕ, color], kwargs...)
+Plot the density of the rotations by rotating a point on the unit sphere.
+The density of the rotations is visualized as a heatmap and takes into account the non-uniformity of the patches' surface area on a sphere.
+"""
+function sphere_density(rotations, point=[0, 0, 1]; n_θ=90, n_ϕ=45, color=:viridis, kwargs...)
+  # rotate on unit sphere
+  r_points = map(r -> Vector(r * normalize(point)), rotations)
+  # histogram of spherical coordinates: θ ∈ [-π,π], ϕ ∈ [-π/2,π/2]
+  spherical = SphericalFromCartesian().(r_points)
+  θ_hist = range(-π, π; length=n_θ + 1)
+  ϕ_hist = range(-π / 2, π / 2; length=n_ϕ + 1)
+  hist = fit(Histogram, (getproperty.(spherical, :θ), getproperty.(spherical, :ϕ)), (θ_hist, ϕ_hist))
+
+  # sphere surface patches do not have a uniform area, calculate actual patch area using the sphere  integral for r=1
+  ∫_unitsphere(θ_l, θ_u, ϕ_l, ϕ_u) = (cos(ϕ_l) - cos(ϕ_u)) * (θ_u - θ_l)
+  # different range than the spherical coordinates conversion above
+  θ_patch = range(-π, π; length=n_θ + 1)
+  ϕ_patch = range(0, π; length=n_ϕ + 1)
+  patches = [∫_unitsphere(θ..., ϕ...) for θ in partition(θ_patch, 2, 1), ϕ in partition(ϕ_patch, 2, 1)]
+  # area correction & max-norm
+  weights = normalize(hist.weights ./ patches, Inf)
+
+  # parametrize surface for the plot
+  θ_surf = range(-π, π; length=n_θ)
+  ϕ_surf = range(0, π; length=n_ϕ)
+  x_surf = cos.(θ_surf) * sin.(ϕ_surf)'
+  y_surf = sin.(θ_surf) * sin.(ϕ_surf)'
+  z_surf = ones(n_θ) * cos.(ϕ_surf)'
+
+  # override fill_z to use the weights for the surface color
+  surface(x_surf, y_surf, z_surf; fill_z=weights, color=color, kwargs...)
+end
+
+"""
+  sphere_density(rotations, [point]; [color, markersize, markeralpha], kwargs...)
+Plot the density of the rotations by rotating a point on the unit sphere.
+"""
+function sphere_scatter(rotations, point=[0, 0, 1]; color=RWTH_blue, markersize=0.5, markeralpha=0.25, kwargs...)
+  r_points = map(r -> Vector(r * [0, 0, 1]), rotations)
+  r_scat = hcat(r_points...)
+  scatter3d(r_scat[1, :], r_scat[2, :], r_scat[3, :]; color=color, markersize=markersize, markeralpha=markeralpha, kwargs...)
+end

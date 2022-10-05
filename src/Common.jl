@@ -4,6 +4,7 @@
 
 using CoordinateTransformations
 using CUDA
+using Quaternions
 using Random
 using Rotations
 using StaticArrays
@@ -108,7 +109,7 @@ to_rotation(v::AbstractVector{<:Number}, ::Type{T}=RotXYZ) where {T<:Rotation} =
     to_rotation(A, [T=RotXYZ])
 Convert an array of Quaternions to an array of `Rotation` column wise, optionally specifying the orientation representation `T`.
 """
-to_rotation(Q::Array{<:Quaternion}, ::Type{T}=RotXYZ) where {T<:Rotation} = T.(Q)
+to_rotation(Q::Array{<:Quaternion}, ::Type{T}=RotXYZ) where {T<:Rotation} = Q .|> QuatRotation .|> T
 
 
 """
