@@ -55,7 +55,19 @@ plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probabi
   convert(Matrix, chain, var_name::Symbol, step = 1)
 Converts the chain to a column matrix of the variable `var_name`.
 """
+function Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1)
+  M = hcat([variables(chain[i])[var_name] for i in 1:step:length(chain)]...)
 Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1) = hcat([variables(chain[i])[var_name] for i in 1:step:length(chain)]...)
+  if M isa AbstractArray{<:Quaternion}
+    M = map(M) do q
+      r_q = QuatRotation(q)
+      r_xyz = RotXYZ(r_q)
+      [r_xyz.theta1, r_xyz.theta2, r_xyz.theta3]
+    end
+    M = hcat(M...)
+  end
+  M
+end
 
 """
   convert(Matrix, chain, var_name::Symbol, step = 1)

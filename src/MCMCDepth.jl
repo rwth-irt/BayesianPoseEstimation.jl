@@ -148,6 +148,7 @@ using Reexport
 
 @reexport import DensityInterface: logdensityof
 @reexport import Random: rand!
+@reexport import StatsBase: Weights
 
 # Bijectors
 @reexport import Bijectors: bijector, inverse, link, invlink, with_logabsdet_jacobian, transformed

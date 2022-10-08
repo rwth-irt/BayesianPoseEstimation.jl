@@ -51,8 +51,12 @@ Distributions.logpdf(::QuaternionDistribution{T}, x::Quaternion) where {T} = T(q
 Base.rand(rng::AbstractRNG, ::QuaternionDistribution{T}) where {T} = Quaternion(randn(rng, T), randn(rng, T), randn(rng, T), randn(rng, T)) |> robust_normalize
 
 # Bijectors
-Bijectors.bijector(::QuaternionDistribution) = Bijectors.Identity{0}()
-
+Bijectors.bijector(::QuaternionDistribution) = Identity{0}()
+Bijectors.logabsdetjac(::Identity, ::Quaternion{T}) where {T} = zero(T)
+function Bijectors.logabsdetjac(::Identity, x::AbstractArray{<:Quaternion{T}}) where {T}
+    res = similar(x, T)
+    fill!(res, zero(T))
+end
 
 #TEST
 """
@@ -79,9 +83,9 @@ Bijectors.bijector(::QuaternionPerturbation) = Bijectors.Identity{0}()
 # TEST
 """
     QuaternionProposal
-SymmtericPropsal for quaternions: Uses Hamiltonian product instead of sum and normalizes the result.
+SymmtericPropsal for quaternions: Uses broadcasted (Hamiltonian) product `.*` operator instead of sum `+` and normalizes the result.
 """
-struct QuaternionProposal{var_names,T<:Tuple{Vararg{QuaternionPerturbation}}} <: AbstractProposal
+struct QuaternionProposal{var_names,T} <: AbstractProposal
     models::IndependentModel{var_names,T}
 end
 

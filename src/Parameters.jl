@@ -88,6 +88,7 @@ Base.@kwdef struct Parameters
     # Proposal Model
     proposal_σ_t = [0.01, 0.01, 0.01]
     proposal_σ_r = [0.1, 0.1, 0.1]
+    proposal_σ_r_quat = 0.1
     # Inference
     precision = Float32
     device = :CUDA
@@ -166,6 +167,7 @@ Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.precision.(getfield(p, :mean
 Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.precision.(getfield(p, :σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.precision.(getfield(p, :proposal_σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.precision.(getfield(p, :proposal_σ_r))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.precision.(getfield(p, :proposal_σ_r_quat))
 
 function Base.getproperty(p::Parameters, ::Val{:association_is})
     sym = getfield(p, :association_is) |> eval
