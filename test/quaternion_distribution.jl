@@ -71,3 +71,38 @@ if PLOT
     display(sphere_density(Q_rot, [1, 0, 0]))
     # MCMCDepth.angleaxis_scatter(Q_rot) |> display
 end
+
+# Quaternion perturbation
+q0 = Quaternion(Float16(1), 0, 0, 0, true)
+pert = QuaternionPerturbation(0.1f0)
+q1 = @inferred rand(rng, pert)
+ℓ = @inferred logdensityof(pert, q1)
+@test ℓ == sum(logdensityof.(KernelNormal(0, 0.1f0), imag_part(q1) .* 2))
+@test norm(q1) == 1
+@test q0 * q1 isa QuaternionF32
+@test q1 * q0 == q1
+q2 = rand(rng, dist)
+@test q1 * q2 isa QuaternionF64
+@test q1 * q2 != q2 * q1
+# multiple
+Q = @inferred rand(rng, pert, 2, 2)
+@test Q isa Matrix{QuaternionF32}
+L = @inferred logdensityof(pert, Q)
+@test L isa Matrix{Float32}
+
+# Normalization approximation
+ϕ = rand(KernelNormal(0, 0.01f0), 3)
+@test isapprox(qrotation(ϕ), MCMCDepth.approx_qrotation(ϕ...))
+
+# QuaternionProposal
+prop = QuaternionProposal(IndependentModel((; a=QuaternionPerturbation(0.01))))
+s1 = Sample((; a=rand(dist)), MCMCDepth.quat_logp)
+s2 = @inferred propose(rng, prop, s1)
+ℓ = @inferred transition_probability(prop, s1, s2)
+@test ℓ == 0
+
+# multiple
+S2 = @inferred propose(rng, prop, s1, 2, 2)
+@test S2.variables.a isa Matrix{QuaternionF64}
+L = @inferred transition_probability(prop, s1, S2)
+@test L == 0

@@ -18,7 +18,8 @@ using Random
 
 """
     robust_normalize(q)
-Compared to the implementation in Quaternions.jl, this implementation takes care of the re-normalization and avoiding divisions by zero as described by J. Sola in „Quaternion kinematics for the error-state KF“.
+Compared to the implementation in Quaternions.jl, this implementation takes care of the re-normalization and avoiding divisions by zero.
+Eq. (44) in J. Sola, „Quaternion kinematics for the error-state KF“.
 """
 function robust_normalize(q::Quaternion{T}) where {T}
     a = abs(q)
@@ -30,6 +31,14 @@ function robust_normalize(q::Quaternion{T}) where {T}
         Quaternion(q.s, q.v1, q.v2, q.v3, true)
     end
 end
+
+"""
+    approx_qrotation(x, y, z)
+Approximate conversion of small rotation vectors ϕ = (x, y, z) to a quaternion.
+≈ double the speed of Quaternions.qrotation
+Eq. (193) in J. Sola, „Quaternion kinematics for the error-state KF“
+"""
+approx_qrotation(x, y, z) = Quaternion(1, x / 2, y / 2, z / 2) |> robust_normalize
 
 """
     QuaternionDistribution
@@ -58,7 +67,6 @@ function Bijectors.logabsdetjac(::Identity, x::AbstractArray{<:Quaternion{T}}) w
     fill!(res, zero(T))
 end
 
-#TEST
 """
     QuaternionPerturbation
 Taylor approximation for small perturbation as described in:
@@ -72,15 +80,14 @@ end
 
 QuaternionPerturbation(σ=0.01f0::Real) = QuaternionPerturbation(σ, σ, σ)
 
-Distributions.logpdf(dist::QuaternionPerturbation{T}, x::Quaternion) where {T} = logpdf(KernelNormal(zero(T), dist.σ_x), 2 * x.v1) + logpdf(KernelNormal(zero(T), dist.σ_y), 2 * x.v2) + logpdf(KernelNormal(zero(T), dist.σ_z), 2 * x.v2)
+Distributions.logpdf(dist::QuaternionPerturbation{T}, x::Quaternion) where {T} = logpdf(KernelNormal(zero(T), dist.σ_x), 2 * x.v1) + logpdf(KernelNormal(zero(T), dist.σ_y), 2 * x.v2) + logpdf(KernelNormal(zero(T), dist.σ_z), 2 * x.v3)
 
-Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = Quaternion(1, rand(rng, KernelNormal(0, dist.σ_x)) / 2, rand(rng, KernelNormal(0, dist.σ_y)) / 2, rand(rng, KernelNormal(0, dist.σ_z)) / 2) |> robust_normalize
+Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = approx_qrotation(rand(rng, KernelNormal(0, dist.σ_x)), rand(rng, KernelNormal(0, dist.σ_y)), rand(rng, KernelNormal(0, dist.σ_z)))
 
 # Bijectors
 Bijectors.bijector(::QuaternionPerturbation) = Bijectors.Identity{0}()
 
 
-# TEST
 """
     QuaternionProposal
 SymmtericPropsal for quaternions: Uses broadcasted (Hamiltonian) product `.*` operator instead of sum `+` and normalizes the result.

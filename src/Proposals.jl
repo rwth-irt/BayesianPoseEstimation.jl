@@ -62,7 +62,8 @@ propose(rng::AbstractRNG, proposal::SymmetricProposal, sample::Sample, dims...) 
 
 """
     transition_probability(proposal, new_sample, prev_sample)
-For symmetric proposals, the forward and backward transition probability cancels out
+For symmetric proposals, the forward and backward transition probability cancels out.
+Will be combined with prior and likelihood by broadcasting, so returning a scalar is enough.
 """
 transition_probability(proposal::SymmetricProposal, new_sample::Sample, ::Sample) = 0.0
 
