@@ -6,6 +6,21 @@ using Random
 using SciGL
 
 """
+    pose_prior(render_context, scene, object_id, t_model, r_model, o_model)
+Creates a PriorModel for the variables t, r & o which automatically renders μ after in rand.
+"""
+pose_prior(render_context::RenderContext, scene::Scene, object_id::Integer, t_model, r_model, o_model) = RenderModel(render_context, scene, object_id, IndependentModel((; t=t_model, r=r_model, o=o_model))) |> PriorModel(model, bijectors)
+
+
+"""
+    post
+Consist of a `prior_model`, which generates a sample with variables t, r, o & μ.
+The `observation_model` is a function of (μ, o) which creates a ObservationModel.
+The observation itself is the `z` variable of the sample.
+"""
+pose_posterior(render_context::RenderContext, scene::Scene, object_id::Integer, t_model, r_model, o_model, z_model) = PosteriorModel(prior, ConditionedModel(likelihood, (; z=observation)))
+
+"""
     expected_pixel_count(rng, prior_model, render_context, scene, parameters)
 Calculates the expected number of valid rendered pixels for the poses of the prior model.
 This number can for example be used as the normalization constant in the observation model.
@@ -29,15 +44,20 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 * Tail distribution: occlusions (exponential) and random outliers (uniform)
 """
 function pixel_mixture(min_depth::T, max_depth::T, σ::T, θ::T, μ::T, o::T) where {T<:Real}
+    tail = pixel_tail(min_depth, max_depth, θ, μ)
+    normal = KernelNormal(μ, σ)
+    tail = pixel_tail(min_depth, max_depth, θ, μ)
+    KernelBinaryMixture(normal, tail, o, one(o) - o)
+end
+
+function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
     # TODO Does truncated make a difference?
     # truncate: lower <= upper → max(min_depth, μ)
+    # TODO what about the μ in the association model?
     exponential = truncated(KernelExponential(θ), min_depth, max(min_depth, μ))
     uniform = KernelUniform(zero(T), max_depth)
     # TODO custom weights for exponential and uniform?
     tail = KernelBinaryMixture(exponential, uniform, one(T), one(T))
-    normal = KernelNormal(μ, σ)
-    tail = KernelBinaryMixture(exponential, uniform, one(T), one(T))
-    KernelBinaryMixture(normal, tail, o, one(o) - o)
 end
 
 """

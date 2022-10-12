@@ -46,8 +46,8 @@ end
 Implementing the AbstractMCMC interface for the initial step.
 Uses the first sampler to propose the initial sample.
 """
-function AbstractMCMC.step(rng::AbstractRNG, model, sampler::ComposedSampler)
-    # All samplers have the same prior
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::ComposedSampler)
+    # All samplers use the prior of the PosteriorModel
     new_sample, _ = AbstractMCMC.step(rng, model, first(sampler.samplers))
     # sample, state
     new_sample, new_sample
@@ -57,7 +57,7 @@ end
     step(sample, model, sampler, state)
 Implementing the AbstractMCMC interface for steps given a state from the last step.
 """
-function AbstractMCMC.step(rng::AbstractRNG, model, sampler::ComposedSampler, state)
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::ComposedSampler, state)
     index = sample(rng, sampler.weights)
     # TODO Different states like multiple weighted samples not supported yet
     new_sample, _ = AbstractMCMC.step(rng, model, sampler.samplers[index], state)

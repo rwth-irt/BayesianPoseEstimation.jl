@@ -3,8 +3,6 @@
 # All rights reserved. 
 # Samples
 
-# TODO Do I want another wrapper or base all these models on AbstractModel?
-using AbstractMCMC: AbstractModel
 using Accessors
 using Bijectors
 using DensityInterface
@@ -24,7 +22,7 @@ A model could be as simple as containing only one variable.
 Model variables are assumed to be independent and sampled in order via `ModelVariable(rng, model, dims...)`.
 Does not support hierarchical models because of the one-to-one matching of the model and the variables.
 """
-struct IndependentModel{var_names,T} <: AbstractModel
+struct IndependentModel{var_names,T}
     # Wrapping NamedTuple to avoid type piracy
     models::NamedTuple{var_names,T}
 end
@@ -44,7 +42,7 @@ function Base.rand(rng::AbstractRNG, model::IndependentModel, dims::Integer...)
         # Sampler can transform the model to propose on ℝ
         rand(rng, m, dims...)
     end
-    Sample(var_nt, -Inf)
+    Sample(var_nt)
 end
 
 @inline DensityKind(::IndependentModel) = HasDensity()
@@ -64,7 +62,7 @@ Bijectors.transformed(model::IndependentModel) = IndependentModel(map(transforme
     RngModel
 Wraps an internal `model` and allows to provide an individual RNG for this model.
 """
-struct RngModel{T,U<:AbstractRNG} <: AbstractModel
+struct RngModel{T,U<:AbstractRNG}
     rng::U
     model::T
 end
@@ -89,7 +87,7 @@ Bijectors.transformed(model::RngModel) = @set model.model = transformed(model.mo
     ComposedModel
 Generate Samples from several models which in turn generate samples by merging them in order.
 """
-struct ComposedModel{T<:Tuple} <: AbstractModel
+struct ComposedModel{T<:Tuple}
     models::T
 end
 
@@ -120,7 +118,7 @@ Bijectors.transformed(model::ComposedModel) = @set model.models = transformed.(m
     ConditionedModel
 Decorator for a model which conditiones the sample on the data before evaluating the logdensity.
 """
-struct ConditionedModel{T,V,M} <: AbstractModel
+struct ConditionedModel{T,V,M}
     data::NamedTuple{T,V}
     model::M
 end
@@ -129,7 +127,8 @@ ConditionedModel(sample::Sample, model) = ConditionedModel(sample.variables, mod
 
 function Base.rand(rng::AbstractRNG, model::ConditionedModel, dims...)
     sample = rand(rng, model.model, dims...)
-    merge(sample, model.data)
+    # TODO Might unintentionally override data generated from model
+    # merge(sample, model.data)
 end
 
 @inline DensityKind(::ConditionedModel) = HasDensity()
@@ -148,7 +147,7 @@ Bijectors.transformed(model::ConditionedModel) = TransformedConditionedModel(mod
 
 # TODO workaround - is there a cleaner possibilty without making any assumptions about the model? e.g. that each variable is only defined once, model is one of these model or a distribution...?
 
-struct TransformedConditionedModel{T,V,M} <: AbstractModel
+struct TransformedConditionedModel{T,V,M}
     data::NamedTuple{T,V}
     model::M
 end
@@ -157,9 +156,11 @@ TransformedConditionedModel(sample::Sample, model) = TransformedConditionedModel
 
 function Base.rand(rng::AbstractRNG, model::TransformedConditionedModel, dims...)
     sample = rand(rng, model.model, dims...)
-    merged = merge(sample, model.data)
     # Transform everything except data
-    to_unconstrained_domain(merged, bijector(model))
+    to_unconstrained_domain(sample, bijector(model))
+    # TODO might unintentionally override random value
+    # merged = merge(sample, model.data)
+    # to_unconstrained_domain(merged, bijector(model))
 end
 
 @inline DensityKind(::TransformedConditionedModel) = HasDensity()
@@ -172,4 +173,4 @@ function DensityInterface.logdensityof(model::TransformedConditionedModel, sampl
 end
 
 Bijectors.bijector(model::TransformedConditionedModel) = Base.structdiff(bijector(model.model), model.data)
-Bijectors.transformed(model::TransformedConditionedModel) = ConditionedModel(model.data, model.model) 
+Bijectors.transformed(model::TransformedConditionedModel) = ConditionedModel(model.data, model.model)

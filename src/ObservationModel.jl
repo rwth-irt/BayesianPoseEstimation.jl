@@ -7,17 +7,17 @@ using Base: Callable
 using SciGL
 
 """
-    ObservationModel(normalize_img, normalization_constant, broadcasted_dist, μ)
+    ObservationModel(pixel_dist, normalization_constant)
 Model to compare rendered and observed depth images.
-Accumulates and optionally normalizes the pixel distribution.
 
 # Pixel Distribution
 Each pixel is assumed to be independent and the measurement can be described by a distribution `pixel_dist(μ, o)`.
 `μ` is the expected depth and `o` is the object association probability.
+Therefore, the image logdensity for the measurement `z` is calculated by summing the pixel logdensities.
 Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
 
 # Normalization
-The `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
+If a normalization_constant is provided, `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
 This effectively changes the number of data points evaluated in the sum of the image loglikelihood for different views.
 Thus, the algorithm might prefer (incorrect) poses further or closer to the object, which depends if the pixel loglikelihood is positive or negative.
 
@@ -27,59 +27,65 @@ The `normalization_constant` is multiplied afterwards, a reasonable constant is 
 # Alternatives to Normalization
 * proper preprocessing by cropping or segmenting the image
 * a pixel_dist which handles the tail distribution by providing a reasonable likelihood for invalid expected values
-
 """
-struct ObservationModel{T,B<:BroadcastedDistribution{T},U<:AbstractArray{T}}
-    normalize_img::Bool
+struct ObservationModel{normalized,P,T}
+    pixel_dist::P
     normalization_constant::T
-    broadcasted_dist::B
-    # For the calculation of the normalization constant
-    μ::U
 end
 
-"""
-    ObservationModel(normalize_img, pixel_dist, μ, o)
-Generates a `BroadcastedDistribution` of dim (1,2) from the `pix_dist`, expected depth `μ` and the association probability `o`.
-"""
-function ObservationModel(normalization_constant::T, pixel_dist, μ::AbstractArray{T}, o::Union{T,AbstractArray{T}}) where {T}
-    wrapped_dist(pμ, po) = ValidPixel(pμ, pixel_dist(pμ, po))
-    broadcasted_dist = BroadcastedDistribution(wrapped_dist, Dims(ObservationModel), μ, o)
-    ObservationModel(true, normalization_constant, broadcasted_dist, μ)
-end
+# Hide this one, since normalization only makes sense if the constant is provided
+ObservationModel_(normalized::Bool, pixel_dist::P, normalization_constant::T) where {P,T} = ObservationModel{normalized,P,T}(pixel_dist, normalization_constant)
 
-# TODO Doc the different constructors
-# TEST different behavior
-function ObservationModel(pixel_dist, μ::AbstractArray{T}, o::Union{T,AbstractArray{T}}) where {T}
-    broadcasted_dist = BroadcastedDistribution(pixel_dist, Dims(ObservationModel), μ, o)
-    ObservationModel(false, one(T), broadcasted_dist, μ)
+ObservationModel(pixel_dist) = ObservationModel_(false, pixel_dist, 1)
+
+function ObservationModel(pixel_dist, normalization_constant)
+    wrapped_dist(μ, o) = ValidPixel(μ, pixel_dist(μ, o))
+    ObservationModel_(true, wrapped_dist, normalization_constant)
 end
 
 # Image is always 2D
 const Base.Dims(::Type{<:ObservationModel}) = (1, 2)
 const Base.Dims(::ObservationModel) = Dims(ObservationModel)
 
-# Generate independent random numbers from m_pix(μ, o)
-Base.rand(rng::AbstractRNG, model::ObservationModel, dims::Integer...) = rand(rng, model.broadcasted_dist, dims...)
+"""
+    realize(observation_model, sample)
+Since the pixel_dist parameters μ and o are latent, realize the distribution using a sample which has both variables.
+"""
+realize(observation_model::ObservationModel, sample::Sample) = BroadcastedDistribution(observation_model.pixel_dist, Dims(ObservationModel), variables(sample).μ, variables(sample).o)
+
+"""
+    rand(rng, observation_model, sample)
+Generate a random observation using the expected depth μ and association o of the sample.
+"""
+Base.rand(rng::AbstractRNG, model::ObservationModel, sample::Sample) = rand(rng, realize(model, sample))
 
 # DensityInterface
 @inline DensityKind(::ObservationModel) = HasDensity()
 
-function DensityInterface.logdensityof(model::ObservationModel, x)
-    log_p = logdensityof(model.broadcasted_dist, x)
-    if model.normalize_img
-        # Normalization: divide by the number of rendered pixels
-        n_pixel = nonzero_pixels(model.μ, Dims(model))
-        return model.normalization_constant ./ n_pixel .* log_p
-    end
-    # no normalization = raw sum of the pixel likelihoods
-    log_p
+# Avoid ambiguities: extract variables μ, o & z from the sample
+logdensityof_(model::ObservationModel, x::Sample) = logdensityof(realize(model, x), variables(x).z)
+
+DensityInterface.logdensityof(model::ObservationModel, x::Sample) = logdensityof_(model, x)
+
+function DensityInterface.logdensityof(model::ObservationModel{true}, x::Sample)
+    log_p = logdensityof_(model, x)
+    # Normalization: divide by the number of rendered pixels
+    n_pixel = nonzero_pixels(variables(x).μ, Dims(model))
+    model.normalization_constant ./ n_pixel .* log_p
 end
+
 
 """
     nonzero_pixels(images, dims)
 Calculates the number of nonzero pixels for each image with the given dims.
 """
 nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
+# TODO extend to PixelDist with the latent variable names so μ and o are not hardcoded
+# extract the variables from the sample in the ObservationModel like this (scratchpad/flex_pixel.jl):
+# struct PixelDist{names,F}
+#     fn::F
+# end
+# b_pix(pix_dist::PixDist{names}, nt) where {names} = pix_dist.fn.(values(nt[names])...)
 
 """
     ValidPixel

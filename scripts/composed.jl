@@ -41,57 +41,57 @@ render_model = RenderModel | (render_context, scene, parameters.object_id)
 t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
 # r_model = ProductBroadcastedDistribution(_ -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
 r_model = QuaternionDistribution(parameters.precision) |> cpu_model
+
 # TODO Show robustness for different o by estimating it
 # o_model = Dirac(parameters.precision(3 / 4)) |> cpu_model
 # TODO works but takes longer to converge
 o_model = KernelUniform() |> cpu_model
-prior_model = PriorModel(render_context, scene, parameters.object_id, t_model, r_model, o_model)
 
+prior_model = RenderModel(render_context, scene, parameters.object_id, IndependentModel((; t=t_model, r=r_model, o=o_model)))
+
+# Assemble samplers
 # t & r change expected depth, o not
 t_independent = IndependentProposal(IndependentModel((; t=t_model))) |> render_model
+t_ind_mh = MetropolisHastings(t_independent)
+
 t_sym_dist = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_t) |> cpu_model
 t_symmetric = SymmetricProposal(IndependentModel((; t=t_sym_dist))) |> render_model
+t_sym_mh = MetropolisHastings(t_symmetric)
 
 r_independent = IndependentProposal(IndependentModel((; r=r_model))) |> render_model
+r_ind_mh = MetropolisHastings(r_independent)
+
 # r_proposal = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_r) |> cpu_model
 # r_symmetric = SymmetricProposal(IndependentModel((; r=r_proposal))) |> render_model
 r_sym_dist = r = QuaternionPerturbation(parameters.proposal_σ_r_quat) |> cpu_model
 r_symmetric = QuaternionProposal(IndependentModel((; r=r_sym_dist))) |> render_model
+r_sym_mh = MetropolisHastings(r_symmetric)
 
 o_independent = IndependentProposal(IndependentModel((; o=o_model)))
+o_ind_mh = MetropolisHastings(o_independent)
+
 o_sym_dist = KernelNormal(0, parameters.proposal_σ_o) |> cpu_model
 o_symmetric = SymmetricProposal(IndependentModel((; o=o_sym_dist)))
+o_sym_mh = MetropolisHastings(o_symmetric)
 
-# Assemble samplers
-t_ind_mh = MetropolisHastings(prior_model, t_independent)
-t_sym_mh = MetropolisHastings(prior_model, t_symmetric)
-
-r_ind_mh = MetropolisHastings(prior_model, r_independent)
-r_sym_mh = MetropolisHastings(prior_model, r_symmetric)
-
-o_ind_mh = MetropolisHastings(prior_model, o_independent)
-o_sym_mh = MetropolisHastings(prior_model, o_symmetric)
-
+# ComposedSamplers
 ind_sym_sampler = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0, 1.0, 1.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
 ind_sampler = ComposedSampler(t_ind_mh, r_ind_mh, o_ind_mh)
 # TODO works better than combination? Maybe because we do not sample the poles like with RotXYZ
 sym_sampler = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
 
-# Normalize the img likelihood to the expected number of rendered expected depth pixels.
-# TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
-normalization_constant = parameters.precision(10)
-# TODO normalization_constant = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
-
 # Pixel models
 # Does not handle invalid μ → ValidPixel & normalization in observation_model
 pixel_mix = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
-normalized_observation = ObservationModel | (normalization_constant, pixel_mix)
-normalized_posterior = PosteriorModel(prior_model, normalized_observation)
-
 # Explicitly handles invalid μ → no normalization
 pixel_expl = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
-explicit_observation = ObservationModel | (pixel_expl)
-explicit_posterior = PosteriorModel(prior_model, explicit_observation)
+
+# Observation models
+# TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
+normalization_constant = parameters.precision(10)
+# normalization_constant = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
+normalized_observation = ObservationModel(pixel_mix, normalization_constant)
+explicit_observation = ObservationModel(pixel_expl)
 
 # Fake observation
 # TODO occlusion
@@ -100,23 +100,29 @@ obs_scene = Scene(obs_params, render_context)
 obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
 obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
 obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
-obs = rand(dev_rng, explicit_observation(obs_μ, 0.8f0))
+obs = rand(dev_rng, explicit_observation, Sample((; μ=obs_μ, o=0.8f0)))
 plot_depth_img(Array(obs))
+
+# TODO the interface sucks
+# dist_is(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
+# dist_not(μ) = ValidPixel(μ, pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ))
+# o_association = ImageAssociation | (dist_is | parameters.pixel_σ, dist_not | parameters.pixel_θ, parameters.prior_o)
+# o_analytic(s::Sample) = o_association((variables(s).μ), variables(s).z)
+# o_gibbs = Gibbs(prior_model, o_analytic)
 
 # PosteriorModel
 # TODO normalized_posterior seems way better
-# conditioned_posterior = ConditionedModel((; z=obs), explicit_posterior);
-conditioned_posterior = ConditionedModel((; z=obs), normalized_posterior)
+posterior = PosteriorModel((; z=obs), prior_model, normalized_observation)
+# posterior = PosteriorModel((; z=obs), prior_model, explicit_observation)
+# TODO | syntax for AbstractModel
 
 # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-# TODO rng
-chain = sample(rng, conditioned_posterior, ind_sym_sampler, 10_000; discard_initial=5_000, thinning=2);
+chain = sample(rng, posterior, ind_sym_sampler, 10_000; discard_initial=5_000, thinning=2);
 
 # TODO separate evaluation from experiments, i.e. save & load
 using Plots
 model_chain = map(chain) do sample
-    # TODO function for different samplers
-    s, _ = to_model_domain(sample, bijector(prior_model))
+    s, _ = to_model_domain(sample, bijector(posterior))
     s
 end;
 plotly()

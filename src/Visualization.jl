@@ -57,7 +57,7 @@ Converts the chain to a column matrix of the variable `var_name`.
 """
 function Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1)
   M = hcat([variables(chain[i])[var_name] for i in 1:step:length(chain)]...)
-Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1) = hcat([variables(chain[i])[var_name] for i in 1:step:length(chain)]...)
+  # TODO should this be hidden in here?
   if M isa AbstractArray{<:Quaternion}
     M = map(M) do q
       r_q = QuatRotation(q)

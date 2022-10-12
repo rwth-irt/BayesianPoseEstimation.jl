@@ -25,12 +25,13 @@ Get a named tuple of bijectors for the proposal. Assuming that a proposals live 
 """
 Bijectors.bijector(::AbstractProposal) = (;)
 
+
 """
     transition_probability(proposal, new_sample, prev_sample)
 For the general case of dependent samples for a previous and the new `Sample`.
 Since the proposal model might be defined in a constrained domain, the sample is transformed and the logjac adjustment added to the logdensity.
 """
-function transition_probability(proposal::AbstractProposal, new_sample, prev_sample)
+function transition_probability(proposal, new_sample, prev_sample)
     diff_sample = new_sample - prev_sample
     model_sample, logjac = to_model_domain(diff_sample, proposal.bijectors)
     logdensityof(model(proposal), model_sample) + logjac

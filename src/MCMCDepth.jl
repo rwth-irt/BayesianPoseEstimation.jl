@@ -14,6 +14,7 @@ include("Samples.jl")
 include("FunctionManipulation.jl")
 include("ModelInterface.jl")
 include("Proposals.jl")
+include("PosteriorModel.jl")
 # Extensions
 include("BijectorsExtensions.jl")
 # Distributions
@@ -30,7 +31,6 @@ include("Parameters.jl")
 include("RenderContext.jl")
 include("ObservationModel.jl")
 include("AssociationModel.jl")
-include("PosteriorModel.jl")
 include("RenderModel.jl")
 include("Inference.jl")
 
@@ -125,6 +125,7 @@ export MetropolisHastings
 export expected_pixel_count
 export pixel_explicit
 export pixel_mixture
+export pixel_tail
 
 # Visualization
 export density_variable

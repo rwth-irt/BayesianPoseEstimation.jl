@@ -17,6 +17,13 @@ struct Sample{T,V}
     logp::Float64
 end
 
+"""
+    Sample(variables)
+Generate a new sample from a named tuple of variables.
+By default -Inf is assigned as log probability.
+"""
+Sample(variables::NamedTuple) = Sample(variables, -Inf)
+
 Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logprob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
@@ -74,7 +81,7 @@ Merging the log probabilities does not make sense without evaluating against the
 """
 function Base.merge(a::Sample, b::NamedTuple)
     vars = merge(variables(a), b)
-    Sample(vars, -Inf)
+    Sample(vars)
 end
 Base.merge(a::Sample, b::Sample) = merge(a, variables(b))
 
@@ -86,7 +93,7 @@ Merging the log probabilities does not make sense without evaluating against the
 """
 function map_merge(f, a::Sample, b::NamedTuple)
     vars = map_intersect(f, variables(a), b)
-    Sample(merge(a.variables, vars), -Inf)
+    Sample(merge(a.variables, vars))
 end
 map_merge(f, a::Sample, b::Sample) = map_merge(f, a, variables(b))
 
