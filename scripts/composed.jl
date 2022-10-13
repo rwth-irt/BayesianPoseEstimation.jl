@@ -84,9 +84,9 @@ sym_sampler = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
 
 # Pixel models
 # Does not handle invalid μ → ValidPixel & normalization in observation_model
-pixel_mix = pixel_mixture(parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
+pixel_mix = pixel_mixture(parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 # Explicitly handles invalid μ → no normalization
-pixel_expl = pixel_explicit(parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
+pixel_expl = pixel_explicit(parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 
 # Observation models
 # TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
@@ -115,7 +115,7 @@ plot_depth_img(Array(obs))
 # PosteriorModel
 # TODO normalized_posterior seems way better but is a bit slower
 posterior = PosteriorModel((; z=obs), prior_model, normalized_observation)
-# posterior = PosteriorModel((; z=obs), prior_model, explicit_observation)
+explicit_posterior = PosteriorModel((; z=obs), prior_model, explicit_observation)
 # TODO | syntax for AbstractModel
 
 # WARN random acceptance needs to be calculated on CPU, thus CPU rng
