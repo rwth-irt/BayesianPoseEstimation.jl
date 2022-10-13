@@ -14,7 +14,8 @@ test_a = @inferred test_partial | (; x=2, y=3)
 test_x = @inferred test_partial | 1 | (; y=3)
 @inferred test_x(; x=2)
 @test test_x(; x=2) == 6
-test_args = @inferred test_x | Val(:x)
+# TODO I don't think it is possible to make this type stable and won't be crucial, since this will usually we be called only once
+test_args = test_x | :x
 @inferred test_args(2)
 @test test_args(2) == 6
 
@@ -27,7 +28,7 @@ bench_ax = @inferred bench_x | (1,)
 @benchmark bench_ax(; y=3)
 bench_ax_s = @inferred test_partial | 1 | (; x=2)
 @benchmark bench_ax(; y=3)
-bench_kwargs_to_args = @inferred bench_ax | Val(:y)
+bench_kwargs_to_args = bench_ax | :y
 # Faster than bench_ax? :D Nice!
 @benchmark bench_kwargs_to_args(3)
 
@@ -40,7 +41,7 @@ test_a = @inferred test_partial | (; x=2, y=3)
 a = CUDA.fill(1, 100)
 CUDA.@time test_a.(a)
 # WARN cannot be conditioned on named parameter via broadcasting a CUDA array since NamedTuple broadcasting is reserved → move to args before broadcasting
-test_kwargs_to_args = @inferred test_partial | Val(:y) | Val(:x)
+test_kwargs_to_args = test_partial | (:y, :x)
 @test test_kwargs_to_args(1, 2, 3) == 2
 @test test_kwargs_to_args(1, 3, 2) == 0
 broadcast_1 = broadcast(test_kwargs_to_args, a, 2, 3)
