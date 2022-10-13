@@ -28,20 +28,15 @@ The `normalization_constant` is multiplied afterwards, a reasonable constant is 
 * proper preprocessing by cropping or segmenting the image
 * a pixel_dist which handles the tail distribution by providing a reasonable likelihood for invalid expected values
 """
-struct ObservationModel{normalized,P,T}
+struct ObservationModel{normalized,P<:ManipulatedFunction,T}
     pixel_dist::P
     normalization_constant::T
 end
 
+ObservationModel(pixel_dist) = ObservationModel_(false, pixel_dist, 1)
+ObservationModel(pixel_dist::ManipulatedFunction{names}, normalization_constant) where {names} = ObservationModel_(true, pixel_dist, normalization_constant)
 # Hide this one, since normalization only makes sense if the constant is provided
 ObservationModel_(normalized::Bool, pixel_dist::P, normalization_constant::T) where {P,T} = ObservationModel{normalized,P,T}(pixel_dist, normalization_constant)
-
-ObservationModel(pixel_dist) = ObservationModel_(false, pixel_dist, 1)
-
-function ObservationModel(pixel_dist, normalization_constant)
-    wrapped_dist(μ, o) = ValidPixel(μ, pixel_dist(μ, o))
-    ObservationModel_(true, wrapped_dist, normalization_constant)
-end
 
 # Image is always 2D
 const Base.Dims(::Type{<:ObservationModel}) = (1, 2)
@@ -49,9 +44,18 @@ const Base.Dims(::ObservationModel) = Dims(ObservationModel)
 
 """
     realize(observation_model, sample)
-Since the pixel_dist parameters μ and o are latent, realize the distribution using a sample which has both variables.
+The pixel_dist is parametrized by latent variables (μ, o, ...).
+This function creates a BroadcastedDistribution which is conditioned on the matching variable names of the pixel_dist.
+For a normalized observation_model, the pixel_dist is additionally wrapped in a ValidPixel.
 """
-realize(observation_model::ObservationModel, sample::Sample) = BroadcastedDistribution(observation_model.pixel_dist, Dims(ObservationModel), variables(sample).μ, variables(sample).o)
+function realize(obs_model::ObservationModel{true}, sample::Sample)
+    dist(μ, x...) = ValidPixel(μ, obs_model.pixel_dist(x...))
+    BroadcastedDistribution(dist, Dims(ObservationModel), variables(sample).μ, values(variables(sample), obs_model.pixel_dist)...)
+end
+
+realize(obs_model::ObservationModel, sample::Sample) = BroadcastedDistribution(obs_model.pixel_dist, Dims(ObservationModel), values(variables(sample), obs_model.pixel_dist)...)
+
+Base.values(nt::NamedTuple, ::ManipulatedFunction{names}) where {names} = values(nt[names])
 
 """
     rand(rng, observation_model, sample)
@@ -60,7 +64,7 @@ Generate a random observation using the expected depth μ and association o of t
 Base.rand(rng::AbstractRNG, model::ObservationModel, sample::Sample) = rand(rng, realize(model, sample))
 
 # DensityInterface
-@inline DensityKind(::ObservationModel) = HasDensity()
+@inline DensityInterface.DensityKind(::ObservationModel) = HasDensity()
 
 # Avoid ambiguities: extract variables μ, o & z from the sample
 logdensityof_(model::ObservationModel, x::Sample) = logdensityof(realize(model, x), variables(x).z)
@@ -74,29 +78,23 @@ function DensityInterface.logdensityof(model::ObservationModel{true}, x::Sample)
     model.normalization_constant ./ n_pixel .* log_p
 end
 
-
 """
     nonzero_pixels(images, dims)
 Calculates the number of nonzero pixels for each image with the given dims.
 """
 nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
-# TODO extend to PixelDist with the latent variable names so μ and o are not hardcoded
-# extract the variables from the sample in the ObservationModel like this (scratchpad/flex_pixel.jl):
-# struct PixelDist{names,F}
-#     fn::F
-# end
-# b_pix(pix_dist::PixDist{names}, nt) where {names} = pix_dist.fn.(values(nt[names])...)
+
 
 """
     ValidPixel
 Takes care of missing values in the expected depth `μ == 0` by setting the logdensity to zero, effectively ignoring these pixels in the sum.
 Consequently, the sum of the image likelihood must be normalized by dividing through the number of valid pixels, since the likelihood is very sensitive to the number of evaluated data points.
 """
-struct ValidPixel{T<:Real,M} <: AbstractKernelDistribution{T,Continuous}
-    # Shouls not cause memory overhead if used in lazily broadcasted context
+struct ValidPixel{T<:Real,D} <: AbstractKernelDistribution{T,Continuous}
+    # Should not cause memory overhead if used in lazily broadcasted context
     μ::T
     # Do not constrain M<:AbstractKernelDistribution{T} because it might be transformed / truncated
-    model::M
+    model::D
 end
 
 function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}

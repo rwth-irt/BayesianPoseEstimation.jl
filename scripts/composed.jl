@@ -12,6 +12,8 @@ using CUDA
 using Distributions
 using MCMCDepth
 using Random
+using Plots
+plotly()
 
 # TODO Do I want a main method with a plethora of parameters?
 # https://bkamins.github.io/julialang/2022/07/15/main.html
@@ -82,9 +84,9 @@ sym_sampler = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
 
 # Pixel models
 # Does not handle invalid μ → ValidPixel & normalization in observation_model
-pixel_mix = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
+pixel_mix = pixel_mixture(parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
 # Explicitly handles invalid μ → no normalization
-pixel_expl = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
+pixel_expl = pixel_explicit(parameters.min_depth, parameters.max_depth, parameters.pixel_σ, parameters.pixel_θ)
 
 # Observation models
 # TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
@@ -111,7 +113,7 @@ plot_depth_img(Array(obs))
 # o_gibbs = Gibbs(prior_model, o_analytic)
 
 # PosteriorModel
-# TODO normalized_posterior seems way better
+# TODO normalized_posterior seems way better but is a bit slower
 posterior = PosteriorModel((; z=obs), prior_model, normalized_observation)
 # posterior = PosteriorModel((; z=obs), prior_model, explicit_observation)
 # TODO | syntax for AbstractModel
@@ -120,15 +122,13 @@ posterior = PosteriorModel((; z=obs), prior_model, normalized_observation)
 chain = sample(rng, posterior, ind_sym_sampler, 10_000; discard_initial=5_000, thinning=2);
 
 # TODO separate evaluation from experiments, i.e. save & load
-using Plots
 model_chain = map(chain) do sample
     s, _ = to_model_domain(sample, bijector(posterior))
     s
 end;
-plotly()
 plot_variable(model_chain, :t, 100)
 plot_variable(model_chain, :r, 100)
-# plot_variable(model_chain, :o, 100)
+plot_variable(model_chain, :o, 100)
 plot_logprob(model_chain, 100)
 density_variable(model_chain, :t)
 density_variable(model_chain, :r)

@@ -44,11 +44,17 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 * Tail distribution: occlusions (exponential) and random outliers (uniform)
 """
 function pixel_mixture(min_depth::T, max_depth::T, σ::T, θ::T, μ::T, o::T) where {T<:Real}
-    tail = pixel_tail(min_depth, max_depth, θ, μ)
     normal = KernelNormal(μ, σ)
     tail = pixel_tail(min_depth, max_depth, θ, μ)
     KernelBinaryMixture(normal, tail, o, one(o) - o)
 end
+
+# TODO auto generate?
+pixel_mixture(; min_depth, max_depth, σ, θ, μ, o) = pixel_mixture(min_depth, max_depth, σ, θ, μ, o)
+
+# # TODO doc
+pixel_mixture(min_depth, max_depth, σ, θ) = pixel_mixture | (:μ, :o) | (; min_depth=min_depth, max_depth=max_depth, σ=σ, θ=θ)
+pixel_mixture(min_depth, max_depth, θ) = pixel_mixture | (:μ, :σ, :o) | (; min_depth=min_depth, max_depth=max_depth, θ=θ)
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
     # TODO Does truncated make a difference?
@@ -57,7 +63,7 @@ function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
     exponential = truncated(KernelExponential(θ), min_depth, max(min_depth, μ))
     uniform = KernelUniform(zero(T), max_depth)
     # TODO custom weights for exponential and uniform?
-    tail = KernelBinaryMixture(exponential, uniform, one(T), one(T))
+    KernelBinaryMixture(exponential, uniform, one(T), one(T))
 end
 
 """
@@ -75,7 +81,13 @@ function pixel_explicit(min_depth::T, max_depth::T, σ::T, θ::T, μ::T, o::T) w
         pixel_mixture(min_depth, max_depth, σ, θ, μ, o)
     else
         # Distribution must be of same type for CUDA support so set o to zero to evaluate the tail only
-        pixel_mixture(min_depth, max_depth, σ, θ, μ, o)
-        # pixel_mixture(zero(T), max_depth, σ, θ, μ, zero(T))
+        # pixel_mixture_(min_depth, max_depth, σ, θ, μ, o)
+        pixel_mixture(zero(T), max_depth, σ, θ, μ, zero(T))
     end
 end
+
+# TODO doc
+pixel_explicit(; min_depth, max_depth, σ, θ, μ, o) = pixel_explicit(min_depth, max_depth, σ, θ, μ, o)
+
+# TODO order matters? kwarg_to_arg first fails
+pixel_explicit(min_depth, max_depth, σ, θ) = pixel_explicit | :μ | (; min_depth=min_depth, max_depth=max_depth) | :o| (; σ=σ, θ=θ) 
