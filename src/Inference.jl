@@ -36,21 +36,25 @@ function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::Ren
 end
 
 """
-    pixel_mixture(min_depth, max_depth, θ; μ, σ, o)
+    pixel_mixture(min_depth, max_depth, θ, σ; μ, o)
 Mixture distribution for a depth pixel: normal / tail.
 The mixture is weighted by the association o for the normal and 1-o for the tail.
 
 * Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
 * Tail distribution: occlusions (exponential) and random outliers (uniform)
 """
-function pixel_mixture(min_depth::T, max_depth::T, θ::T; μ::T, σ::T, o::T) where {T<:Real}
+function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T; μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
     tail = pixel_tail(min_depth, max_depth, θ, μ)
     KernelBinaryMixture(normal, tail, o, one(o) - o)
 end
 
-# TODO doc - autogenerate via PPL?
-pixel_mixture(min_depth, max_depth, θ, σ) = pixel_mixture | (:μ, :o) | (min_depth, max_depth, θ) | (; σ=σ)
+# TODO autogenerate (:μ, :o) via PPL?
+"""
+    pixel_mixture(parameters)
+Generates a pixel_mixture(μ, o) distribution given the parameters.
+"""
+pixel_mixture(parameters::Parameters) = pixel_mixture | (:μ, :o) | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
     # TODO Does truncated make a difference?
@@ -63,7 +67,7 @@ function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
 end
 
 """
-    pixel_explicit(min_depth, max_depth, θ; μ, σ, o)
+    pixel_explicit(min_depth, max_depth, θ, σ; μ, o)
 Mixture distribution for a depth pixel which explicitly handles invalid μ.
 In case the expected depth is invalid, only the tail distribution for outliers is evaluated.
 Otherwise, if the measured depth and expected depth are zero, a unreasonably high likelihood would be returned.
@@ -72,14 +76,18 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 * Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
 * Tail distribution: occlusions (exponential) and random outliers (uniform)
 """
-function pixel_explicit(min_depth::T, max_depth::T, θ::T; μ::T, σ::T, o::T) where {T<:Real}
+function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T; μ::T, o::T) where {T<:Real}
     if μ > 0
-        pixel_mixture(min_depth, max_depth, θ; μ=μ, σ=σ, o=o)
+        pixel_mixture(min_depth, max_depth, θ, σ; μ=μ, o=o)
     else
         # Distribution must be of same type for CUDA support so set o to zero to evaluate the tail only
-        pixel_mixture(min_depth, max_depth, θ, μ=μ, σ=σ, o=zero(T))
+        pixel_mixture(min_depth, max_depth, θ, σ; μ=μ, o=zero(T))
     end
 end
 
-# TODO doc - autogenerate via PPL?
-pixel_explicit(min_depth, max_depth, θ, σ) = pixel_explicit | (:μ, :o) | (min_depth, max_depth, θ) | (; σ=σ)
+# TODO autogenerate (:μ, :o) via PPL?
+"""
+    pixel_explicit(parameters)
+Generates a pixel_explicit(μ, o) distribution given the parameters.
+"""
+pixel_explicit(parameters::Parameters) = pixel_explicit | (:μ, :o) | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)

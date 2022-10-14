@@ -84,9 +84,9 @@ sym_sampler = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
 
 # Pixel models
 # Does not handle invalid μ → ValidPixel & normalization in observation_model
-pixel_mix = pixel_mixture(parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+pixel_mix = pixel_mixture(parameters)
 # Explicitly handles invalid μ → no normalization
-pixel_expl = pixel_explicit(parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+pixel_expl = pixel_explicit(parameters)
 
 # Observation models
 # TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
