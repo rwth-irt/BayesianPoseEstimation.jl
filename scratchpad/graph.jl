@@ -5,7 +5,48 @@ using MCMCDepth
 using Random
 using Test
 
-struct ConditionalNode{varname,names,D<:Function,N<:NamedTuple{names}}
+abstract type AbstractNode{name,childnames} end
+
+nodes(node::AbstractNode) = node.nodes
+
+argvalues(::ConditionalNode{<:Any,childnames}, nt) where {childnames} = values(nt[childnames])
+varvalue(::ConditionalNode{varname}, nt) where {varname} = nt[varname]
+
+# realize the distribution
+(node::ConditionalNode)(nt::NamedTuple) = node.dist.(argvalues(node, nt)...)
+
+# fn first to enable do syntax
+function traverse(fn, node::AbstractNode{varname}, nt::NamedTuple{names}, args...) where {varname,names}
+    # Termination: Value already available (conditioned on or calculate via another path)
+    if varname in names
+        return nt
+    end
+    # Conditional = values from other nodes required, compute depth first
+    for n in nodes(node)
+        # TODO modification of nt seemingly make this instable, but keeping it constant does not change runtime
+        # WARN wrong implementation for the above stated: traverse(fn, n, nt, args...)
+        nt = traverse(fn, n, nt, args...)
+    end
+    # Finally the internal dist can be realized and the value for this node can be merged
+    retval = fn(node, nt, args...)
+    merge(nt, NamedTuple{(varname,)}((retval,)))
+end
+
+
+#################
+
+# TODO Idea is that this node just wraps another one and thus shares the same varname and argnames
+# TODO makes it harder to compile into static graph? - not really, simply merge from the right as (;varname=this_node)
+struct ModifierNode{varname,argnames,M,N<:AbstractNode{varname,argnames}} <: AbstractNode{varname,argnames}
+    model::M
+    node::N
+end
+
+nodes(node::ModifierNode) = (node.node,)
+
+##################
+
+struct ConditionalNode{varname,names,D<:Function,N<:NamedTuple{names}} <: AbstractNode{varname,names}
     # Must be function to avoid UnionAll type instabilities
     dist::D
     nodes::N
@@ -19,32 +60,8 @@ function ConditionalNode(varname::Symbol, ::Type{D}, nodes::N) where {names,D,N<
     ConditionalNode{varname,names,typeof(wrapped),N}(wrapped, nodes)
 end
 
-argvalues(::ConditionalNode{<:Any,names}, nt) where {names} = values(nt[names])
-varvalue(::ConditionalNode{varname}, nt) where {varname} = nt[varname]
 
-# realize the distributioncnames,
-(node::ConditionalNode)(x...) = node.dist.(x...)
-# (node::ConditionalNode)(; y...) = node.dist(argvalues(node, y)...)
-(node::ConditionalNode)(nt::NamedTuple) = node.dist.(argvalues(node, nt)...)
-
-# fn first to enable do syntax
-function traverse(fn, node::ConditionalNode{varname}, nt::NamedTuple{names}, args...) where {varname,names}
-    # Termination: Value already available (conditioned on or calculate via another path)
-    if varname in names
-        return nt
-    end
-    # Conditional = values from other nodes required, compute depth first
-    for n in node.nodes
-        # TODO modification of nt seemingly make this instable, but keeping it constant does not change runtime
-        # WARN wrong implementation traverse(fn, n, nt, args...)
-        nt = traverse(fn, n, nt, args...)
-    end
-    # Finally the internal dist can be realized and the value for this node can be merged
-    retval = fn(node, nt, args...)
-    merge(nt, NamedTuple{(varname,)}((retval,)))
-end
-
-Base.rand(rng::AbstractRNG, node::ConditionalNode{varname}, dims::Integer...) where {varname,names} =
+Base.rand(rng::AbstractRNG, node::ConditionalNode{varname}, dims::Integer...) where {varname} =
     traverse(node, (;), rng, dims...) do node_, nt_, rng_, dims_...
         if isempty(node_.nodes)
             rand(rng_, node_(nt_), dims_...)
