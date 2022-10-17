@@ -4,16 +4,17 @@ using DensityInterface
 using MCMCDepth
 using Random
 using Test
+using Unrolled
 
 abstract type AbstractNode{name,childnames} end
 
 nodes(node::AbstractNode) = node.nodes
 
-argvalues(::ConditionalNode{<:Any,childnames}, nt) where {childnames} = values(nt[childnames])
-varvalue(::ConditionalNode{varname}, nt) where {varname} = nt[varname]
+argvalues(::AbstractNode{<:Any,childnames}, nt) where {childnames} = values(nt[childnames])
+varvalue(::AbstractNode{varname}, nt) where {varname} = nt[varname]
 
 # realize the distribution
-(node::ConditionalNode)(nt::NamedTuple) = node.dist.(argvalues(node, nt)...)
+(node::AbstractNode)(nt::NamedTuple) = node.dist.(argvalues(node, nt)...)
 
 # fn first to enable do syntax
 function traverse(fn, node::AbstractNode{varname}, nt::NamedTuple{names}, args...) where {varname,names}
@@ -23,8 +24,6 @@ function traverse(fn, node::AbstractNode{varname}, nt::NamedTuple{names}, args..
     end
     # Conditional = values from other nodes required, compute depth first
     for n in nodes(node)
-        # TODO modification of nt seemingly make this instable, but keeping it constant does not change runtime
-        # WARN wrong implementation for the above stated: traverse(fn, n, nt, args...)
         nt = traverse(fn, n, nt, args...)
     end
     # Finally the internal dist can be realized and the value for this node can be merged
@@ -32,6 +31,32 @@ function traverse(fn, node::AbstractNode{varname}, nt::NamedTuple{names}, args..
     merge(nt, NamedTuple{(varname,)}((retval,)))
 end
 
+simplify(node::AbstractNode) =
+    traverse(node, (;)) do node, _
+        node
+    end
+
+Base.rand(rng::AbstractRNG, node::AbstractNode{varname}, dims::Integer...) where {varname} =
+    traverse(node, (;), rng, dims...) do node_, nt_, rng_, dims_...
+        if isempty(nodes(node_))
+            # Use dims only in leafs, otherwise they potentiate
+            rand(rng_, node_(nt_), dims_...)
+        else
+            rand(rng_, node_(nt_))
+        end
+    end
+
+DensityInterface.logdensityof(node::AbstractNode, nt::NamedTuple) =
+    reduce(.+, traverse(node, (;)) do node_, _
+        logdensityof(node_(nt), varvalue(node_, nt))
+    end)
+
+function Bijectors.bijector(node::AbstractNode)
+    sample = rand(node)
+    traverse(node, (;), sample) do node_, _...
+        bijector(node_(sample))
+    end
+end
 
 #################
 
@@ -60,27 +85,7 @@ function ConditionalNode(varname::Symbol, ::Type{D}, nodes::N) where {names,D,N<
     ConditionalNode{varname,names,typeof(wrapped),N}(wrapped, nodes)
 end
 
-
-Base.rand(rng::AbstractRNG, node::ConditionalNode{varname}, dims::Integer...) where {varname} =
-    traverse(node, (;), rng, dims...) do node_, nt_, rng_, dims_...
-        if isempty(node_.nodes)
-            rand(rng_, node_(nt_), dims_...)
-        else
-            rand(rng_, node_(nt_))
-        end
-    end
-
-DensityInterface.logdensityof(node::ConditionalNode, nt::NamedTuple) =
-    reduce(.+, traverse(node, (;)) do node, _
-        logdensityof(node(nt), varvalue(node, nt))
-    end)
-
-function Bijectors.bijector(node::ConditionalNode)
-    sample = rand(node)
-    traverse(node, (;), sample) do node_, _...
-        bijector(node_(sample))
-    end
-end
+##################
 
 a = ConditionalNode(:a, KernelUniform, (;))
 b = ConditionalNode(:b, KernelExponential, (;))
@@ -90,39 +95,48 @@ d = ConditionalNode(:d, KernelNormal, (; c=c, b=b))
 nt = rand(Random.default_rng(), d)
 ℓ = logdensityof(d, nt)
 @test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
+bij = bijector(d)
+@test bij isa NamedTuple{(:a, :b, :c, :d)}
+@test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
-# WARN non-generic implementations are faster
+########################
 
-function rand_specialized(rng::AbstractRNG, node::ConditionalNode{varname}, nt::NamedTuple{names}, dims::Integer...) where {varname,names}
-    if varname in names
-        return nt
+Base.rand(rng::AbstractRNG, graph::NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}, dims::Integer...) = rand_unroll(rng, values(graph), (;), dims...)
+# unroll required for type stability
+@unroll function rand_unroll(rng::AbstractRNG, graph, nt, dims::Integer...)
+    @unroll for node in graph
+        nt = rand_barrier(rng, node, nt, dims...)
     end
-    for n in node.nodes
-        nt = rand(rng, n, nt, dims...)
-    end
-    # Only apply dims for leafs
-    if isempty(node.nodes)
-        retval = rand(rng, node(nt), dims...)
-    else
-        retval = rand(rng, node(nt))
-
-    end
-    merge(nt, NamedTuple{(varname,)}((retval,)))
+    nt
 end
+# Use dims only in leafs, otherwise they potentiate
+rand_barrier(rng, node::AbstractNode{name,()}, nt, dims...) where {name} = (; nt..., name => rand(rng, node(nt), dims...))
+rand_barrier(rng, node::AbstractNode{name}, nt, dims...) where {name} = (; nt..., name => rand(rng, node(nt)))
 
-function logdensityof_specialized(node::ConditionalNode{varname}, nt::NamedTuple{names}, obs) where {varname,names}
-    if varname in names
-        return nt
-    end
-    for n in node.nodes
-        nt = logdensityof(n, nt, obs)
-    end
-    retval = logdensityof(node(obs), varvalue(node, obs))
-    merge(nt, NamedTuple{(varname,)}((retval,)))
-end
+# still don't get why reduce(.+, map...) is type stable but mapreduce(.+,...) not
+DensityInterface.logdensityof(graph::NamedTuple{names,<:Tuple{Vararg{AbstractNode}}}, nt::NamedTuple) where {names} =
+    reduce(.+, map(values(graph), values(nt[names])) do node, value
+        logdensityof(node(nt), value)
+    end)
 
-nt = @btime rand(Random.default_rng(), c)
-nt = @btime rand_specialized(Random.default_rng(), c, (;))
+simplified = simplify(d)
+rand(Random.default_rng(), simplified)
+nt = @inferred rand(Random.default_rng(), simplified)
+ℓ = @inferred logdensityof(simplified, nt)
+@test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
 
-ℓ = @btime logdensityof(c, nt)
-ℓ = @btime logdensityof_specialized(c, (;), nt)
+
+# WARN non-simplified implementations are not type stable
+@benchmark rand(Random.default_rng(), d)
+# 100x faster
+@benchmark rand(Random.default_rng(), simplified)
+
+@benchmark rand(Random.default_rng(), d, 10)
+# 10x faster - gets negliable for larger dims
+@benchmark rand(Random.default_rng(), simplified, 10)
+
+# For now no automatic broadcasting of logdensityof
+nt = rand(Random.default_rng(), simplified)
+@benchmark logdensityof(d, nt)
+# 100x faster
+@benchmark logdensityof(simplified, nt)
