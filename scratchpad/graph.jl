@@ -7,14 +7,19 @@ using Test
 using Unrolled
 
 abstract type AbstractNode{name,childnames} end
+Base.Broadcast.broadcastable(x::AbstractNode) = Ref(x)
 
-nodes(node::AbstractNode) = node.nodes
+# realize the distribution
+(node::AbstractNode)(x...) = model(node).(x...)
+(node::AbstractNode)(nt::NamedTuple) = node(argvalues(node, nt)...)
 
+# Override if required for specific implementations
 argvalues(::AbstractNode{<:Any,childnames}, nt) where {childnames} = values(nt[childnames])
 varvalue(::AbstractNode{varname}, nt) where {varname} = nt[varname]
 
-# realize the distribution
-(node::AbstractNode)(nt::NamedTuple) = node.dist.(argvalues(node, nt)...)
+nodes(node::AbstractNode) = node.nodes
+model(node::AbstractNode) = node.model
+
 
 # fn first to enable do syntax
 function traverse(fn, node::AbstractNode{varname}, nt::NamedTuple{names}, args...) where {varname,names}
@@ -58,7 +63,23 @@ function Bijectors.bijector(node::AbstractNode)
     end
 end
 
-#################
+##################
+
+struct VariableNode{varname,names,M<:Function,N<:NamedTuple{names}} <: AbstractNode{varname,names}
+    # Must be function to avoid UnionAll type instabilities
+    model::M
+    nodes::N
+end
+
+VariableNode(varname::Symbol, model::M, nodes::N) where {names,M<:Function,N<:NamedTuple{names}} = VariableNode{varname,names,M,N}(model, nodes)
+
+function VariableNode(varname::Symbol, ::Type{M}, nodes::N) where {names,M,N<:NamedTuple{names}}
+    # Workaround so D is not UnionAll but interpreted as constructor
+    wrapped = (x...) -> M(x...)
+    VariableNode{varname,names,typeof(wrapped),N}(wrapped, nodes)
+end
+
+##################
 
 # TODO Idea is that this node just wraps another one and thus shares the same varname and argnames
 # TODO makes it harder to compile into static graph? - not really, simply merge from the right as (;varname=this_node)
@@ -67,35 +88,44 @@ struct ModifierNode{varname,argnames,M,N<:AbstractNode{varname,argnames}} <: Abs
     node::N
 end
 
+# TODO Pass the node into the model to evaluate the internal logdensity and be able to modify it? Is there a cleaner way?
+argvalues(node::ModifierNode{varname,childnames}, nt) where {varname,childnames} = (node.node, values(nt[(varname, childnames...)])...)
+varvalue(::ModifierNode{varname}, nt) where {varname} = nt[varname]
 nodes(node::ModifierNode) = (node.node,)
 
-##################
-
-struct ConditionalNode{varname,names,D<:Function,N<:NamedTuple{names}} <: AbstractNode{varname,names}
-    # Must be function to avoid UnionAll type instabilities
-    dist::D
-    nodes::N
+struct SimpleModifierModel{N,T,A}
+    node::N
+    value::T
+    args::A
 end
 
-ConditionalNode(varname::Symbol, dist::D, nodes::N) where {names,D<:Function,N<:NamedTuple{names}} = ConditionalNode{varname,names,D,N}(dist, nodes)
+SimpleModifierModel(node, value, args...) = SimpleModifierModel(node, value, args)
 
-function ConditionalNode(varname::Symbol, ::Type{D}, nodes::N) where {names,D,N<:NamedTuple{names}}
-    # Workaround so D is not UnionAll but interpreted as constructor
-    wrapped = (x...) -> D(x...)
-    ConditionalNode{varname,names,typeof(wrapped),N}(wrapped, nodes)
-end
+Base.rand(::Random.AbstractRNG, model::SimpleModifierModel, dims...) = 10 .* model.value
+
+DensityInterface.logdensityof(model::SimpleModifierModel{<:Any,T}, x) where {T} = logdensityof(model.node(model.args...), x) + one(T)
+
+Bijectors.bijector(model::SimpleModifierModel) = bijector(model.node(model.args...))
 
 ##################
 
-a = ConditionalNode(:a, KernelUniform, (;))
-b = ConditionalNode(:b, KernelExponential, (;))
-c = ConditionalNode(:c, KernelNormal, (; a=a, b=b))
-d = ConditionalNode(:d, KernelNormal, (; c=c, b=b))
+a = VariableNode(:a, KernelUniform, (;))
+b = VariableNode(:b, KernelExponential, (;))
+c = VariableNode(:c, KernelNormal, (; a=a, b=b))
+d = VariableNode(:d, KernelNormal, (; c=c, b=b))
+d_mod = ModifierNode(SimpleModifierModel, d)
 
 nt = rand(Random.default_rng(), d)
 ℓ = logdensityof(d, nt)
 @test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
 bij = bijector(d)
+@test bij isa NamedTuple{(:a, :b, :c, :d)}
+@test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
+
+# TODO It should be possible to pass the logdensity of the wrapperd node to the ModifierNode
+@test logdensityof(d, nt) == logdensityof(d_mod, nt) - 1
+# TODO not implemented
+bij = bijector(d_mod)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
