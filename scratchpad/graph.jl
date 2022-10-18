@@ -20,46 +20,45 @@ varvalue(::AbstractNode{varname}, nt) where {varname} = nt[varname]
 nodes(node::AbstractNode) = node.nodes
 model(node::AbstractNode) = node.model
 
+# typestable rand & logdensityof conditioned on variables - do not traverse
+# directly support fn(node, nt, args...) of traverse
+# dispatching on the node type makes it extendable / hackable
+merge_value(variables, ::AbstractNode{name}, value) where {name} = (; variables..., name => value)
+
+rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables), dims...)
+# dims... only for leafs, otherwise the dimensioms potentiate
+rand_barrier(node::AbstractNode{<:Any}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables))
+
+logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
+
+bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(variables))
 
 # fn first to enable do syntax
-function traverse(fn, node::AbstractNode{varname}, nt::NamedTuple{names}, args...) where {varname,names}
+function traverse(fn, node::AbstractNode{varname}, variables::NamedTuple{names}, args...) where {varname,names}
     # Termination: Value already available (conditioned on or calculate via another path)
     if varname in names
-        return nt
+        return variables
     end
     # Conditional = values from other nodes required, compute depth first
     for n in nodes(node)
-        nt = traverse(fn, n, nt, args...)
+        variables = traverse(fn, n, variables, args...)
     end
     # Finally the internal dist can be realized and the value for this node can be merged
-    retval = fn(node, nt, args...)
-    merge(nt, NamedTuple{(varname,)}((retval,)))
+    value = fn(node, variables, args...)
+    merge_value(variables, node, value)
 end
 
-simplify(node::AbstractNode) =
-    traverse(node, (;)) do node, _
-        node
-    end
-
-Base.rand(rng::AbstractRNG, node::AbstractNode{varname}, dims::Integer...) where {varname} =
-    traverse(node, (;), rng, dims...) do node_, nt_, rng_, dims_...
-        if isempty(nodes(node_))
-            # Use dims only in leafs, otherwise they potentiate
-            rand(rng_, node_(nt_), dims_...)
-        else
-            rand(rng_, node_(nt_))
-        end
-    end
+Base.rand(rng::AbstractRNG, node::AbstractNode{varname}, dims::Integer...) where {varname} = traverse(rand_barrier, node, (;), rng, dims...)
 
 DensityInterface.logdensityof(node::AbstractNode, nt::NamedTuple) =
-    reduce(.+, traverse(node, (;)) do node_, _
-        logdensityof(node_(nt), varvalue(node_, nt))
+    reduce(.+, traverse(node, (;)) do n, _
+        logdensityof_barrier(n, nt)
     end)
 
 function Bijectors.bijector(node::AbstractNode)
-    sample = rand(node)
-    traverse(node, (;), sample) do node_, _...
-        bijector(node_(sample))
+    variables = rand(node)
+    traverse(node, (;), variables) do n, _...
+        bijector_barrier(n, variables)
     end
 end
 
@@ -85,27 +84,41 @@ end
 # TODO makes it harder to compile into static graph? - not really, simply merge from the right as (;varname=this_node)
 struct ModifierNode{varname,argnames,M,N<:AbstractNode{varname,argnames}} <: AbstractNode{varname,argnames}
     model::M
-    node::N
+    wrapped::N
 end
+
+function rand_barrier(node::ModifierNode, variables::NamedTuple, rng::AbstractRNG, dims...)
+    wrapped_value = rand_barrier(node.wrapped, variables, rng, dims...)
+    rand(rng, node(variables), wrapped_value)
+end
+
+function logdensityof_barrier(node::ModifierNode, variables::NamedTuple)
+    ℓ = logdensityof_barrier(node.wrapped, variables)
+    logdensityof(node(variables), varvalue(node, variables), ℓ)
+end
+
+bijector_barrier(node::ModifierNode, variables::NamedTuple) = bijector_barrier(node.wrapped, variables)
 
 # TODO Pass the node into the model to evaluate the internal logdensity and be able to modify it? Is there a cleaner way?
-argvalues(node::ModifierNode{varname,childnames}, nt) where {varname,childnames} = (node.node, values(nt[(varname, childnames...)])...)
-varvalue(::ModifierNode{varname}, nt) where {varname} = nt[varname]
-nodes(node::ModifierNode) = (node.node,)
+# argvalues(node::ModifierNode{varname,childnames}, nt) where {varname,childnames} = (node.wrapped, values(nt[(varname, childnames...)])...)
+# varvalue(::ModifierNode{varname}, nt) where {varname} = nt[varname]
+nodes(node::ModifierNode) = (node.wrapped,)
 
-struct SimpleModifierModel{N,T,A}
-    node::N
-    value::T
-    args::A
+struct SimpleModifierModel end
+
+# Construct with same args as wrapped model
+SimpleModifierModel(args...) = SimpleModifierModel()
+
+Base.rand(::AbstractRNG, model::SimpleModifierModel, value) = 10 .* value
+
+DensityInterface.logdensityof(model::SimpleModifierModel, x, ℓ) = ℓ + one(ℓ)
+
+function Bijectors.bijector(node::AbstractNode)
+    sample = rand(node)
+    traverse(node, (;), sample) do n, _...
+        bijector_barrier(n, sample)
+    end
 end
-
-SimpleModifierModel(node, value, args...) = SimpleModifierModel(node, value, args)
-
-Base.rand(::Random.AbstractRNG, model::SimpleModifierModel, dims...) = 10 .* model.value
-
-DensityInterface.logdensityof(model::SimpleModifierModel{<:Any,T}, x) where {T} = logdensityof(model.node(model.args...), x) + one(T)
-
-Bijectors.bijector(model::SimpleModifierModel) = bijector(model.node(model.args...))
 
 ##################
 
@@ -122,26 +135,34 @@ bij = bijector(d)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
-# TODO It should be possible to pass the logdensity of the wrapperd node to the ModifierNode
+using Plots
+plotly()
+nt = rand(Random.default_rng(), d_mod)
+histogram([rand(Random.default_rng(), d_mod).d for _ in 1:100])
+histogram!([rand(Random.default_rng(), d).d for _ in 1:100])
+
 @test logdensityof(d, nt) == logdensityof(d_mod, nt) - 1
 # TODO not implemented
 bij = bijector(d_mod)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
-########################
+######################## sequentialized graph ########################
+
+sequentialize(node::AbstractNode) =
+    traverse(node, (;)) do node, _
+        node
+    end
 
 Base.rand(rng::AbstractRNG, graph::NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}, dims::Integer...) = rand_unroll(rng, values(graph), (;), dims...)
 # unroll required for type stability
-@unroll function rand_unroll(rng::AbstractRNG, graph, nt, dims::Integer...)
+@unroll function rand_unroll(rng::AbstractRNG, graph, variables, dims::Integer...)
     @unroll for node in graph
-        nt = rand_barrier(rng, node, nt, dims...)
+        value = rand_barrier(node, variables, rng, dims...)
+        variables = merge_value(variables, node, value)
     end
-    nt
+    variables
 end
-# Use dims only in leafs, otherwise they potentiate
-rand_barrier(rng, node::AbstractNode{name,()}, nt, dims...) where {name} = (; nt..., name => rand(rng, node(nt), dims...))
-rand_barrier(rng, node::AbstractNode{name}, nt, dims...) where {name} = (; nt..., name => rand(rng, node(nt)))
 
 # still don't get why reduce(.+, map...) is type stable but mapreduce(.+,...) not
 DensityInterface.logdensityof(graph::NamedTuple{names,<:Tuple{Vararg{AbstractNode}}}, nt::NamedTuple) where {names} =
@@ -149,24 +170,25 @@ DensityInterface.logdensityof(graph::NamedTuple{names,<:Tuple{Vararg{AbstractNod
         logdensityof(node(nt), value)
     end)
 
-simplified = simplify(d)
-rand(Random.default_rng(), simplified)
-nt = @inferred rand(Random.default_rng(), simplified)
-ℓ = @inferred logdensityof(simplified, nt)
+
+seq_graph = sequentialize(d)
+rand(Random.default_rng(), seq_graph)
+nt = @inferred rand(Random.default_rng(), seq_graph)
+ℓ = @inferred logdensityof(seq_graph, nt)
 @test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
 
 
 # WARN non-simplified implementations are not type stable
 @benchmark rand(Random.default_rng(), d)
-# 100x faster
-@benchmark rand(Random.default_rng(), simplified)
+# 30x faster
+@benchmark rand(Random.default_rng(), seq_graph)
 
-@benchmark rand(Random.default_rng(), d, 10)
-# 10x faster - gets negliable for larger dims
-@benchmark rand(Random.default_rng(), simplified, 10)
+@benchmark rand(Random.default_rng(), d, 100)
+# 2x faster - gets less for larger dims
+@benchmark rand(Random.default_rng(), seq_graph, 100)
 
 # For now no automatic broadcasting of logdensityof
-nt = rand(Random.default_rng(), simplified)
-@benchmark logdensityof(d, nt)
-# 100x faster
-@benchmark logdensityof(simplified, nt)
+vars = rand(Random.default_rng(), seq_graph)
+@benchmark logdensityof(d, vars)
+# 30x faster
+@benchmark logdensityof(seq_graph, vars)
