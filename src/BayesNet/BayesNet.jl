@@ -6,7 +6,6 @@
 using Bijectors
 using DensityInterface
 using Random
-using Unrolled
 
 """
     AbstractNode{name,child_names}
@@ -125,72 +124,3 @@ function VariableNode(name::Symbol, ::Type{M}, children::N) where {names,M,N<:Na
     wrapped = (x...) -> M(x...)
     VariableNode{name,names,typeof(wrapped),N}(wrapped, children)
 end
-
-
-# TODO could be a hijacked VariableNode, replacing the model with a broadcasted one and bypassing it by returning its children
-function BroadcastedNode(node::AbstractNode{name}, dims...) where {name}
-    broadcasted_model(x...) = BroadcastedDistribution(model(node), dims, x...)
-    VariableNode(name, broadcasted_model, children(node))
-end
-
-
-"""
-    ModifierNode
-Wraps another node and represents the same variable as the `wrapped` node.
-`rand(rng, model, wrapped_value)` and `logdensityof(model, wrapped_ℓ)` allow to modify the value returned by the wrapped node by passing the returned value to the model.
-When traversing the graph, only the wrapped node is returned by `nodes`. 
-"""
-struct ModifierNode{name,child_names,M,N<:AbstractNode{name,child_names}} <: AbstractNode{name,child_names}
-    model::M
-    wrapped::N
-end
-
-nodes(node::ModifierNode) = (node.wrapped,)
-
-function rand_barrier(node::ModifierNode, variables::NamedTuple, rng::AbstractRNG, dims...)
-    wrapped_value = rand_barrier(node.wrapped, variables, rng, dims...)
-    rand(rng, node(variables), wrapped_value)
-end
-
-function logdensityof_barrier(node::ModifierNode, variables::NamedTuple)
-    wrapped_ℓ = logdensityof_barrier(node.wrapped, variables)
-    logdensityof(node(variables), varvalue(node, variables), wrapped_ℓ)
-end
-
-bijector_barrier(node::ModifierNode, variables::NamedTuple) = bijector_barrier(node.wrapped, variables)
-
-
-"""
-    sequentialize(node)
-Since the BayesNet is a directed acyclic graph, there is exactly one shortest path to sequentially call the nodes, so each node has the children values available upon execution.
-This allows to implement type stable functions by unrolling the loop over the sequence.
-Finds that path by depth search and returns it as an ordered NamedTuple. 
-"""
-sequentialize(node::AbstractNode) =
-    traverse(node, (;)) do node, _
-        node
-    end
-
-"""
-    rand(rng, graph, dims...)
-Type stable implementation to generate random values from the variables of the sequentialized graph.
-"""
-Base.rand(rng::AbstractRNG, graph::NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}, dims::Integer...) = rand_unroll(rng, values(graph), (;), dims...)
-# unroll required for type stability
-@unroll function rand_unroll(rng::AbstractRNG, graph, variables, dims::Integer...)
-    @unroll for node in graph
-        value = rand_barrier(node, variables, rng, dims...)
-        variables = merge_value(variables, node, value)
-    end
-    variables
-end
-
-"""
-    rand(rng, graph, dims...)
-Type stable implementation to calculate the logdensity for a set of variables for the sequentialized graph.
-"""
-DensityInterface.logdensityof(graph::NamedTuple{names,<:Tuple{Vararg{AbstractNode}}}, nt::NamedTuple) where {names} =
-    reduce(.+, map(values(graph), values(nt[names])) do node, value
-        logdensityof(node(nt), value)
-    end)
-# still don't get why reduce(.+, map...) is type stable but mapreduce(.+,...) not

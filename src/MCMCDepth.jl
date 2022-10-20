@@ -21,6 +21,10 @@ include("BijectorsExtensions.jl")
 include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
 include("QuaternionDistribution.jl")
+# BayesNet
+include("BayesNet/BayesNet.jl")
+include("BayesNet/ModifierNode.jl")
+include("BayesNet/Sequentialized.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
@@ -66,6 +70,11 @@ export KernelUniform
 export ProductBroadcastedDistribution
 export BroadcastedDistribution
 export DiscreteBroadcastedDistribution
+
+# BayesNet
+export VariableNode
+export ModifierNode
+export sequentialize
 
 # ModelInterface
 export ComposedModel
