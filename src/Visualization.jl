@@ -12,6 +12,12 @@ using StatsBase
 import StatsPlots: density as stats_density
 
 const RWTH_blue = colorant"#00549f"
+distinguishable_rwth(n) = distinguishable_colors(n, RWTH_blue, lchoices=0:75)
+
+diss_defaults(; size=(148.4789, 83.5193), fontsize=11, kwargs...) = Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(fontsize), colorbar_tickfontsize=correct_fontsize(fontsize), size=correct_size(size), fontfamily="helvetica", kwargs...)
+correct_fontsize(font_size) = round(font_size)
+# 4//3 plotly magic number??
+correct_size(size) = size .* 4//3 .* (mm / pt) .|> round
 
 """
    value_or_typemax(x, [value=zero(x)])
@@ -76,79 +82,81 @@ Converts the chains to a column matrix of the variable `var_name`.
 Base.convert(::Type{Matrix}, chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name::Symbol, step=1) = hcat([Base.convert(Matrix, c, var_name, step) for c in chains]...)
 
 """
-  scatter_position(M, c_grad)
+  scatter_position(M; c_grad)
 Creates a 3D scatter plot of the column matrix.
 """
-function scatter_position(M::AbstractMatrix, c_grad=:viridis)
+function scatter_position(M::AbstractMatrix; c_grad=:viridis, kwargs...)
   # z value for color in order of the samples
-  mz = [1:length(M[1, :])...]
-  scatter(M[1, :], M[2, :], M[3, :], marker_z=mz, color=cgrad(c_grad), label="Sample Number", markersize=3, xlabel="x", ylabel="y", zlabel="z")
+  mz = [1:length(M[1, :])+1...]
+  s = size(M)
+  s = size(mz)
+  scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), label="Sample Number", markersize=3, xlabel="x", ylabel="y", zlabel="z", kwargs...)
 end
 
 """
-  scatter_position(chains, step, c_grad)
+  scatter_position(chains, [step]; c_grad, kwargs...)
 Creates a 3D scatter plot of the chain for the given variable.
 """
-scatter_position(chains::AbstractVector, step=1, c_grad=:viridis) = scatter_position(Base.convert(Matrix, chains, :t, step), c_grad)
+scatter_position(chains::AbstractVector, step=1; c_grad=:viridis, kwargs...) = scatter_position(Base.convert(Matrix, chains, :t, step); c_grad=c_grad, kwargs...)
 
 """
-  density_variable(chains, var_name, step, palette)
+  density_variable(chains, var_name, [step]; kwargs...)
 Creates a density plot for the given variable.
 """
-function histogram_variable(chains, var_name, step=1, palette=:tol_bright)
+function histogram_variable(chains, var_name, step=1; kwargs...)
   M = convert(Matrix, chains, var_name, step)
-  histogram(transpose(M), fill=true, fillalpha=0.4, palette=palette)
+  histogram(transpose(M); fill=true, fillalpha=0.4, kwargs...)
 end
 
 """
-  density_variable(chains, var_name, step, palette)
+  density_variable(chains, var_name, [step]; kwargs...)
 Creates a density plot for the given variable.
 """
-function density_variable(chains, var_name, step=1, palette=:tol_bright)
+function density_variable(chains, var_name, step=1; kwargs...)
   M = convert(Matrix, chains, var_name, step)
-  density(transpose(M), fill=true, fillalpha=0.4, palette=palette, trim=true)
+  density(transpose(M); fill=true, fillalpha=0.4, palette=distinguishable_rwth(first(size(M))), trim=true, kwargs...)
 end
 
 """
-  polar_density_variable(chains, var_name, step, palette)
+  polar_density_variable(chains, var_name, [step]; palette, kwargs...)
 Creates a density plot in polar coordinates for the given variable.
 """
-function polar_density_variable(chains, var_name, step=1, palette=:tol_bright)
+function polar_density_variable(chains, var_name, step=1; kwargs...)
   M = convert(Matrix, chains, var_name, step)
-  stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=palette, trim=true)
+  stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=distinguishable_rwth(first(size(M))), trim=true, kwargs...)
 end
 
 """
-  polar_histogram_variable(chains, var_name, step, nbins, palette)
+  polar_histogram_variable(chains, var_name, [step], [nbins], palette)
 Creates a histogram plot in polar coordinates for the given variable.
 """
-function polar_histogram_variable(chains, var_name; step=1, nbins=90, palette=:tol_bright)
+function polar_histogram_variable(chains, var_name; step=1, nbins=90, kwargs...)
   M = convert(Matrix, chains, var_name, step)
   bins = range(0, 2π, length=nbins)
-  pl = plot(palette=palette)
+  pl = plot(palette=distinguishable_rwth(first(size(M))))
   for i in 1:size(M, 1)
     hist = fit(Histogram, M[i, :], bins)
-    plot!(pl, bins[begin:end], append!(hist.weights, hist.weights[1]), proj=:polar, fill=true, fillalpha=0.4)
+    plot!(pl, bins[begin:end], append!(hist.weights, hist.weights[1]); proj=:polar, fill=true, fillalpha=0.4, kwargs...)
   end
   yticks!(pl, Float64[])
 end
 
 """
-  polar_variable(chains, var_name, step, nbins, palette)
+  polar_variable(chains, var_name, [step]; kwargs....)
 Line plot of the variable.
 """
-function plot_variable(chains, var_name, step=1, palette=:tol_bright, label=["x" "y" "z"])
+function plot_variable(chains, var_name, step=1; kwargs...)
   M = convert(Matrix, chains, var_name, step)
-  scatter(transpose(M), palette=palette, markersize=2)
+  scatter(transpose(M); palette=distinguishable_rwth(first(size(M))), markersize=2, kwargs...)
 end
 
 """
-  plot_logprob(chains, var_name, step, nbins, palette)
+  plot_logprob(chains, [step]; kwargs...)
 Plot of the logdensity over the samples.
 """
-function plot_logprob(chains, step=1, palette=:tol_bright)
+function plot_logprob(chains, step=1; kwargs...)
   logprobs = hcat([logprob(chains[i]) for i in 1:step:length(chains)]...)
-  scatter(transpose(logprobs); palette=palette, markersize=2, label="logprob")
+  scatter(transpose(logprobs); palette=distinguishable_rwth(first(size(logprobs))), markersize=2, label="logprob", kwargs...)
 end
 
 """

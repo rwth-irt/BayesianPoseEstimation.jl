@@ -119,22 +119,36 @@ explicit_posterior = PosteriorModel((; z=obs), prior_model, explicit_observation
 # TODO | syntax for AbstractModel
 
 # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-chain = sample(rng, posterior, ind_sym_sampler, 10_000; discard_initial=5_000, thinning=2);
+chain = sample(rng, posterior, ind_sym_sampler, 20_000; discard_initial=0_000, thinning=1);
 
 # TODO separate evaluation from experiments, i.e. save & load
 model_chain = map(chain) do sample
     s, _ = to_model_domain(sample, bijector(posterior))
     s
 end;
-plot_variable(model_chain, :t, 100)
-plot_variable(model_chain, :r, 100)
-plot_variable(model_chain, :o, 100)
-plot_logprob(model_chain, 100)
-density_variable(model_chain, :t)
-density_variable(model_chain, :r)
-density_variable(model_chain, :o)
+plotly()
+STEP = 300
+MCMCDepth.diss_defaults(; fontfamily="calibri", fontsize=11, size=(160, 90))
+plt_t_chain = plot_variable(model_chain, :t, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Position [m]", showlegend=false, bottom_margin=10mm);
+plt_r_chain = plot_variable(model_chain, :r, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Orientierung [XYZ°]", showlegend=false);
+plot_variable(model_chain, :o, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Zugehörigkeit", showlegend=false);
+plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", showlegend=false);
+plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientierung [°]", ylabel="Wahrscheinlichkeit", showlegend=false);
+density_variable(model_chain, :o; label=["x" "y" "z"], xlabel="Zugehörigkeit [°]", ylabel="Wahrscheinlichkeit", showlegend=false);
+scatter_position(model_chain, 100);
+# TEST
+l = @layout [grid(2, 2) s{1e-10w}];
+l_fake = plot((-3:-1)', (-3:-1)', lims=(0, 1), legend=:topright, label=["x" "y" "z"], palette=MCMCDepth.distinguishable_rwth(3), frame=:none);
+plot(
+    plt_t_chain, plt_t_dens,
+    plt_r_chain, plt_r_dens,
+    l_fake;
+    layout=l
+)
+
+# plot_logprob(model_chain, STEP)
+
 # # pyplot()
 # polar_histogram_variable(model_chain, :r; nbins=180)
-
 # # mean(getproperty.(variables.(model_chain), (:t)))
-plot_depth_img(render(render_context, scene, parameters.object_id, to_pose(model_chain[end].variables.t, model_chain[end].variables.r)) |> Array)
+# plot_depth_img(render(render_context, scene, parameters.object_id, to_pose(model_chain[end].variables.t, model_chain[end].variables.r)) |> Array)
