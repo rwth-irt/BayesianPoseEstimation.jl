@@ -10,7 +10,6 @@ using Test
 
 rng = Random.default_rng()
 Random.seed!(rng, 42)
-pyplot()
 
 # Setup render context & scene
 params = MCMCDepth.Parameters()
@@ -36,7 +35,7 @@ plot_depth_img(μ)
 
 obs_params = @set params.mesh_files = ["meshes/BM067R.obj", "meshes/cube.obj"]
 obs_scene = Scene(obs_params, render_context)
-obs_scene = @set obs_scene.meshes[2].pose.t = [-0.5, 0.5, 0.6]
+obs_scene = @set obs_scene.meshes[2].pose.translation = [-0.5, 0.5, 0.6]
 obs_t = [-0.05, 0.048, 0.25]
 obs_r = [1, 1.03, 0]
 obs_p = to_pose(obs_t, obs_r)
@@ -48,14 +47,24 @@ plot_depth_img(μ - μ2; colorbar_title="depth difference [m]")
 
 o = rand(rng, KernelUniform(0.9f0, 1.0f0), 100, 100)
 img = rand(my_pixel_dist.(obs_μ, o))
-plot_depth_img(img)
 
+# install fonts for matplotlib (Arial, Times New Romans & Calibri / Cambria replacements)
+#$ apt install ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
+#$ fc-cache
+#$ rm -rf ~/.cache/matplotlib
+#julia> fonts = PyPlot.matplotlib.font_manager.FontManager().get_font_names()
+pyplot()
+MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, size=(160, 60))
+
+plt_depth = plot_depth_img(img, title="Simuliertes Tiefenbild", colorbar_title="Distanz [m]", xlabel="x-Pixel", ylabel="y-Pixel")
 plot_depth_img(logdensityof.(my_pixel_dist.(μ, o), img) .|> exp; colorbar_title="probability density", reverse=false, value_to_typemax=1)
 # Shorter differences should result in higher logdensity. Keep in mind the mixture.
-
 
 dist_is(μ) = ValidPixel(μ, KernelNormal(μ, 0.1f0))
 dist_not(μ) = ValidPixel(μ, truncated(KernelExponential(1.0f0), nothing, μ))
 ia = ImageAssociation(dist_is, dist_not, fill(0.5f0, 100, 100), μ)
 ℓ = logdensityof(ia, img)
-plot_prob_img(ℓ, colorbar_title="association probability")
+pyplot()
+plt_o = plot_prob_img(ℓ; title="Objektzugehörigkeit", colorbar_title="Wahrscheinlichkeit [0,1]", xlabel="x-Pixel", ylabel="y-Pixel")
+
+plot(plt_depth, plt_o; layout=(1, 2))

@@ -14,10 +14,15 @@ import StatsPlots: density as stats_density
 const RWTH_blue = colorant"#00549f"
 distinguishable_rwth(n) = distinguishable_colors(n, RWTH_blue, lchoices=0:75)
 
-diss_defaults(; size=(148.4789, 83.5193), fontsize=11, kwargs...) = Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(fontsize), colorbar_tickfontsize=correct_fontsize(fontsize), size=correct_size(size), fontfamily="helvetica", kwargs...)
-correct_fontsize(font_size) = round(font_size)
+diss_defaults(; size=(148.4789, 83.5193), fontsize=11, fontfamily="helvetica", kwargs...) = Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(0.8 * fontsize), colorbar_tickfontsize=correct_fontsize(0.8 * fontsize), size=correct_size(size), fontfamily=fontfamily, colorbar_tickfontfamily=fontfamily, kwargs...)
+
+correct_fontsize(font_size) = correct_fontsize(Plots.backend(), font_size)
+correct_fontsize(::Plots.AbstractBackend, font_size) = round(font_size)
+
+correct_size(size) = correct_size(Plots.backend(), size)
 # 4//3 plotly magic number??
-correct_size(size) = size .* 4//3 .* (mm / pt) .|> round
+correct_size(::Plots.AbstractBackend, size) = size .* 4 // 3 .* (mm / pt) .|> round
+correct_size(::Plots.PyPlotBackend, size) = size .* (16 / 4.064) .|> round
 
 """
    value_or_typemax(x, [value=zero(x)])
@@ -45,10 +50,7 @@ function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=
   end
   width, height = size(img)
   img = value_or_typemax.(img, value_to_typemax)
-  plot = heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:zerolines, x_ticks=[width], xmirror=true, y_ticks=[0, height], background_color_outside=:transparent, kwargs...)
-
-  xlabel!(plot, "x-pixels")
-  ylabel!(plot, "y-pixels")
+  plot = heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
 end
 
 """
