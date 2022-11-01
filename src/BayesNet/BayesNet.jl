@@ -126,13 +126,15 @@ struct VariableNode{name,child_names,M,N<:NamedTuple{child_names}} <: AbstractNo
 end
 
 # construct as parent
-VariableNode(name::Symbol, model::M, children::N) where {child_names,M<:Function,N<:NamedTuple{child_names}} = VariableNode{name,child_names,M,N}(model, children)
+VariableNode(name::Symbol, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = VariableNode{name,child_names,M,N}(model, children)
+
+# Workaround so D is not UnionAll but interpreted as constructor
+function VariableNode(name::Symbol, ::Type{M}, children::N) where {names,M,N<:NamedTuple{names}}
+    wrapped = (x...) -> M(x...)
+    VariableNode(name, wrapped, children)
+end
+
 
 # construct as leaf
-VariableNode(name::Symbol, model::M) where {M} = VariableNode{name,(),M,(;)}(model, (;))
+VariableNode(name::Symbol, model::M) where {M} = VariableNode(name, model, (;))
 
-function VariableNode(name::Symbol, ::Type{M}, children::N) where {names,M,N<:NamedTuple{names}}
-    # Workaround so D is not UnionAll but interpreted as constructor
-    wrapped = (x...) -> M(x...)
-    VariableNode{name,names,typeof(wrapped),N}(wrapped, children)
-end

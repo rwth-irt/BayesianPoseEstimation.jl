@@ -12,8 +12,8 @@ using Test
 
 rng = Random.default_rng()
 
-a = VariableNode(:a, KernelUniform, (;))
-b = VariableNode(:b, KernelExponential, (;))
+a = VariableNode(:a, KernelUniform())
+b = VariableNode(:b, KernelExponential())
 c = VariableNode(:c, KernelNormal, (; a=a, b=b))
 d = VariableNode(:d, KernelNormal, (; c=c, b=b))
 
@@ -23,3 +23,8 @@ nt = rand(rng, d)
 bij = bijector(d)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
+
+# TODO multiple samples?
+nt = rand(rng, d, 2)
+# TODO even here, broadcasting constructor by default does not make sense. Only logdensityof. would make sense
+ℓ = logdensityof(d, nt)
