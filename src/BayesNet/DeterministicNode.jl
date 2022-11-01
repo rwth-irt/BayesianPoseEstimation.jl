@@ -16,7 +16,7 @@ struct DeterministicNode{name,child_names,M,N<:NamedTuple{child_names}} <: Abstr
     children::N
 end
 
-rand_barrier(node::ModifierNode, variables::NamedTuple, ::AbstractRNG, dims...) = model.fn(argvalues(node, variables))
+rand_barrier(node::ModifierNode, variables::NamedTuple, ::AbstractRNG, dims...) = model.fn(childvalues(node, variables))
 
 # Do not change the joint probability - log probability of 0
 logdensityof_barrier(node::ModifierNode, variables::NamedTuple) = zero(varvalue(node, variables))

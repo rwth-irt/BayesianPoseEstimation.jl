@@ -10,9 +10,12 @@ using Random
 """
     AbstractNode{name,child_names}
 Construct a directed acyclic graph (DAG), i.e. a Bayesian network, where each variable conditionally depends on a set of parent variables ([Wikpedia](https://en.wikipedia.org/wiki/Bayesian_network)).
+
 By convention, each node represents a variable and has a unique name associated to it.
 Exceptions can be made for specific node implementations, i.e. a modifier which post-processes the result of its child node.
 `name` is typically a symbol and `child_names` a tuple of symbols
+
+If a node is a leaf (has nod children), it does not depend on any other variables and should have a fully specified model.
 
 # Naming Convention
 Naming of parent-child relationship is reversed in a Bayesian network compared to DAGs.
@@ -84,20 +87,24 @@ end
 # The following functions help with type stability of internal codes and makes it possible to define custom behavior by dispatching on a specialized node type
 
 rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables), dims...)
-# dims... only for leafs, otherwise the dimensioms potentiate
+# do not use dims.. in parent nodes which would lead to dimsᴺ where N=depth of the graph
 rand_barrier(node::AbstractNode{<:Any}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables))
 
+# TODO broadcasting by default required / intended?
 logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
 
 bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(variables))
 
 # Helpers for the concrete realization of the internal model by extracting the matching variables
-
+# TODO is broadcasting by default a good idea? Required to handle multiple child values
 (node::AbstractNode)(x...) = model(node).(x...)
-(node::AbstractNode)(nt::NamedTuple) = node(argvalues(node, nt)...)
+(node::AbstractNode)(nt::NamedTuple) = node(childvalues(node, nt)...)
+# leaf does not depend on any other variables and should have a fully specified model
+(node::AbstractNode{<:Any,()})(x...) = model(node)
+(node::AbstractNode{<:Any,()})(::NamedTuple) = model(node)
 
 # Override if required for specific implementations
-argvalues(::AbstractNode{<:Any,child_names}, nt) where {child_names} = values(nt[child_names])
+childvalues(::AbstractNode{<:Any,child_names}, nt) where {child_names} = values(nt[child_names])
 varvalue(::AbstractNode{varname}, nt) where {varname} = nt[varname]
 
 children(node::AbstractNode) = node.children
@@ -105,19 +112,24 @@ model(node::AbstractNode) = node.model
 
 Base.Broadcast.broadcastable(x::AbstractNode) = Ref(x)
 
+Base.show(io::IO, node::T) where {varname,child_names,T<:AbstractNode{varname,child_names}} = print(io, "$(Base.typename(T).wrapper){:$varname, $child_names}")
 
 """
     VariableNode
 Basic implementation of an AbstractNode:
 Represents a named variable and depends on child nodes.
 """
-struct VariableNode{name,child_names,M<:Function,N<:NamedTuple{child_names}} <: AbstractNode{name,child_names}
+struct VariableNode{name,child_names,M,N<:NamedTuple{child_names}} <: AbstractNode{name,child_names}
     # Must be function to avoid UnionAll type instabilities
     model::M
     children::N
 end
 
-VariableNode(name::Symbol, model::M, children::N) where {names,M<:Function,N<:NamedTuple{names}} = VariableNode{name,names,M,N}(model, children)
+# construct as parent
+VariableNode(name::Symbol, model::M, children::N) where {child_names,M<:Function,N<:NamedTuple{child_names}} = VariableNode{name,child_names,M,N}(model, children)
+
+# construct as leaf
+VariableNode(name::Symbol, model::M) where {M} = VariableNode{name,(),M,(;)}(model, (;))
 
 function VariableNode(name::Symbol, ::Type{M}, children::N) where {names,M,N<:NamedTuple{names}}
     # Workaround so D is not UnionAll but interpreted as constructor
