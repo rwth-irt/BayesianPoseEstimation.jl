@@ -18,13 +18,18 @@ c = VariableNode(:c, KernelNormal, (; a=a, b=b))
 d = VariableNode(:d, KernelNormal, (; c=c, b=b))
 
 nt = rand(rng, d)
+@test nt.d isa Float32
 ℓ = logdensityof(d, nt)
+@test ℓ isa Float32
 @test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
 bij = bijector(d)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
-# TODO multiple samples?
+# multiple samples
 nt = rand(rng, d, 2)
-# TODO even here, broadcasting constructor by default does not make sense. Only logdensityof. would make sense
+@test nt.d isa Array{Float32,1}
+@test size(nt.d) == (2,)
 ℓ = logdensityof(d, nt)
+@test ℓ isa Array{Float32,1}
+@test size(ℓ) == (2,) 
