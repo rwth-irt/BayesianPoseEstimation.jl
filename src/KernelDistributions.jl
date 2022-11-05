@@ -60,8 +60,8 @@ array_for_rng(rng::AbstractRNG, ::AbstractArray{T}, dims::Integer...) where {T<:
 
 
 # By default, Distributions.jl disallows logdensityof with multiple samples (Arrays and Matrices). KernelDistributions should be inherently allowing multiple samples.
-DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractArray) = logpdf.(dist, x)
-DensityInterface.logdensityof(dist::AbstractKernelDistribution, x::AbstractMatrix) = logpdf.(dist, x)
+DensityInterface.logdensityof(dist::KernelOrKernelArray, x::AbstractArray) = logpdf.(dist, x)
+DensityInterface.logdensityof(dist::KernelOrKernelArray, x::AbstractMatrix) = logpdf.(dist, x)
 
 # Random Interface
 
