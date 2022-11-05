@@ -90,14 +90,12 @@ rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, rng::AbstractR
 # do not use dims.. in parent nodes which would lead to dimsᴺ where N=depth of the graph
 rand_barrier(node::AbstractNode{<:Any}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables))
 
-# TODO broadcasting by default required / intended?
 logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
 
 bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(variables))
 
 # Helpers for the concrete realization of the internal model by extracting the matching variables
-# TODO is broadcasting by default a good idea? Required to handle multiple child values
-(node::AbstractNode)(x...) = model(node).(x...)
+(node::AbstractNode)(x...) = model(node)(x...)
 (node::AbstractNode)(nt::NamedTuple) = node(childvalues(node, nt)...)
 # leaf does not depend on any other variables and should have a fully specified model
 (node::AbstractNode{<:Any,()})(x...) = model(node)
@@ -109,6 +107,7 @@ varvalue(::AbstractNode{varname}, nt) where {varname} = nt[varname]
 
 children(node::AbstractNode) = node.children
 model(node::AbstractNode) = node.model
+name(::AbstractNode{name}) where {name} = name
 
 Base.Broadcast.broadcastable(x::AbstractNode) = Ref(x)
 
@@ -134,7 +133,5 @@ function VariableNode(name::Symbol, ::Type{M}, children::N) where {names,M,N<:Na
     VariableNode(name, wrapped, children)
 end
 
-
 # construct as leaf
 VariableNode(name::Symbol, model::M) where {M} = VariableNode(name, model, (;))
-
