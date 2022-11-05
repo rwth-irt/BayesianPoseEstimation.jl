@@ -6,6 +6,8 @@ using DensityInterface
 using Random
 using Unrolled
 
+const SequentializedGraph = NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}
+
 """
     Sequentialized.jl
 Since the BayesNet is a directed acyclic graph, there is exactly one shortest path to sequentially call the nodes, so each node has the children values available upon execution.
@@ -26,7 +28,7 @@ sequentialize(node::AbstractNode) =
     rand(rng, graph, dims...)
 Type stable implementation to generate random values from the variables of the sequentialized graph.
 """
-Base.rand(rng::AbstractRNG, graph::NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}, dims::Integer...) = rand_unroll(rng, values(graph), (;), dims...)
+Base.rand(rng::AbstractRNG, graph::SequentializedGraph, dims::Integer...) = rand_unroll(rng, values(graph), (;), dims...)
 # unroll required for type stability
 @unroll function rand_unroll(rng::AbstractRNG, graph, variables, dims::Integer...)
     @unroll for node in graph
@@ -40,7 +42,7 @@ end
     rand(rng, graph, dims...)
 Type stable implementation to calculate the logdensity for a set of variables for the sequentialized graph.
 """
-DensityInterface.logdensityof(graph::NamedTuple{names,<:Tuple{Vararg{AbstractNode}}}, nt::NamedTuple) where {names} =
+DensityInterface.logdensityof(graph::SequentializedGraph, nt::NamedTuple) where {names} =
     reduce(.+, map(values(graph), values(nt[names])) do node, value
         logdensityof(node(nt), value)
     end)
