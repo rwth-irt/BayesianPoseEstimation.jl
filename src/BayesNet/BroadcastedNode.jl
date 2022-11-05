@@ -24,7 +24,11 @@ BroadcastedNode(name::Symbol, model::M, children::N, dist_type::D) where {child_
 function BroadcastedNode(name::Symbol, dist_type, children::NamedTuple)
     # Workaround so D is not UnionAll but interpreted as constructor
     # No reduction by default
-    wrapped = BroadcastedDistribution | (dist_type, ())
+    sacrifice_model = BroadcastedDistribution | (dist_type, ())
+    sacrifice_node = BroadcastedNode(name, sacrifice_model, children, dist_type)
+    sacrifice_values = rand(sacrifice_node)
+    dims = param_dims(varvalue(sacrifice_node, sacrifice_values))
+    wrapped = BroadcastedDistribution | (dist_type, dims)
     BroadcastedNode(name, wrapped, children, dist_type)
 end
 

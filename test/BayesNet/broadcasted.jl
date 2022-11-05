@@ -28,17 +28,25 @@ nt = @inferred rand(rng, a, 2)
 @test size(ℓ) == (2,)
 @test ℓ == [0, 0]
 
-b = BroadcastedNode(:b, KernelExponential, [1.0f0, 2.0f0, 3.0f0])
+b = BroadcastedNode(:b, KernelExponential, fill(1.0f0, 3, 4))
 c = BroadcastedNode(:c, KernelNormal, (; a=a, b=b))
 nt = rand(rng, c)
-@test nt.c isa Array{Float32,1}
-@test size(nt.c) == (3,)
+@test nt.c isa Array{Float32,2}
+@test size(nt.c) == (3, 4)
 ℓ = logdensityof(c, nt)
-# TODO I think that I would have expected a reduction similar to the children? Product by default?
 @test ℓ isa Float32
-@test ℓ == 0
+# WARN Multiple times requires matching sizes of children
+b = BroadcastedNode(:b, KernelExponential, fill(1.0f0, 3))
+c = BroadcastedNode(:c, KernelNormal, (; a=a, b=b))
+nt = rand(rng, c, 2)
+@test nt.a isa Array{Float32,2}
+@test size(nt.a) == (3, 2)
+ℓ = @inferred logdensityof(a, nt)
+@test ℓ isa Array{Float32,1}
+@test size(ℓ) == (2,)
+@test ℓ == [0, 0]
 
-d = VariableNode(:d, KernelNormal, (; c=c, b=b))
+# TODO d = VariableNode(:d, KernelNormal, (; c=c, b=b))
 
 
 
