@@ -67,7 +67,7 @@ param_dims(params...) = (1:n_param_dims(params...)...,)
 
 """
     marginals(dist)
-Lazy broadcasted array of distributions → use dot syntax, Broadcast.broadcasted(..., marginals) or Broadcast.materialize(marginals).
+Lazy broadcasted array of distributions → use dot syntax, Broadcast.broadcasted([...], marginals) or Broadcast.materialize(marginals).
 """
 marginals(dist::BroadcastedDistribution) = dist.marginals
 

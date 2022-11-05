@@ -35,7 +35,7 @@ end
 ManipulatedFunction(func::F, original::G, args::T, kwargs::U, names=()) where {F,G,T,U} = ManipulatedFunction{names,F,G,T,U}(func, original, args, kwargs)
 
 ManipulatedFunction(f::Function) = ManipulatedFunction(f, f, (), (;))
-# Callable support. Since constuctor can be function or type, convert to anonymous function.
+# Callable support. Since constructor can be function or type, convert to anonymous function.
 ManipulatedFunction(::Type{T}) where {T} = ManipulatedFunction((x...; y...) -> T(x..., y...), T, (), (;))
 ManipulatedFunction(f::Callable, x) = ManipulatedFunction(ManipulatedFunction(f), x)
 
@@ -66,6 +66,13 @@ function (mf::ManipulatedFunction{names})(args...; kwargs...) where {names}
 end
 
 # Pretty print
-Base.show(io::IO, mf::ManipulatedFunction{names}) where {names} = print(io, "$(fn_name(mf.original))$((mf.args..., names...)); $(mf.kwargs))")
+function Base.show(io::IO, mf::ManipulatedFunction{names}) where {names}
+    if mf.kwargs == (;)
+        print(io, "$(fn_name(mf.original))$((mf.args..., names...))")
+    else
+        print(io, "$(fn_name(mf.original))$((mf.args..., names...)); $(mf.kwargs))")
+    end
+end
+
 Base.show(io::IO, ::MIME"text/plain", mf::ManipulatedFunction) = show(io, mf)
 fn_name = String ∘ Symbol
