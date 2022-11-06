@@ -12,10 +12,10 @@ using Test
 
 rng = Random.default_rng()
 
-a = VariableNode(:a, KernelUniform())
-b = VariableNode(:b, KernelExponential())
-c = VariableNode(:c, KernelNormal, (; a=a, b=b))
-d = VariableNode(:d, KernelNormal, (; c=c, b=b))
+a = SimpleNode(:a, KernelUniform())
+b = SimpleNode(:b, KernelExponential())
+c = SimpleNode(:c, KernelNormal, (; a=a, b=b))
+d = SimpleNode(:d, KernelNormal, (; c=c, b=b))
 
 nt = rand(rng, d)
 @test nt.d isa Float32
@@ -26,10 +26,5 @@ bij = bijector(d)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
-# multiple samples
-nt = rand(rng, d, 2)
-@test nt.d isa Array{Float32,1}
-@test size(nt.d) == (2,)
-ℓ = logdensityof(d, nt)
-@test ℓ isa Array{Float32,1}
-@test size(ℓ) == (2,) 
+# multiple samples not supported
+@test_throws MethodError rand(rng, d, 2)
