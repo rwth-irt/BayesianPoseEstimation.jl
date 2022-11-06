@@ -153,7 +153,7 @@ struct KernelNormal{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     μ::T
     σ::T
 end
-KernelNormal(μ, σ) = KernelNormal(promote(μ, σ)...)
+KernelNormal(μ::Real, σ::Real) = KernelNormal(promote(μ, σ)...)
 KernelNormal(::Type{T}=Float32) where {T} = KernelNormal{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelNormal{T}) where {T} = print(io, "KernelNormal{$(T)}, μ: $(dist.μ), σ: $(dist.σ)")
@@ -211,7 +211,7 @@ struct KernelUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous}
     min::T
     max::T
 end
-KernelUniform(min, max) = KernelUniform(promote(min, max)...)
+KernelUniform(min::Real, max::Real) = KernelUniform(promote(min, max)...)
 KernelUniform(::Type{T}=Float32) where {T} = KernelUniform{T}(0.0, 1.0)
 
 Base.show(io::IO, dist::KernelUniform{T}) where {T} = print(io, "KernelUniform{$(T)}, a: $(dist.min), b: $(dist.max)")
@@ -254,7 +254,7 @@ struct KernelBinaryMixture{T<:AbstractFloat,S<:ValueSupport,U<:UnivariateDistrib
     KernelBinaryMixture{T}(dist_1::U, dist_2::V, weight_1, weight_2) where {T,S<:ValueSupport,U<:UnivariateDistribution{S},V<:UnivariateDistribution{S}} = new{T,S,U,V}(dist_1, dist_2, log(weight_1 / (weight_1 + weight_2)), log(weight_2 / (weight_1 + weight_2)))
 end
 
-KernelBinaryMixture(::Type{T}, dist_1, dist_2, weight_1, weight_2) where {T} = KernelBinaryMixture{T}(dist_1, dist_2, weight_1, weight_2)
+KernelBinaryMixture(::Type{T}, dist_1, dist_2, weight_1::Real, weight_2::Real) where {T} = KernelBinaryMixture{T}(dist_1, dist_2, weight_1, weight_2)
 KernelBinaryMixture(dist_1, dist_2, weight_1::T, weight_2::T) where {T} = KernelBinaryMixture{T}(dist_1, dist_2, weight_1, weight_2)
 
 
