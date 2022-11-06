@@ -23,8 +23,10 @@ include("BroadcastedDistribution.jl")
 include("QuaternionDistribution.jl")
 # BayesNet
 include("BayesNet/BayesNet.jl")
+include("BayesNet/BroadcastedNode.jl")
 include("BayesNet/ModifierNode.jl")
 include("BayesNet/Sequentialized.jl")
+include("BayesNet/SimpleNode.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
@@ -72,8 +74,9 @@ export BroadcastedDistribution
 export DiscreteBroadcastedDistribution
 
 # BayesNet
-export VariableNode
+export BroadcastedNode
 export ModifierNode
+export SimpleNode
 export sequentialize
 
 # ModelInterface

@@ -2,55 +2,61 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-# TODO should the model always be a BroadcastedDistribution?
-
 
 """
     BroadcastedNode
 Wraps a distribution or a child node by broadcasting it over the parameters via a BroadcastedDistribution.
 You will need to take care of matching dimensionalities in the graph.
 """
-struct BroadcastedNode{name,child_names,M,N<:NamedTuple{child_names},D<:Type} <: AbstractNode{name,child_names}
+struct BroadcastedNode{name,child_names,M,N<:NamedTuple{child_names}} <: AbstractNode{name,child_names}
     # Must be function to avoid UnionAll type instabilities
     model::M
     children::N
-    dist_type::D
 end
 
 # Convenience constructor for moving name to the parametric type
-BroadcastedNode(name::Symbol, model::M, children::N, dist_type::D) where {child_names,M,N<:NamedTuple{child_names},D<:Type} = BroadcastedNode{name,child_names,M,N,D}(model, children, dist_type)
+BroadcastedNode(name::Symbol, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = BroadcastedNode{name,child_names,M,N}(model, children)
 
-# Construct as parent
-function BroadcastedNode(name::Symbol, dist_type, children::NamedTuple)
+"""
+    BroadcastedNode(name, dist, children)
+Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
+The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims for the minimal realization of the distribution given the `children`.
+"""
+function BroadcastedNode(name::Symbol, distribution::Type, children::NamedTuple)
     # Workaround so D is not UnionAll but interpreted as constructor
     # No reduction by default
-    sacrifice_model = BroadcastedDistribution | (dist_type, ())
-    sacrifice_node = BroadcastedNode(name, sacrifice_model, children, dist_type)
+    sacrifice_model = BroadcastedDistribution | (distribution, ())
+    sacrifice_node = BroadcastedNode(name, sacrifice_model, children)
     sacrifice_values = rand(sacrifice_node)
     dims = param_dims(varvalue(sacrifice_node, sacrifice_values))
-    wrapped = BroadcastedDistribution | (dist_type, dims)
-    BroadcastedNode(name, wrapped, children, dist_type)
+    wrapped = BroadcastedDistribution | (distribution, dims)
+    BroadcastedNode(name, wrapped, children)
 end
 
 # Construct as leaf
 # TODO doc that it is constructed as product distribution
-BroadcastedNode(name::Symbol, dist_type, params...) = BroadcastedNode(name, ProductBroadcastedDistribution(dist_type, params...), (;), dist_type)
+"""
+    BroadcastedNode(name, dist, params...)
+Construct the node as leaf (no children) by broadcasting the `distribution` over the `params`.
+The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims of the `params`.
+"""
+BroadcastedNode(name::Symbol, distribution, params...) = BroadcastedNode(name, ProductBroadcastedDistribution(distribution, params...), (;))
 
-BroadcastedNode(name::Symbol, model::BroadcastedDistribution) = BroadcastedNode(name, model, (;))
 
-function broadcast_node(node::AbstractNode{name}) where {name}
-    variables = rand(node)
-    traverse(node, (;), variables) do child, _...
-        broadcast_barrier(child, variables)
-    end
-end
+# TODO Do I want to enable conversion or should a BroadcastedNode be the default?
+# function broadcast_node(node::AbstractNode{name}) where {name}
+#     variables = rand(node)
+#     traverse(node, (;), variables) do child, _...
+#         broadcast_barrier(child, variables)
+#     end
+# end
 
-function broadcast_barrier(node::AbstractNode{name}, variables::NamedTuple) where {name}
-    dims = param_dims(variables[name])
-    # TODO bake in the dims using partial application
-    wrapped = BroadcastedDistribution(model(node), dims, x...)
-    BroadcastedNode(name, broadcasted_model, children(node))
-end
+# function broadcast_barrier(node::AbstractNode{name}, variables::NamedTuple) where {name}
+#     dims = param_dims(variables[name])
+#     # TODO bake in the dims using partial application
+#     wrapped = BroadcastedDistribution(model(node), dims, x...)
+#     BroadcastedNode(name, broadcasted_model, children(node))
+# end
 
 # BroadcastedNode(name, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = BroadcastedNode{name,child_names,M,N}(model, children)
 

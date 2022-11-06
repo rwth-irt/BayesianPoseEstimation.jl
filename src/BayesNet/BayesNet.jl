@@ -112,26 +112,3 @@ name(::AbstractNode{name}) where {name} = name
 Base.Broadcast.broadcastable(x::AbstractNode) = Ref(x)
 
 Base.show(io::IO, node::T) where {varname,child_names,T<:AbstractNode{varname,child_names}} = print(io, "$(Base.typename(T).wrapper){:$varname, $child_names}")
-
-"""
-    VariableNode
-Basic implementation of an AbstractNode:
-Represents a named variable and depends on child nodes.
-"""
-struct VariableNode{name,child_names,M,N<:NamedTuple{child_names}} <: AbstractNode{name,child_names}
-    # Must be function to avoid UnionAll type instabilities
-    model::M
-    children::N
-end
-
-# construct as parent
-VariableNode(name::Symbol, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = VariableNode{name,child_names,M,N}(model, children)
-
-# Workaround so D is not UnionAll but interpreted as constructor
-function VariableNode(name::Symbol, ::Type{M}, children::N) where {names,M,N<:NamedTuple{names}}
-    wrapped = (x...) -> M(x...)
-    VariableNode(name, wrapped, children)
-end
-
-# construct as leaf
-VariableNode(name::Symbol, model::M) where {M} = VariableNode(name, model, (;))
