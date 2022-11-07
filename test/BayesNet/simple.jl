@@ -3,7 +3,7 @@
 # All rights reserved. 
 
 # WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
+include("../../src/MCMCDepth.jl")
 using .MCMCDepth
 
 using MCMCDepth

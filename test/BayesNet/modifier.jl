@@ -3,7 +3,7 @@
 # All rights reserved. 
 
 # WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
+include("../../src/MCMCDepth.jl")
 using .MCMCDepth
 
 using DensityInterface
@@ -16,16 +16,17 @@ using Test
 struct SimpleModifierModel end
 # Construct with same args as wrapped model
 SimpleModifierModel(args...) = SimpleModifierModel()
-Base.rand(::AbstractRNG, model::SimpleModifierModel, value) = 10 .* value
+Base.rand(::AbstractRNG, model::SimpleModifierModel, value) = 10 * value
 DensityInterface.logdensityof(::SimpleModifierModel, ::Any, ℓ) = ℓ + one(ℓ)
 
 plotly()
 rng = Random.default_rng()
 
-a = VariableNode(:a, KernelUniform, (;))
-b = VariableNode(:b, KernelExponential, (;))
-c = VariableNode(:c, KernelNormal, (; a=a, b=b))
-d = VariableNode(:d, KernelNormal, (; c=c, b=b))
+a = SimpleNode(:a, KernelUniform())
+b = SimpleNode(:b, KernelExponential())
+c = SimpleNode(:c, KernelNormal, (; a=a, b=b))
+d = SimpleNode(:d, KernelNormal, (; c=c, b=b))
+# TODO test if not at end
 d_mod = ModifierNode(SimpleModifierModel, d)
 
 nt = rand(rng, d_mod)
