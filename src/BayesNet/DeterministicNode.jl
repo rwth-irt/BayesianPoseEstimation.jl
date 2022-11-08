@@ -16,10 +16,11 @@ struct DeterministicNode{name,child_names,M,N<:NamedTuple{child_names}} <: Abstr
     children::N
 end
 
-rand_barrier(node::ModifierNode, variables::NamedTuple, ::AbstractRNG, dims...) = model.fn(childvalues(node, variables))
+DeterministicNode(name::Symbol, fn::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = DeterministicNode{name,child_names,M,N}(fn, children)
+
+rand_barrier(node::DeterministicNode, variables::NamedTuple, ::AbstractRNG, dims...) = node.fn(childvalues(node, variables)...)
 
 # Do not change the joint probability - log probability of 0
-logdensityof_barrier(node::ModifierNode, variables::NamedTuple) = zero(varvalue(node, variables))
+logdensityof_barrier(node::DeterministicNode, variables::NamedTuple) = varvalue(node, variables) |> eltype |> zero
 
-# TODO is the assumption of ℝ support correct?
-bijector_barrier(node::ModifierNode, variables::NamedTuple) = Bijectors.Identity{0}()
+bijector_barrier(node::DeterministicNode, variables::NamedTuple) = Bijectors.Identity{0}()

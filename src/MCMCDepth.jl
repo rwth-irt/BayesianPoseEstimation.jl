@@ -24,6 +24,7 @@ include("QuaternionDistribution.jl")
 # BayesNet
 include("BayesNet/BayesNet.jl")
 include("BayesNet/BroadcastedNode.jl")
+include("BayesNet/DeterministicNode.jl")
 include("BayesNet/ModifierNode.jl")
 include("BayesNet/Sequentialized.jl")
 include("BayesNet/SimpleNode.jl")
@@ -75,6 +76,7 @@ export DiscreteBroadcastedDistribution
 
 # BayesNet
 export BroadcastedNode
+export DeterministicNode
 export ModifierNode
 export SimpleNode
 export sequentialize
