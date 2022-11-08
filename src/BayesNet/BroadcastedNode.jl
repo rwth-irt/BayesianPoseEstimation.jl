@@ -15,7 +15,11 @@ struct BroadcastedNode{name,child_names,M,N<:NamedTuple{child_names}} <: Abstrac
 end
 
 # Convenience constructor for moving name to the parametric type
-BroadcastedNode(name::Symbol, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = BroadcastedNode{name,child_names,M,N}(model, children)
+BroadcastedNode_(name::Symbol, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = BroadcastedNode{name,child_names,M,N}(model, children)
+
+# WARN Manipulated function not type stable for Type as arg
+broadcast_model(::Type{T}, dims) where {T} = (x...) -> BroadcastedDistribution(T, dims, x...)
+broadcast_model(fn::Function, dims) = (x...) -> BroadcastedDistribution(fn, dims, x...)
 
 # Construct as parent
 """
@@ -23,16 +27,14 @@ BroadcastedNode(name::Symbol, model::M, children::N) where {child_names,M,N<:Nam
 Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims for the minimal realization of the distribution given the `children`.
 """
-function BroadcastedNode(name::Symbol, ::Type{distribution}, children::NamedTuple) where {distribution}
+function BroadcastedNode(name::Symbol, distribution::Callable, children::NamedTuple)
     # Workaround so D is not UnionAll but interpreted as constructor
     # No reduction by default
-    sacrifice_model = BroadcastedDistribution | (distribution, ())
-    sacrifice_node = BroadcastedNode(name, sacrifice_model, children)
+    sacrifice_model = broadcast_model(distribution, ())
+    sacrifice_node = BroadcastedNode_(name, sacrifice_model, children)
     sacrifice_values = rand(sacrifice_node)
     dims = param_dims(varvalue(sacrifice_node, sacrifice_values))
-    # WARN Manipulated function not type stable for Type as arg
-    wrapped(x...) = BroadcastedDistribution(distribution, dims, x...)
-    BroadcastedNode(name, wrapped, children)
+    BroadcastedNode_(name, broadcast_model(distribution, dims), children)
 end
 
 # Construct as leaf
@@ -41,4 +43,4 @@ end
 Construct the node as leaf (no children) by broadcasting the `distribution` over the `params`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims of the `params`.
 """
-BroadcastedNode(name::Symbol, distribution, params...) = BroadcastedNode(name, ProductBroadcastedDistribution(distribution, params...), (;))
+BroadcastedNode(name::Symbol, distribution, params...) = BroadcastedNode_(name, ProductBroadcastedDistribution(distribution, params...), (;))
