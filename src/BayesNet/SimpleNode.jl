@@ -18,9 +18,9 @@ end
 SimpleNode(name::Symbol, model::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = SimpleNode{name,child_names,M,N}(model, children)
 
 # construct as parent
-function SimpleNode(name::Symbol, dist::Type, children::N) where {names,N<:NamedTuple{names}}
+function SimpleNode(name::Symbol, ::Type{distribution}, children::NamedTuple) where {distribution}
     # Workaround so D is not UnionAll but interpreted as constructor
-    wrapped(x...) = dist(x...)
+    wrapped(x...) = distribution(x...)
     SimpleNode(name, wrapped, children)
 end
 

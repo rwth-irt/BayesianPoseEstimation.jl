@@ -3,7 +3,7 @@
 # All rights reserved. 
 
 # WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
+include("../../src/MCMCDepth.jl")
 using .MCMCDepth
 
 using BenchmarkTools
@@ -13,16 +13,30 @@ using Test
 
 rng = Random.default_rng()
 
-a = VariableNode(:a, KernelUniform, (;))
-b = VariableNode(:b, KernelExponential, (;))
-c = VariableNode(:c, KernelNormal, (; a=a, b=b))
-d = VariableNode(:d, KernelNormal, (; c=c, b=b))
+a = SimpleNode(:a, KernelUniform())
+b = SimpleNode(:b, KernelExponential())
+c = SimpleNode(:c, KernelNormal, (; a=a, b=b))
+d = SimpleNode(:d, KernelNormal, (; c=c, b=b))
 
 seq_graph = sequentialize(d)
-rand(Random.default_rng(), seq_graph)
 nt = @inferred rand(Random.default_rng(), seq_graph)
 ℓ = @inferred logdensityof(seq_graph, nt)
 @test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
+
+# Test BroadcastedNode
+a = BroadcastedNode(:a, KernelUniform, 0, fill(1.0f0, 2))
+b = BroadcastedNode(:b, KernelExponential, fill(1.0f0, 2))
+c = BroadcastedNode(:c, KernelNormal, (; a=a, b=b))
+d = BroadcastedNode(:d, KernelNormal, (; c=c, b=b))
+
+seq_graph = sequentialize(d)
+nt = @inferred rand(Random.default_rng(), seq_graph)
+ℓ = @inferred logdensityof(seq_graph, nt)
+@test ℓ == sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d))
+
+nt = @inferred rand(Random.default_rng(), seq_graph, 3)
+ℓ = @inferred logdensityof(seq_graph, nt)
+@test ℓ' ≈ sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d); dims=(1,))
 
 # WARN non-simplified implementations are not type stable
 @benchmark rand(Random.default_rng(), d)

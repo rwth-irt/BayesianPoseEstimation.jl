@@ -19,18 +19,19 @@ BroadcastedNode(name::Symbol, model::M, children::N) where {child_names,M,N<:Nam
 
 # Construct as parent
 """
-    BroadcastedNode(name, dist, children)
+    BroadcastedNode(name, distribution, children)
 Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims for the minimal realization of the distribution given the `children`.
 """
-function BroadcastedNode(name::Symbol, distribution::Type, children::NamedTuple)
+function BroadcastedNode(name::Symbol, ::Type{distribution}, children::NamedTuple) where {distribution}
     # Workaround so D is not UnionAll but interpreted as constructor
     # No reduction by default
     sacrifice_model = BroadcastedDistribution | (distribution, ())
     sacrifice_node = BroadcastedNode(name, sacrifice_model, children)
     sacrifice_values = rand(sacrifice_node)
     dims = param_dims(varvalue(sacrifice_node, sacrifice_values))
-    wrapped = BroadcastedDistribution | (distribution, dims)
+    # WARN Manipulated function not type stable for Type as arg
+    wrapped(x...) = BroadcastedDistribution(distribution, dims, x...)
     BroadcastedNode(name, wrapped, children)
 end
 

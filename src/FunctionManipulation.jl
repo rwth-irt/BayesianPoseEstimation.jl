@@ -36,7 +36,7 @@ ManipulatedFunction(func::F, original::G, args::T, kwargs::U, names=()) where {F
 
 ManipulatedFunction(f::Function) = ManipulatedFunction(f, f, (), (;))
 # Callable support. Since constructor can be function or type, convert to anonymous function.
-ManipulatedFunction(::Type{T}) where {T} = ManipulatedFunction((x...; y...) -> T(x..., y...), T, (), (;))
+ManipulatedFunction(::Type{T}) where {T} = ManipulatedFunction((x...; y...) -> T(x...; y...), T, (), (;))
 ManipulatedFunction(f::Callable, x) = ManipulatedFunction(ManipulatedFunction(f), x)
 
 # partial applications of an existing ManipulatedFunction
@@ -56,14 +56,19 @@ Base.:|(f::Union{Callable,ManipulatedFunction}, x) = ManipulatedFunction(f, x)
 
 
 # ManipulatedFunction is callable
+# TODO if mf.args contains a Type / UnionAll it is unstable (UnionAll)
+# bar(::Type{T}, λ) where {T} = T(λ)
+# b = bar | KernelExponential
+# @code_warntype b(2.0)
 function (mf::ManipulatedFunction{names})(args...; kwargs...) where {names}
     # these args are mapped to kwargs using the parametric names
     kw2arg = args[end-length(names)+1:end]
     nt = NamedTuple{names}(kw2arg)
     # these args are not mapped to kwargs
     remaining = args[begin:end-length(names)]
-    mf.original(mf.args..., remaining...; mf.kwargs..., nt..., kwargs...)
+    mf.func(mf.args..., remaining...; mf.kwargs..., nt..., kwargs...)
 end
+
 
 # Pretty print
 function Base.show(io::IO, mf::ManipulatedFunction{names}) where {names}

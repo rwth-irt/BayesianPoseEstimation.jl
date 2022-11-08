@@ -42,7 +42,7 @@ end
     rand(rng, graph, dims...)
 Type stable implementation to calculate the logdensity for a set of variables for the sequentialized graph.
 """
-DensityInterface.logdensityof(graph::SequentializedGraph, nt::NamedTuple) where {names} =
+DensityInterface.logdensityof(graph::SequentializedGraph{names}, nt::NamedTuple) where {names} =
     reduce(.+, map(values(graph), values(nt[names])) do node, value
         logdensityof(node(nt), value)
     end)
