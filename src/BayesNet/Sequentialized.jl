@@ -25,21 +25,21 @@ sequentialize(node::AbstractNode) =
     end
 
 """
-    rand(rng, graph, dims...)
+    rand(graph, dims...)
 Type stable implementation to generate random values from the variables of the sequentialized graph.
 """
-Base.rand(rng::AbstractRNG, graph::SequentializedGraph, dims::Integer...) = rand_unroll(rng, values(graph), (;), dims...)
+Base.rand(graph::SequentializedGraph, dims::Integer...) = rand_unroll(values(graph), (;), dims...)
 # unroll required for type stability
-@unroll function rand_unroll(rng::AbstractRNG, graph, variables, dims::Integer...)
+@unroll function rand_unroll(graph, variables, dims::Integer...)
     @unroll for node in graph
-        value = rand_barrier(node, variables, rng, dims...)
+        value = rand_barrier(node, variables, dims...)
         variables = merge_value(variables, node, value)
     end
     variables
 end
 
 """
-    rand(rng, graph, dims...)
+    logdensityof(graph, nt)
 Type stable implementation to calculate the logdensity for a set of variables for the sequentialized graph.
 """
 DensityInterface.logdensityof(graph::SequentializedGraph{names}, nt::NamedTuple) where {names} =

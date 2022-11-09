@@ -18,7 +18,7 @@ end
 
 DeterministicNode(name::Symbol, fn::M, children::N) where {child_names,M,N<:NamedTuple{child_names}} = DeterministicNode{name,child_names,M,N}(fn, children)
 
-rand_barrier(node::DeterministicNode, variables::NamedTuple, ::AbstractRNG, dims...) = node.fn(childvalues(node, variables)...)
+rand_barrier(node::DeterministicNode, variables::NamedTuple, dims...) = node.fn(childvalues(node, variables)...)
 
 # Do not change the joint probability - log probability of 0
 logdensityof_barrier(node::DeterministicNode, variables::NamedTuple) = varvalue(node, variables) |> eltype |> zero

@@ -12,20 +12,20 @@ using Test
 
 rng = Random.default_rng()
 
-a = BroadcastedNode(:a, KernelExponential, [1.0f0, 2, 3])
-b = BroadcastedNode(:b, KernelExponential, [1.0f0, 2])
+a = BroadcastedNode(:a, rng, KernelExponential, [1.0f0, 2, 3])
+b = BroadcastedNode(:b, rng, KernelExponential, [1.0f0, 2])
 
 fn(a, ::Any) = a
 c = DeterministicNode(:c, fn, (; a=a, b=b))
 
-nt = rand(rng, c)
+nt = rand(c)
 @test nt.c isa Array{Float32,1}
 @test size(nt.c) == (3,)
 ℓ = logdensityof(c, nt)
 @test ℓ isa Float32
 @test ℓ == logdensityof(a, nt) + logdensityof(b, nt)
 
-nt = rand(rng, c, 2)
+nt = rand(c, 2)
 @test nt.c isa Array{Float32,2}
 @test size(nt.c) == (3, 2)
 ℓ = logdensityof(c, nt)

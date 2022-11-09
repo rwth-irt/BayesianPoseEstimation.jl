@@ -22,20 +22,20 @@ DensityInterface.logdensityof(::SimpleModifierModel, ::Any, ℓ) = ℓ + one(ℓ
 plotly()
 rng = Random.default_rng()
 
-a = SimpleNode(:a, KernelUniform())
-b = SimpleNode(:b, KernelExponential())
-c = SimpleNode(:c, KernelNormal, (; a=a, b=b))
-d = SimpleNode(:d, KernelNormal, (; c=c, b=b))
+a = SimpleNode(:a, rng, KernelUniform())
+b = SimpleNode(:b, rng, KernelExponential())
+c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
+d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
 # TODO test if not at end
-d_mod = ModifierNode(SimpleModifierModel, d)
+d_mod = ModifierNode(d, rng, SimpleModifierModel)
 
-nt = rand(rng, d_mod)
+nt = rand(d_mod)
 @test logdensityof(d, nt) == logdensityof(d_mod, nt) - 1
 bij = bijector(d_mod)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
 # Visual test: d_mod should be wider than d
-nt = rand(Random.default_rng(), d_mod)
-histogram([rand(Random.default_rng(), d_mod).d for _ in 1:100]; label="d_mod")
-histogram!([rand(Random.default_rng(), d).d for _ in 1:100]; label="d")
+nt = rand(d_mod)
+histogram([rand(d_mod).d for _ in 1:100]; label="d_mod");
+histogram!([rand(d).d for _ in 1:100]; label="d")

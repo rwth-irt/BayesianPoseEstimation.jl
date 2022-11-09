@@ -26,6 +26,23 @@ Programming is done more intuitively using the graph & node notation, thus we us
 """
 abstract type AbstractNode{name,child_names} end
 
+# These fields are expected to be available in <:AbstractNode for the default implementations of rand_barrier and logdensityof_barrier
+children(node::AbstractNode) = node.children
+model(node::AbstractNode) = node.model
+name(::AbstractNode{name}) where {name} = name
+rng(node::AbstractNode) = node.rng 
+
+# Interface: define custom behavior by dispatching on a specialized node type
+# Also help with type stability
+
+rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, dims...) = rand(rng(node), node(variables), dims...)
+# do not use dims.. in parent nodes which would lead to dimsᴺ where N=depth of the graph
+rand_barrier(node::AbstractNode{<:Any}, variables::NamedTuple, dims...) = rand(rng(node), node(variables))
+
+logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
+
+bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(variables))
+
 """
     traverse(fn, node, variables, [args...])
 Effectively implements a depth first search to all nodes of the graph.
@@ -56,11 +73,11 @@ merge_value(variables, ::AbstractNode{name}, value) where {name} = (; variables.
 # Model interface
 
 """
-    rand(rng, node, dims...)
+    rand(node, dims...)
 Generate the random variables from the model by traversing the child nodes.
 Each node is evaluated only once and the dims are only applied to leafs.
 """
-Base.rand(rng::AbstractRNG, node::AbstractNode{varname}, dims::Integer...) where {varname} = traverse(rand_barrier, node, (;), rng, dims...)
+Base.rand(node::AbstractNode{varname}, dims::Integer...) where {varname} = traverse(rand_barrier, node, (;), dims...)
 
 """
     logdensityof(node, variables)
@@ -84,15 +101,9 @@ function Bijectors.bijector(node::AbstractNode)
     end
 end
 
-# The following functions help with type stability of internal codes and makes it possible to define custom behavior by dispatching on a specialized node type
-
-rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables), dims...)
-# do not use dims.. in parent nodes which would lead to dimsᴺ where N=depth of the graph
-rand_barrier(node::AbstractNode{<:Any}, variables::NamedTuple, rng::AbstractRNG, dims...) = rand(rng, node(variables))
-
-logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
-
-bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(variables))
+# Help to extract values from samples (NamedTuples)
+childvalues(::AbstractNode{<:Any,child_names}, nt::NamedTuple) where {child_names} = values(nt[child_names])
+varvalue(::AbstractNode{name}, nt::NamedTuple) where {name} = nt[name]
 
 # Helpers for the concrete realization of the internal model by extracting the matching variables
 (node::AbstractNode)(x...) = model(node)(x...)
@@ -101,14 +112,6 @@ bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(vari
 (node::AbstractNode{<:Any,()})(x...) = model(node)
 (node::AbstractNode{<:Any,()})(::NamedTuple) = model(node)
 
-# Override if required for specific implementations
-childvalues(::AbstractNode{<:Any,child_names}, nt) where {child_names} = values(nt[child_names])
-varvalue(::AbstractNode{varname}, nt) where {varname} = nt[varname]
-
-children(node::AbstractNode) = node.children
-model(node::AbstractNode) = node.model
-name(::AbstractNode{name}) where {name} = name
-
+# Base implementations
 Base.Broadcast.broadcastable(x::AbstractNode) = Ref(x)
-
 Base.show(io::IO, node::T) where {varname,child_names,T<:AbstractNode{varname,child_names}} = print(io, "$(Base.typename(T).wrapper){:$varname, $child_names}")

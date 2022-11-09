@@ -12,12 +12,12 @@ using Test
 
 rng = Random.default_rng()
 
-a = SimpleNode(:a, KernelUniform())
-b = SimpleNode(:b, KernelExponential())
-c = SimpleNode(:c, KernelNormal, (; a=a, b=b))
-d = SimpleNode(:d, KernelNormal, (; c=c, b=b))
+a = SimpleNode(:a, rng, KernelUniform())
+b = SimpleNode(:b, rng, KernelExponential())
+c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
+d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
 
-nt = rand(rng, d)
+nt = rand(d)
 @test nt.d isa Float32
 ℓ = logdensityof(d, nt)
 @test ℓ isa Float32
@@ -27,4 +27,4 @@ bij = bijector(d)
 @test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
 # multiple samples not supported
-@test_throws MethodError rand(rng, d, 2)
+@test_throws MethodError rand(d, 2)
