@@ -24,7 +24,7 @@ broadcast_model(fn::Function, dims) = (x...) -> BroadcastedDistribution(fn, dims
 
 # Construct as parent
 """
-    BroadcastedNode(name, children, distribution, rng)
+    BroadcastedNode(name, children, rng, distribution)
 Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims for the minimal realization of the distribution given the `children`.
 """

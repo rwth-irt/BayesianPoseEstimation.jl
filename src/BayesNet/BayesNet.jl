@@ -37,7 +37,7 @@ rng(node::AbstractNode) = node.rng
 
 rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, dims...) = rand(rng(node), node(variables), dims...)
 # do not use dims.. in parent nodes which would lead to dimsᴺ where N=depth of the graph
-rand_barrier(node::AbstractNode{<:Any}, variables::NamedTuple, dims...) = rand(rng(node), node(variables))
+rand_barrier(node::AbstractNode, variables::NamedTuple, dims...) = rand(rng(node), node(variables))
 
 logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
 
