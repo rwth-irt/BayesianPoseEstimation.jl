@@ -45,7 +45,7 @@ DiscreteBroadcastedDistribution(dist, dims::Dims, params...) = BroadcastedDistri
 Construct a BroadcastedDistribution for a distribution generating function, conditioned on params.
 Automatically reduces all dimensions of the parameters, like a product distribution.
 """
-ProductBroadcastedDistribution(dist, params::Union{Number,AbstractArray}...) = BroadcastedDistribution(promote_params_eltype(params...), param_dims(params...), broadcasted(dist, params...), Continuous)
+ProductBroadcastedDistribution(dist, params...) = BroadcastedDistribution(promote_params_eltype(params...), param_dims(params...), broadcasted(dist, params...), Continuous)
 
 """
     promote_params_eltype(params...)
@@ -102,6 +102,8 @@ Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logden
 
 # <:Real Required to avoid ambiguities with Distributions.jl
 Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
+
+Distributions.logpdf(dist::BroadcastedDistribution{<:Any,N}, x::AbstractArray{<:AbstractArray{<:Real,N}}) where {N} = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 
 # Scalar case for CUDA
 Distributions.logpdf(dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}}, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(materialize(marginals(dist)), x), dist.dims)
