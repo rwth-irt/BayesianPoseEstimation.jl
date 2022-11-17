@@ -78,6 +78,8 @@ export BroadcastedNode
 export DeterministicNode
 export ModifierNode
 export SimpleNode
+
+export prior
 export sequentialize
 
 # ModelInterface

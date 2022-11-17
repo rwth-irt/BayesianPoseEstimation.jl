@@ -102,6 +102,21 @@ function Bijectors.bijector(node::AbstractNode)
     end
 end
 
+"""
+    prior(node)
+The prior of a node are the leaf children.
+Returns a SequentializedGraph for the prior 
+"""
+function prior(node::AbstractNode{name}) where {name}
+    result = (;)
+    for child in children(node)
+        result = merge(result, prior(child))
+    end
+    result
+end
+# Leaf is the prior
+prior(node::AbstractNode{name,()}) where {name} = (; name => node)
+
 # Help to extract values from samples (NamedTuples)
 childvalues(::AbstractNode{<:Any,child_names}, nt::NamedTuple) where {child_names} = values(nt[child_names])
 varvalue(::AbstractNode{name}, nt::NamedTuple) where {name} = nt[name]

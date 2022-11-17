@@ -47,3 +47,9 @@ DensityInterface.logdensityof(graph::SequentializedGraph{names}, nt::NamedTuple)
         logdensityof_barrier(node, nt)
     end)
 # still don't get why reduce(.+, map...) is type stable but mapreduce(.+,...) not
+
+"""
+    bijector(node)
+Infer the bijectors of the sequentialized graph.
+"""
+Bijectors.bijector(graph::SequentializedGraph) = map(x -> bijector_barrier(x, (;)), graph)
