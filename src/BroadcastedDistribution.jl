@@ -135,8 +135,7 @@ Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcas
 # Scalars can not be sampled on the GPU as they result in scalar indexing. Generate on the CPU instead
 function Base.rand(rng::CUDA.RNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}})
     # Init CPU rng from the CUDA rng
-    cpu_rng = Random.default_rng()
-    Random.seed!(cpu_rng, rng.seed)
+    cpu_rng = Xoshiro(rng.seed)
     # Increment the CUDA rng
     # TODO copy-pasted from KernelDistributions.jl → move into its own function
     new_counter = Int64(rng.counter) + 1
