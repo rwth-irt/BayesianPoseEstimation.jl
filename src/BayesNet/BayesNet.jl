@@ -85,12 +85,10 @@ Calculate the logdensity of the model given the variables by traversing the chil
 Each node is evaluated only once.
 """
 # TODO promote before reduce
-function DensityInterface.logdensityof(node::AbstractNode, variables::NamedTuple)
-    ℓ = traverse(node, (;)) do child, _
+DensityInterface.logdensityof(node::AbstractNode, variables::NamedTuple) = reduce(add_logdensity,
+    traverse(node, (;)) do child, _
         logdensityof_barrier(child, variables)
-    end
-    reduce(add_logdensity, ℓ)
-end
+    end)
 
 """
     bijector(node)

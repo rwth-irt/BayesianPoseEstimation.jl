@@ -32,7 +32,7 @@ d = BroadcastedNode(:d, (; c=c, b=b), rng, KernelNormal)
 seq_graph = sequentialize(d)
 nt = @inferred rand(seq_graph)
 ℓ = @inferred logdensityof(seq_graph, nt)
-@test ℓ == sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d))
+@test ℓ ≈ sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d))
 
 nt = @inferred rand(seq_graph, 3)
 ℓ = @inferred logdensityof(seq_graph, nt)
@@ -40,7 +40,7 @@ nt = @inferred rand(seq_graph, 3)
 
 # WARN non-simplified implementations are not type stable
 @benchmark rand(d)
-# 30x faster
+# 3-30x faster
 @benchmark rand(seq_graph)
 
 @benchmark rand(d, 100)
@@ -50,5 +50,5 @@ nt = @inferred rand(seq_graph, 3)
 # For now no automatic broadcasting of logdensityof
 vars = rand(seq_graph)
 @benchmark logdensityof(d, vars)
-# 30x faster
+# 3-30x faster
 @benchmark logdensityof(seq_graph, vars)

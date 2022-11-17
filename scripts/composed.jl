@@ -50,19 +50,6 @@ r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
 # TODO works but takes longer to converge
 o = BroadcastedNode(:o, dev_rng, KernelUniform, parameters.precision)
 
-# TODO how to exlude this from the sample
-# o_fn(::Type, ::Any, ::Any, o::Real) = o
-# # TOD is there a nicer way to implement this than 
-# function o_fn(::Type{A}, width, height, o::AbstractVector{T}) where {A,T}
-#     res = A{T}(undef, width, height, size(o)...)
-#     for i = eachindex(o)
-#         # view to avoid scalar indexing on GPU
-#         view(res, :, :, i) .= o[i]
-#     end
-#     res
-# end
-# o_vec = DeterministicNode(:o_vec, o_fn | (device_array_type(parameters), parameters.width, parameters.height), (; o=o))
-
 function render_fn(render_context, scene, object_id, t, r)
     p = to_pose(t, r)
     render(render_context, scene, object_id, p)
@@ -73,18 +60,45 @@ end
 pixel_dist = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 z = BroadcastedNode(:z, (; μ=μ, o=o), dev_rng, pixel_dist)
 
-CUDA.@time s = rand(z);
-CUDA.@time s = rand(z, 60);
-# TODO
-
-plot(plot_depth_img(Array(s.μ[:, :, 1])), plot_prob_img(Array(s.o_vec[:, :, 1])), plot_depth_img(Array(s.z[:, :, 1])),
-    plot_depth_img(Array(s.μ[:, :, 2])), plot_prob_img(Array(s.o_vec[:, :, 2])), plot_depth_img(Array(s.z[:, :, 2])))
+s = rand(z, 2);
+plot(plot_depth_img(Array(s.μ[:, :, 1])), plot_prob_img(Array(s.o[:, :, 1])), plot_depth_img(Array(s.z[:, :, 1])),
+    plot_depth_img(Array(s.μ[:, :, 2])), plot_prob_img(Array(s.o[:, :, 2])), plot_depth_img(Array(s.z[:, :, 2])))
 
 
 # TODO
-z_norm = ModifierNode(:z_norm, normalize_likelihood, (; μ=μ, z=z))
+struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
+    normalization_constant::T
+    μ::M
+end
 
+ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
 
+Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
+using DensityInterface
+function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
+    # Images are always 2D
+    n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
+    ℓ .* model.normalization_constant ./ n_pixel
+end
+
+norm_const = parameters.precision(10)
+z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | norm_const)
+s = rand(z_norm, 2);
+plot(plot_depth_img(Array(s.μ[:, :, 1])), plot_prob_img(Array(s.o[:, :, 1])), plot_depth_img(Array(s.z[:, :, 1])),
+    plot_depth_img(Array(s.μ[:, :, 2])), plot_prob_img(Array(s.o[:, :, 2])), plot_depth_img(Array(s.z[:, :, 2])))
+
+logdensityof(z, s)
+logdensityof(z_norm, s)
+
+seq_z = sequentialize(z_norm)
+
+# TODO remove
+# s = rand(seq_z)
+# logdensityof(seq_z, s)
+# s = rand(seq_z, 2)
+# logdensityof(seq_z, s)
+
+# TODO Extract prior from graph → should be the leafs?
 prior_model = RenderModel(render_context, scene, parameters.object_id, IndependentModel((; t=t_model, r=r_model, o=o_model)))
 
 # Assemble samplers

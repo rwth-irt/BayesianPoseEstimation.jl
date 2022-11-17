@@ -43,7 +43,7 @@ end
 Type stable implementation to calculate the logdensity for a set of variables for the sequentialized graph.
 """
 DensityInterface.logdensityof(graph::SequentializedGraph{names}, nt::NamedTuple) where {names} =
-    reduce(add_logdensity, map(values(graph), values(nt[names])) do node, value
-        logdensityof(node(nt), value)
+    reduce(add_logdensity, map(values(graph)) do node
+        logdensityof_barrier(node, nt)
     end)
 # still don't get why reduce(.+, map...) is type stable but mapreduce(.+,...) not
