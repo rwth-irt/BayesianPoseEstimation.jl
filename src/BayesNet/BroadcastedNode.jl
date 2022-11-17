@@ -77,8 +77,11 @@ https://freecontent.manning.com/vectorizing-your-code-using-broadcasting/
 https://discourse.julialang.org/t/designating-the-axes-for-broadcasting/29203/2
 """
 insertdims(A::Real, ::Dims, ::Dims) = A
-# TODO for initialization, does it cause unexpected behavior if the BroadcastedDistribution is actually scalar? Probably not since A must be a real in this case, which calls the above.
+# For initialization
 insertdims(A, ::Dims, ::Dims{0}) = A
+# Avoid ambiguities
+insertdims(A::Real, ::Dims, ::Dims{0}) = A
+
 function insertdims(A, original::Dims{O}, ::Dims{B}) where {O,B}
     # WARN fill array is not type stable
     fill_ones = ntuple(_ -> 1, B - O)

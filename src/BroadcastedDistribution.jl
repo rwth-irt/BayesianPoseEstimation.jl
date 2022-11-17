@@ -125,7 +125,24 @@ function Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{T}, dims::Int
     rand!(rng, dist, A)
 end
 
+# Scalar case
 Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}}, dims::Int...) = rand(rng, materialize(marginals(dist)), dims...)
+
+# TODO this fix only works for BroadcastedDistribution of size 0, each KernelDistribution would require a specific implementation to avoid method ambiguities with the AbstractRNG
+# Scalars can not be sampled on the GPU as they result in scalar indexing. Generate on the CPU instead
+function Base.rand(rng::CUDA.RNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}})
+    # Init CPU rng from the CUDA rng
+    cpu_rng = Random.default_rng()
+    Random.seed!(cpu_rng, rng.seed)
+    # Increment the CUDA rng
+    # TODO copy-pasted from KernelDistributions.jl → move into its own function
+    new_counter = Int64(rng.counter) + 1
+    overflow, remainder = fldmod(new_counter, typemax(UInt32))
+    rng.seed += overflow
+    rng.counter = remainder
+    # Return random value from CPU rng
+    rand(cpu_rng, materialize(marginals(dist)))
+end
 
 """
     rand!(rng, dist, [dims...])

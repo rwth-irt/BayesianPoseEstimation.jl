@@ -3,8 +3,8 @@
 # All rights reserved.
 
 # WARN Do not run this if you want Revise to work
-# include("../src/MCMCDepth.jl")
-# using .MCMCDepth
+include("../src/MCMCDepth.jl")
+using .MCMCDepth
 
 using AbstractMCMC
 using Accessors
@@ -14,6 +14,9 @@ using MCMCDepth
 using Random
 using Plots
 using Plots.PlotMeasures
+
+pyplot()
+MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
 
 # TODO Do I want a main method with a plethora of parameters?
 # https://bkamins.github.io/julialang/2022/07/15/main.html
@@ -29,8 +32,7 @@ end
 # RNGs
 rng = cpu_rng(parameters)
 dev_rng = device_rng(parameters)
-# Allows us to enforce the pose models to run on the CPU
-cpu_model = RngModel | rng
+# Run specific parts on the GPU
 dev_model = RngModel | dev_rng
 
 # Render context
@@ -38,16 +40,50 @@ render_context = RenderContext(parameters.width, parameters.height, parameters.d
 scene = Scene(parameters, render_context)
 render_model = RenderModel | (render_context, scene, parameters.object_id)
 
-# Pose models on CPU to be able to call OpenGL
+# Model specification
 # TODO lot of copy - paste. Function to generate samplers?
-t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
-# r_model = ProductBroadcastedDistribution(_ -> KernelCircularUniform(), cpu_array(parameters, 3)) |> cpu_model
-r_model = QuaternionDistribution(parameters.precision) |> cpu_model
-
+# Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
+t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
+r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
 # TODO Show robustness for different o by estimating it
-# o_model = Dirac(parameters.precision(3 / 4)) |> cpu_model
+# o = BroadcastedNode(:o, rng, Dirac, parameters.precision(3 / 4))
 # TODO works but takes longer to converge
-o_model = KernelUniform() |> cpu_model
+o = BroadcastedNode(:o, dev_rng, KernelUniform, parameters.precision)
+
+# TODO how to exlude this from the sample
+# o_fn(::Type, ::Any, ::Any, o::Real) = o
+# # TOD is there a nicer way to implement this than 
+# function o_fn(::Type{A}, width, height, o::AbstractVector{T}) where {A,T}
+#     res = A{T}(undef, width, height, size(o)...)
+#     for i = eachindex(o)
+#         # view to avoid scalar indexing on GPU
+#         view(res, :, :, i) .= o[i]
+#     end
+#     res
+# end
+# o_vec = DeterministicNode(:o_vec, o_fn | (device_array_type(parameters), parameters.width, parameters.height), (; o=o))
+
+function render_fn(render_context, scene, object_id, t, r)
+    p = to_pose(t, r)
+    render(render_context, scene, object_id, p)
+end
+μ_fn = render_fn | (render_context, scene, parameters.object_id)
+μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
+
+pixel_dist = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+z = BroadcastedNode(:z, (; μ=μ, o=o), dev_rng, pixel_dist)
+
+CUDA.@time s = rand(z);
+CUDA.@time s = rand(z, 60);
+# TODO
+
+plot(plot_depth_img(Array(s.μ[:, :, 1])), plot_prob_img(Array(s.o_vec[:, :, 1])), plot_depth_img(Array(s.z[:, :, 1])),
+    plot_depth_img(Array(s.μ[:, :, 2])), plot_prob_img(Array(s.o_vec[:, :, 2])), plot_depth_img(Array(s.z[:, :, 2])))
+
+
+# TODO
+z_norm = ModifierNode(:z_norm, normalize_likelihood, (; μ=μ, z=z))
+
 
 prior_model = RenderModel(render_context, scene, parameters.object_id, IndependentModel((; t=t_model, r=r_model, o=o_model)))
 
@@ -127,8 +163,6 @@ model_chain = map(chain) do sample
     s
 end;
 STEP = 300
-pyplot()
-MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
 
 plt_t_chain = plot_variable(model_chain, :t, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Position [m]", legend=false)
 plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=:outerright, left_margin=5mm);

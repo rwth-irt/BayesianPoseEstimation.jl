@@ -87,25 +87,26 @@ sum_and_dropdims(A::Number, ::Dims{N}) where {N} = A
 Convert and broadcast positions and orientations to a vector of `Pose`.
 """
 to_pose(t, r) = to_pose(to_translation(t), to_rotation(r))
+# TODO test & remove
 to_pose(t::Translation, r::Rotation) = Pose(t, r)
-to_pose(t::AbstractArray{<:Translation}, r) = Pose.(t, to_rotation(r))
-to_pose(t, r::AbstractArray{<:Rotation}) = Pose.(to_translation(t), r)
 to_pose(t::AbstractArray{<:Translation}, r::AbstractArray{<:Rotation}) = Pose.(t, r)
+to_pose(t::AbstractArray{<:Translation}, r::Rotation) = Pose.(t, (r,))
+to_pose(t::Translation, r::AbstractArray{<:Rotation}) = Pose.((t,), r)
 
 """
     to_translation(A)
-Convert an array to a vector of `Translation` column wise.
+Convert the input to a `Vector{Translation}`.
 """
 to_translation(A::AbstractArray{<:Number}) = [to_translation(t) for t in eachcol(A)]
 to_translation(A::AbstractArray{<:Translation}) = A
-to_translation(v::AbstractVector{<:Number}) = Translation(SVector{3}(v))
 
-# Identity if already Translation
+# Wrap in vector
+to_translation(v::AbstractVector{<:Number}) = Translation(SVector{3}(v))
 to_translation(t::Translation) = t
 
 """
     to_rotation(A, [T=RotXYZ])
-Convert an array to a vector of `Rotation` column wise, optionally specifying the orientation representation `T`.
+Convert an array to a `Vector{Rotation}` column wise, optionally specifying the orientation representation `T`.
 """
 to_rotation(A::AbstractArray{T}) where {T<:Number} = [RotXYZ(r...) for r in eachcol(A)]
 # SciGL will take care of conversion to affine transformation matrix
@@ -116,7 +117,7 @@ to_rotation(A::AbstractArray{<:Rotation}) = A
 
 """
     to_rotation(A, [T=RotXYZ])
-Convert an array of Quaternions to an array of `Rotation` column wise, optionally specifying the orientation representation `T`.
+Convert an array of Quaternions to a `Vector{Rotation}` column wise, optionally specifying the orientation representation `T`.
 """
 to_rotation(Q::Array{<:Quaternion}) = QuatRotation.(Q)
 to_rotation(q::Quaternion) = QuatRotation(q)
