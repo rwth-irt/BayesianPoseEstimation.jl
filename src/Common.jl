@@ -159,3 +159,10 @@ Normalize the array A so that its p-norm equals unity, i.e. norm(a, p) == 1.
 Compared to normalize, you can specify the dims to sum over.
 """
 normalize_dims(A::AbstractArray, p=2; dims=(1,)) = normalize_dims!(similar(A), p; dims=dims)
+
+"""
+    add_logdensity(A, B)
+Add logdensities from different devices
+"""
+add_logdensity(A, B) = A .+ B
+add_logdensity(A::Array, B::CuArray) = A .+ Array(B)

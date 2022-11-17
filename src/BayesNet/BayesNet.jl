@@ -30,7 +30,7 @@ abstract type AbstractNode{name,child_names} end
 children(node::AbstractNode) = node.children
 model(node::AbstractNode) = node.model
 name(::AbstractNode{name}) where {name} = name
-rng(node::AbstractNode) = node.rng 
+rng(node::AbstractNode) = node.rng
 
 # Interface: define custom behavior by dispatching on a specialized node type
 # Also help with type stability
@@ -84,10 +84,13 @@ Base.rand(node::AbstractNode{varname}, dims::Integer...) where {varname} = trave
 Calculate the logdensity of the model given the variables by traversing the child nodes.
 Each node is evaluated only once.
 """
-DensityInterface.logdensityof(node::AbstractNode, variables::NamedTuple) =
-    reduce(.+, traverse(node, (;)) do child, _
+# TODO promote before reduce
+function DensityInterface.logdensityof(node::AbstractNode, variables::NamedTuple)
+    ℓ = traverse(node, (;)) do child, _
         logdensityof_barrier(child, variables)
-    end)
+    end
+    reduce(add_logdensity, ℓ)
+end
 
 """
     bijector(node)

@@ -100,6 +100,9 @@ Evaluate the logdensity of multi-dimensional distributions and data using broadc
 """
 Distributions.logpdf(dist::BroadcastedDistribution, x) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 
+# TODO Maybe rethink basing this on Distributions.Distribution because this causes a lot of ambiguities
+# Avoid ambiguities with Distributions.jl
+Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 # <:Real Required to avoid ambiguities with Distributions.jl
 Distributions.logpdf(dist::BroadcastedDistribution, x::AbstractArray{<:Real}) = sum_and_dropdims(logdensityof.(marginals(dist), x), dist.dims)
 
