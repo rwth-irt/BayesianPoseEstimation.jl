@@ -17,9 +17,14 @@ a = SimpleNode(:a, rng, KernelUniform())
 b = SimpleNode(:b, rng, KernelExponential())
 c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
 d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
+seq_graph = sequentialize(d)
+
+# Type stable bijectors
+bij = @inferred bijector(seq_graph)
+@test bij isa NamedTuple{(:a, :b, :c, :d)}
+@test values(bij) == (bijector(KernelUniform()), bijector(KernelExponential()), bijector(KernelNormal()), bijector(KernelNormal()))
 
 # Type stable rand
-seq_graph = sequentialize(d)
 nt = @inferred rand(seq_graph, (; a=1))
 @test nt.a == 1
 nt = @inferred rand(seq_graph)
@@ -42,7 +47,7 @@ nt = @inferred rand(seq_graph, 3)
 ℓ = @inferred logdensityof(seq_graph, nt)
 @test ℓ' ≈ sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d); dims=(1,))
 
-# evaluate deterministic nodes
+# Type stable evaluate deterministic nodes
 fn(x, ::Any) = x
 c = DeterministicNode(:c, fn, (; a=a, b=b))
 d = BroadcastedNode(:d, (; c=c, b=b), rng, KernelNormal)

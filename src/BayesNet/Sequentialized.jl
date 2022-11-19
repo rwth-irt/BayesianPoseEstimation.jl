@@ -67,4 +67,7 @@ DensityInterface.logdensityof(graph::SequentializedGraph{names}, nt::NamedTuple)
     bijector(node)
 Infer the bijectors of the sequentialized graph.
 """
-Bijectors.bijector(graph::SequentializedGraph) = map(x -> bijector_barrier(x, (;)), graph)
+function Bijectors.bijector(graph::SequentializedGraph)
+    variables = rand(graph)
+    map(x -> bijector_barrier(x, variables), graph)
+end
