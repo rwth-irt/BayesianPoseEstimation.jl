@@ -39,6 +39,10 @@ rand_barrier(node::AbstractNode{<:Any,()}, variables::NamedTuple, dims...) = ran
 # do not use dims.. in parent nodes which would lead to dimsᴺ where N=depth of the graph
 rand_barrier(node::AbstractNode, variables::NamedTuple, dims...) = rand(rng(node), node(variables))
 
+# Do only evaluate DeterministicNodes
+evaluate_barrier(node::AbstractNode, variables::NamedTuple) = varvalue(node, variables)
+# evaluate_barrier(::AbstractNode, ::NamedTuple) = nothing
+
 logdensityof_barrier(node::AbstractNode, variables::NamedTuple) = logdensityof(node(variables), varvalue(node, variables))
 
 bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(variables))
@@ -80,7 +84,7 @@ merge_value(variables, ::AbstractNode, ::Nothing) = variables
 # Model interface
 
 """
-    rand(node, [variables], dims...)
+    rand(node, [variables, dims...])
 Generate the random variables from the model by traversing the child nodes.
 Each node is evaluated only once and the dims are only applied to leafs.
 The `variables` parameter allows to condition the model and will not be re-sampled.
@@ -88,6 +92,18 @@ The `variables` parameter allows to condition the model and will not be re-sampl
 Base.rand(node::AbstractNode{varname}, variables::NamedTuple, dims::Integer...) where {varname} = traverse(rand_barrier, node, variables, dims...)
 Base.rand(node::AbstractNode, dims::Integer...) = rand(node, (;), dims...)
 
+"""
+    evaluate(node, variables)
+Evaluate only the deterministic nodes in the graph given the random `variables`.
+All required random variables are assumed to be available.
+"""
+function evaluate(node::AbstractNode, variables::NamedTuple)
+    # pass empty `variables` to traverse to evaluate all nodes
+    nt = traverse(node, (;)) do child, _
+        evaluate_barrier(child, variables)
+    end
+    merge(variables, nt)
+end
 
 """
     logdensityof(node, variables)

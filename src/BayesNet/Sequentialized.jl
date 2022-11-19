@@ -25,25 +25,33 @@ sequentialize(node::AbstractNode) =
     end
 
 """
-    rand(graph, [variables], dims...)
+    rand(graph, [variables, dims...])
 Type stable implementation to generate random values from the variables of the sequentialized graph.
 The `variables` parameter allows to condition the model and will not be re-sampled.
 """
 Base.rand(graph::SequentializedGraph, variables::NamedTuple, dims::Integer...) = rand_unroll(values(graph), variables, dims...)
 Base.rand(graph::SequentializedGraph, dims::Integer...) = rand(graph, (;), dims...)
 
-
 # unroll required for type stability
 @unroll function rand_unroll(graph, variables, dims::Integer...)
     @unroll for node in graph
         if !(name(node) in keys(variables))
-            println(variables)
             value = rand_barrier(node, variables, dims...)
             variables = merge_value(variables, node, value)
         end
     end
     variables
 end
+
+"""
+    evaluate(graph, variables)
+Type stable version to only the deterministic nodes in the `graph` given the random `variables`.
+All required random variables are assumed to be available.
+"""
+evaluate(graph::SequentializedGraph, variables::NamedTuple) =
+    map(graph) do node
+        evaluate_barrier(node, variables)
+    end
 
 """
     logdensityof(graph, nt)

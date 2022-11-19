@@ -79,6 +79,8 @@ export DeterministicNode
 export ModifierNode
 export SimpleNode
 
+export evaluate
+export parents
 export prior
 export sequentialize
 

@@ -42,6 +42,13 @@ nt = @inferred rand(seq_graph, 3)
 ℓ = @inferred logdensityof(seq_graph, nt)
 @test ℓ' ≈ sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d); dims=(1,))
 
+# evaluate deterministic nodes
+fn(x, ::Any) = x
+c = DeterministicNode(:c, fn, (; a=a, b=b))
+d = BroadcastedNode(:d, (; c=c, b=b), rng, KernelNormal)
+seq_graph = sequentialize(d)
+@inferred evaluate(seq_graph, (; a=1, b=2.0f0, c=3.0f0, d=4.0f0))
+
 # WARN non-simplified implementations are not type stable
 @benchmark rand(d)
 # 3-30x faster
