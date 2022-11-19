@@ -17,7 +17,10 @@ b = SimpleNode(:b, rng, KernelExponential())
 c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
 d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
 
+nt = rand(d, (; a=1))
+@test nt.a == 1
 nt = rand(d)
+@test nt.a != 1
 @test nt.d isa Float32
 ℓ = logdensityof(d, nt)
 @test ℓ isa Float32

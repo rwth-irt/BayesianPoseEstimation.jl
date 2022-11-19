@@ -18,8 +18,12 @@ b = SimpleNode(:b, rng, KernelExponential())
 c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
 d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
 
+# Type stable rand
 seq_graph = sequentialize(d)
+nt = @inferred rand(seq_graph, (; a=1))
+@test nt.a == 1
 nt = @inferred rand(seq_graph)
+@test nt.a != 1
 ℓ = @inferred logdensityof(seq_graph, nt)
 @test ℓ == logdensityof(KernelUniform(), nt.a) + logdensityof(KernelExponential(), nt.b) + logdensityof(KernelNormal(nt.a, nt.b), nt.c) + logdensityof(KernelNormal(nt.c, nt.b), nt.d)
 

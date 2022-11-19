@@ -29,7 +29,7 @@ abstract type AbstractNode{name,child_names} end
 # These fields are expected to be available in <:AbstractNode for the default implementations of rand_barrier and logdensityof_barrier
 children(node::AbstractNode) = node.children
 model(node::AbstractNode) = node.model
-name(::AbstractNode{name}) where {name} = name
+name(::AbstractNode{NAME}) where {NAME} = NAME
 rng(node::AbstractNode) = node.rng
 
 # Interface: define custom behavior by dispatching on a specialized node type
@@ -67,17 +67,22 @@ end
     merge_value(variables, node, value)
 Right to left merges the value for the node with the correct name into the previously sampled variables.
 Allows to override / modify previous values.
+If the value is nothing, the variable does not get merged
 """
 merge_value(variables, ::AbstractNode{name}, value) where {name} = (; variables..., name => value)
+merge_value(variables, ::AbstractNode, ::Nothing) = variables
 
 # Model interface
 
 """
-    rand(node, dims...)
+    rand(node, [variables], dims...)
 Generate the random variables from the model by traversing the child nodes.
 Each node is evaluated only once and the dims are only applied to leafs.
+The `variables` parameter allows to condition the model and will not be re-sampled.
 """
-Base.rand(node::AbstractNode{varname}, dims::Integer...) where {varname} = traverse(rand_barrier, node, (;), dims...)
+Base.rand(node::AbstractNode{varname}, variables::NamedTuple, dims::Integer...) where {varname} = traverse(rand_barrier, node, variables, dims...)
+Base.rand(node::AbstractNode, dims::Integer...) = rand(node, (;), dims...)
+
 
 """
     logdensityof(node, variables)
