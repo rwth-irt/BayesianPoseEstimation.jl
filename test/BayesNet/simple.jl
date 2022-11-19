@@ -31,3 +31,11 @@ bij = bijector(d)
 
 # multiple samples not supported
 @test_throws MethodError rand(d, 2)
+
+# prior extraction
+prior_d = prior(d)
+@test prior_d == (; a=a, b=b)
+
+# parent extraction
+parent_a = MCMCDepth.parents(:a, d)
+@test parent_a == (; c=c, d=d)

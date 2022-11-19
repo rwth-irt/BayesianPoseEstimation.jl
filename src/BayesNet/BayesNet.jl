@@ -46,10 +46,15 @@ bijector_barrier(node::AbstractNode, variables::NamedTuple) = bijector(node(vari
 """
     traverse(fn, node, variables, [args...])
 Effectively implements a depth first search to all nodes of the graph.
-It is crucial that each node is executed only once for random sampling:
-If a node is sampled multiple times for different paths, the variables are not consistent to each other.
+
+`fn(node, variables, args...)` is a function of the current `node`, the `variables` gathered from the recursions and `args` of the traverse function.
+The return values of `fn` are accumulated in a NamedTuple indexed by the node name.
+Only the first value of a node is considered, repeated calls for the same node name are ignored.
+If `nothing` is returned, the value is ignored. p…
 """
 function traverse(fn, node::AbstractNode{name}, variables::NamedTuple{varnames}, args...) where {name,varnames}
+    #It is crucial that each node is executed only once for random sampling:
+    # If a node is sampled multiple times for different paths, the variables are not consistent to each other.
     # Termination: Value already available (conditioned on or calculate via another path)
     if name in varnames
         return variables
@@ -112,19 +117,44 @@ end
 The prior of a node are the leaf children.
 Returns a SequentializedGraph for the prior 
 """
-function prior(node::AbstractNode{name}) where {name}
-    result = (;)
-    for child in children(node)
-        result = merge(result, prior(child))
+prior(node::AbstractNode) =
+    traverse(node, (;)) do child, _
+        if is_leaf(child)
+            return child
+        else
+            return nothing
+        end
     end
-    result
-end
-# Leaf is the prior
-prior(node::AbstractNode{name,()}) where {name} = (; name => node)
+
+"""
+    parents(node_name, root)
+Returns a SequentializedGraph for the parents for the given `node_name` up until the `root` node.
+"""
+parents(node_name, root::AbstractNode) =
+    traverse(root, (;)) do child, variables
+        # leafs cannot be parents
+        if is_leaf(child)
+            return nothing
+        end
+        # child is direct parent
+        if node_name in keys(children(child))
+            return child
+        end
+        # child is parent of another parent
+        is_parent = mapreduce(|, keys(variables)) do var_name
+            var_name in keys(children(child))
+        end
+        if is_parent
+            return child
+        end
+        return nothing
+    end
+
 
 # Help to extract values from samples (NamedTuples)
 childvalues(::AbstractNode{<:Any,child_names}, nt::NamedTuple) where {child_names} = values(nt[child_names])
 varvalue(::AbstractNode{name}, nt::NamedTuple) where {name} = nt[name]
+is_leaf(node::AbstractNode) = children(node) == (;)
 
 # Helpers for the concrete realization of the internal model by extracting the matching variables
 (node::AbstractNode)(x...) = model(node)(x...)
