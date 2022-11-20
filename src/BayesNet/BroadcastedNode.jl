@@ -2,7 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-
 """
     BroadcastedNode
 Broadcasts the parameters of the children using a BroadcastedDistribution.
@@ -27,7 +26,7 @@ BroadcastedNode_(name::Symbol, children::C, rng::R, model::M, model_dims::Dims{N
 Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims for the minimal realization of the distribution given the `children`.
 """
-function BroadcastedNode(name::Symbol, children::NamedTuple, rng::AbstractRNG, distribution::Callable)
+function BroadcastedNode(name::Symbol, children::NamedTuple, rng::AbstractRNG, distribution::Base.Callable)
     # Generate one sample to calculate dimensions of the node and children. Empty Dims because they are unknown and don't make a difference for a single sample generation.
     sacrifice_model = broadcast_model(distribution, ())
     sacrifice_child_sizes = ntuple(_ -> (), length(children))

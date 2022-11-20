@@ -26,6 +26,13 @@ Programming is done more intuitively using the graph & node notation, thus we us
 """
 abstract type AbstractNode{name,child_names} end
 
+"""
+    SequentializedGraph
+A graph that can be executed in sequence compared to traversing the graph.
+Since Bayseian networks are DAGs, they can always be sequentialized.
+"""
+const SequentializedGraph = NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}
+
 # These fields are expected to be available in <:AbstractNode for the default implementations of rand_barrier and logdensityof_barrier
 children(node::AbstractNode) = node.children
 model(node::AbstractNode) = node.model
@@ -99,8 +106,8 @@ All required random variables are assumed to be available.
 """
 function evaluate(node::AbstractNode, variables::NamedTuple)
     # pass empty `variables` to traverse to evaluate all nodes
-    nt = traverse(node, (;)) do child, _
-        evaluate_barrier(child, variables)
+    nt = traverse(node, (;)) do current, _
+        evaluate_barrier(current, variables)
     end
     merge(variables, nt)
 end
@@ -112,8 +119,8 @@ Each node is evaluated only once.
 """
 # TODO promote before reduce
 DensityInterface.logdensityof(node::AbstractNode, variables::NamedTuple) = reduce(add_logdensity,
-    traverse(node, (;)) do child, _
-        logdensityof_barrier(child, variables)
+    traverse(node, (;)) do current, _
+        logdensityof_barrier(current, variables)
     end)
 
 """
@@ -123,8 +130,8 @@ Internally a random is used to instantiate the models.
 """
 function Bijectors.bijector(node::AbstractNode)
     variables = rand(node)
-    traverse(node, (;), variables) do child, _...
-        bijector_barrier(child, variables)
+    traverse(node, (;), variables) do current, _...
+        bijector_barrier(current, variables)
     end
 end
 
@@ -134,38 +141,44 @@ The prior of a node are the leaf children.
 Returns a SequentializedGraph for the prior 
 """
 prior(node::AbstractNode) =
-    traverse(node, (;)) do child, _
-        if is_leaf(child)
-            return child
+    traverse(node, (;)) do current, _
+        if is_leaf(current)
+            return current
         else
             return nothing
         end
     end
 
 """
-    parents(node_name, root)
+    parents(root, node_name)
 Returns a SequentializedGraph for the parents for the given `node_name` up until the `root` node.
 """
-parents(node_name, root::AbstractNode) =
-    traverse(root, (;)) do child, variables
-        # leafs cannot be parents
-        if is_leaf(child)
+parents(root::AbstractNode, node_name) =
+    traverse(root, (;)) do current, variables
+        # current node is parent
+        if node_name in keys(children(current))
+            return current
+        end
+        # one of the child nodes is parent
+        if isempty(variables)
             return nothing
         end
-        # child is direct parent
-        if node_name in keys(children(child))
-            return child
-        end
-        # child is parent of another parent
         is_parent = mapreduce(|, keys(variables)) do var_name
-            var_name in keys(children(child))
+            var_name in keys(children(current))
         end
         if is_parent
-            return child
+            return current
         end
         return nothing
     end
 
+parents(root::AbstractNode, nodes::AbstractNode...) =
+    reduce(nodes; init=(;)) do accumulated, node
+        nt = parents(root, name(node))
+        # Merge only nodes which are not present in the evaluation model yet
+        diff_nt = Base.structdiff(nt, accumulated)
+        merge(accumulated, diff_nt)
+    end
 
 # Help to extract values from samples (NamedTuples)
 childvalues(::AbstractNode{<:Any,child_names}, nt::NamedTuple) where {child_names} = values(nt[child_names])

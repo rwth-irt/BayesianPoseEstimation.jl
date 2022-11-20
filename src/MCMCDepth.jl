@@ -8,6 +8,13 @@ module MCMCDepth
 
 # Common functions on Base & CUDA types
 include("Common.jl")
+# BayesNet
+include("BayesNet/BayesNet.jl")
+include("BayesNet/BroadcastedNode.jl")
+include("BayesNet/DeterministicNode.jl")
+include("BayesNet/ModifierNode.jl")
+include("BayesNet/Sequentialized.jl")
+include("BayesNet/SimpleNode.jl")
 # Model primitives
 include("Samples.jl")
 include("FunctionManipulation.jl")
@@ -48,6 +55,17 @@ export norm_dims, normalize_dims!, normalize_dims
 export sum_and_dropdims
 export to_rotation, to_translation, to_pose
 
+# BayesNet
+export BroadcastedNode
+export DeterministicNode
+export ModifierNode
+export SimpleNode
+
+export evaluate
+export parents
+export prior
+export sequentialize
+
 # Samples
 export Sample
 
@@ -72,17 +90,6 @@ export KernelUniform
 export ProductBroadcastedDistribution
 export BroadcastedDistribution
 export DiscreteBroadcastedDistribution
-
-# BayesNet
-export BroadcastedNode
-export DeterministicNode
-export ModifierNode
-export SimpleNode
-
-export evaluate
-export parents
-export prior
-export sequentialize
 
 # ModelInterface
 export ComposedModel

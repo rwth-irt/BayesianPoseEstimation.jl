@@ -37,5 +37,11 @@ prior_d = prior(d)
 @test prior_d == (; a=a, b=b)
 
 # parent extraction
-parent_a = MCMCDepth.parents(:a, d)
+parent_a = parents(d, :a)
 @test parent_a == (; c=c, d=d)
+parent_c = parents(d, :c)
+@test parent_c == (; d=d)
+parent_ac = parents(d, a, c)
+@test parent_ac == (; c=c, d=d)
+parent_ba = parents(d, b, a)
+@test parent_ba == (; c=c, d=d)

@@ -6,7 +6,6 @@ using DensityInterface
 using Random
 using Unrolled
 
-const SequentializedGraph = NamedTuple{<:Any,<:Tuple{Vararg{AbstractNode}}}
 
 """
     Sequentialized.jl
