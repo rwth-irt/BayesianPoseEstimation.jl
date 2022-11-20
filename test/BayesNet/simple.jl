@@ -12,10 +12,10 @@ using Test
 
 rng = Random.default_rng()
 
-a = SimpleNode(:a, rng, KernelUniform())
-b = SimpleNode(:b, rng, KernelExponential())
-c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
-d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
+a = SimpleNode(:a, rng, KernelUniform)
+b = SimpleNode(:b, rng, KernelExponential)
+c = SimpleNode(:c, rng, KernelNormal, (; a=a, b=b))
+d = SimpleNode(:d, rng, KernelNormal, (; c=c, b=b))
 
 nt = rand(d, (; a=1))
 @test nt.a == 1

@@ -30,7 +30,7 @@ nt = @inferred rand(a, 2)
 @test ℓ == [0, 0]
 
 b = BroadcastedNode(:b, rng, KernelExponential, fill(1.0f0, 3, 4))
-c = BroadcastedNode(:c, (; a=a, b=b), rng, KernelNormal)
+c = BroadcastedNode(:c, rng, KernelNormal, (; a=a, b=b))
 nt = rand(c)
 @test nt.c isa Array{Float32,2}
 @test size(nt.c) == (3, 4)
@@ -45,7 +45,7 @@ nt = rand(c, 2)
 @test size(ℓ) == (2,)
 
 # Test logdensityof calculation
-d = BroadcastedNode(:d, (; c=c, b=b), rng, KernelNormal)
+d = BroadcastedNode(:d, rng, KernelNormal, (; c=c, b=b))
 nt = rand(d)
 ℓ = logdensityof(d, nt)
 @test ℓ isa Float32

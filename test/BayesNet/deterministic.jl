@@ -30,7 +30,7 @@ nt = rand(c, 2)
 @test size(nt.c) == (3, 2)
 ℓ = logdensityof(c, nt)
 @test ℓ isa Array{Float32,1}
-@test ℓ == logden
+@test ℓ == logdensityof(a, nt) + logdensityof(b, nt)
 
 # Test that evaluate only calls the DeterministicNode
 nt = evaluate(c, (; a=1, b=2, c=3))

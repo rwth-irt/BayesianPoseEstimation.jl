@@ -13,10 +13,10 @@ using Test
 
 rng = Random.default_rng()
 
-a = SimpleNode(:a, rng, KernelUniform())
-b = SimpleNode(:b, rng, KernelExponential())
-c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
-d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
+a = SimpleNode(:a, rng, KernelUniform)
+b = SimpleNode(:b, rng, KernelExponential)
+c = SimpleNode(:c, rng, KernelNormal, (; a=a, b=b))
+d = SimpleNode(:d, rng, KernelNormal, (; c=c, b=b))
 seq_graph = sequentialize(d)
 
 # Type stable bijectors
@@ -35,8 +35,8 @@ nt = @inferred rand(seq_graph)
 # Test BroadcastedNode
 a = BroadcastedNode(:a, rng, KernelUniform, 0, fill(1.0f0, 2))
 b = BroadcastedNode(:b, rng, KernelExponential, fill(1.0f0, 2))
-c = BroadcastedNode(:c, (; a=a, b=b), rng, KernelNormal)
-d = BroadcastedNode(:d, (; c=c, b=b), rng, KernelNormal)
+c = BroadcastedNode(:c, rng, KernelNormal, (; a=a, b=b))
+d = BroadcastedNode(:d, rng, KernelNormal, (; c=c, b=b))
 
 seq_graph = sequentialize(d)
 nt = @inferred rand(seq_graph)

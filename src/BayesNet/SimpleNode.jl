@@ -18,11 +18,11 @@ end
 SimpleNode(name::Symbol, children::N, rng::R, model::M) where {child_names,N<:NamedTuple{child_names},R<:AbstractRNG,M<:Union{Distribution,Function}} = SimpleNode{name,child_names,N,R,M}(children, rng, model)
 
 # construct as parent
-function SimpleNode(name::Symbol, children::NamedTuple, rng::AbstractRNG, ::Type{distribution}) where {distribution}
+function SimpleNode(name::Symbol, rng::AbstractRNG, ::Type{distribution}, children::NamedTuple) where {distribution}
     # Workaround so D is not UnionAll but interpreted as constructor
     wrapped(x...) = distribution(x...)
     SimpleNode(name, children, rng, wrapped)
 end
 
 # construct as leaf
-SimpleNode(name::Symbol, rng::AbstractRNG, model) = SimpleNode(name, (;), rng, model)
+SimpleNode(name::Symbol, rng::AbstractRNG, distribution, params...) = SimpleNode(name, (;), rng, distribution(params...))

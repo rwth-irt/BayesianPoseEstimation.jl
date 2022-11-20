@@ -22,11 +22,10 @@ DensityInterface.logdensityof(::SimpleModifierModel, ::Any, ℓ) = ℓ + one(ℓ
 plotly()
 rng = Random.default_rng()
 
-a = SimpleNode(:a, rng, KernelUniform())
-b = SimpleNode(:b, rng, KernelExponential())
-c = SimpleNode(:c, (; a=a, b=b), rng, KernelNormal)
-d = SimpleNode(:d, (; c=c, b=b), rng, KernelNormal)
-# TODO test if not at end
+a = SimpleNode(:a, rng, KernelUniform)
+b = SimpleNode(:b, rng, KernelExponential)
+c = SimpleNode(:c, rng, KernelNormal, (; a=a, b=b))
+d = SimpleNode(:d, rng, KernelNormal, (; c=c, b=b))
 d_mod = ModifierNode(d, rng, SimpleModifierModel)
 
 nt = rand(d_mod)

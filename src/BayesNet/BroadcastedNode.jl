@@ -22,11 +22,11 @@ BroadcastedNode_(name::Symbol, children::C, rng::R, model::M, model_dims::Dims{N
 
 # Construct as parent
 """
-    BroadcastedNode(name, children, rng, distribution)
+    BroadcastedNode(name, rng, distribution, children)
 Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims for the minimal realization of the distribution given the `children`.
 """
-function BroadcastedNode(name::Symbol, children::NamedTuple, rng::AbstractRNG, distribution::Base.Callable)
+function BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution::Base.Callable, children::NamedTuple)
     # Generate one sample to calculate dimensions of the node and children. Empty Dims because they are unknown and don't make a difference for a single sample generation.
     sacrifice_model = broadcast_model(distribution, ())
     sacrifice_child_sizes = ntuple(_ -> (), length(children))

@@ -12,8 +12,11 @@ using Random
 using Test
 
 # Prepare a sample
-a_model = KernelExponential(Float16(2.0))
-b_model = BroadcastedDistribution(Exponential, (1,), [2.0f0, 1.0f0, 0.5f0])
+rng = Random.default_rng()
+a = BroadcastedNode(:a, rng, KernelExponential, Float16(2.0))
+b = BroadcastedNode(:b, rng, Exponential, [2.0f0, 1.0f0, 0.5f0])
+rand(b)
+c = BroadcastedNode(:c, rng, KernelNormal, a, b)
 c_model = ProductBroadcastedDistribution(KernelExponential, fill(2.0f0, 2))
 
 abc_model = IndependentModel((; a=a_model, b=b_model, c=c_model))
