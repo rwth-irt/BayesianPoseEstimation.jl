@@ -45,3 +45,10 @@ parent_ac = parents(d, a, c)
 @test parent_ac == (; c=c, d=d)
 parent_ba = parents(d, b, a)
 @test parent_ba == (; c=c, d=d)
+
+# evaluate deterministic nodes
+fn(x, ::Any) = x
+c = DeterministicNode(:c, fn, (; a=a, b=b))
+d = SimpleNode(:d, rng, KernelNormal, (; c=c, b=b))
+nt = evaluate(d, (; a=1, b=2.0f0, c=3.0f0, d=4.0f0, e=0.0f0))
+@test nt == (; a=1, b=2.0f0, c=1.0f0, d=4.0f0, e=0.0f0)

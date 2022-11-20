@@ -47,10 +47,12 @@ end
 Type stable version to only the deterministic nodes in the `graph` given the random `variables`.
 All required random variables are assumed to be available.
 """
-evaluate(graph::SequentializedGraph, variables::NamedTuple) =
-    map(graph) do node
+function evaluate(graph::SequentializedGraph, variables::NamedTuple)
+    nt = map(graph) do node
         evaluate_barrier(node, variables)
     end
+    merge(variables, nt)
+end
 
 """
     logdensityof(graph, nt)
