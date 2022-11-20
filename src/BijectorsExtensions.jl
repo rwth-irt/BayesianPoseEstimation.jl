@@ -89,6 +89,8 @@ function Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector, x)
     y, logjacs = first.(with_logjac), last.(with_logjac)
     y, sum_and_dropdims(logjacs, b.dims)
 end
+# Scalar case result in a tuple for with_logjac instead of an array of tples
+Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector{0}, x::Real) = with_logabsdet_jacobian.(b.bijectors, x)
 
 """
     is_identity(::Bijector)

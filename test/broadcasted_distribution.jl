@@ -102,7 +102,7 @@ X = rand(rng, dist, 3)
 @test logdensityof(dist, X) isa Float64
 @test logdensityof(dist, X) ≈ logpdf(product, X) |> sum
 
-# Should also work with scalars
+# Scalar case
 dist = @inferred ProductBroadcastedDistribution(KernelExponential, Float16(10.0))
 x = @inferred rand(rng, dist)
 @test x isa Float16
@@ -113,6 +113,17 @@ X = rand(curng, dist, 3)
 @test size(X) == (3,)
 ℓ = @inferred logdensityof(dist, X)
 @test ℓ isa CuArray{Float16,1}
+
+# Scalar broadcasted bijector
+t_dist = transformed(dist)
+
+Y = rand(rng, t_dist)
+X_invlink = @inferred invlink(dist, Y)
+b = @inferred inverse(bijector(dist))
+X, logjac = @inferred with_logabsdet_jacobian(b, Y)
+@test X_invlink == X
+@test logjac == logabsdetjac(b, Y)
+@test logdensityof(t_dist, Y) ≈ logdensityof(dist, X) + logjac
 
 # Test different sizes of the marginals and rand(..., dims)
 normal_fn(μ::T) where {T} = KernelNormal(μ, T(0.1))
@@ -225,6 +236,7 @@ Y = rand(rng, t_dist, 3, 2)
 Y = rand(rng, t_dist, 3, 2, 1)
 @inferred logdensityof(t_dist, Y)
 
+# Array case of bijector
 X_invlink = @inferred invlink(dist, Y)
 b = @inferred inverse(bijector(dist))
 X, logjac = @inferred with_logabsdet_jacobian(b, Y)
