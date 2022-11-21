@@ -87,21 +87,30 @@ Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = approx_
 # Bijectors
 Bijectors.bijector(::QuaternionPerturbation) = Bijectors.Identity{0}()
 
-
 """
     QuaternionProposal
 SymmtericPropsal for quaternions: Uses broadcasted (Hamiltonian) product `.*` operator instead of sum `+` and normalizes the result.
 """
-struct QuaternionProposal{var_names,T} <: AbstractProposal
-    models::IndependentModel{var_names,T}
+struct QuaternionProposal{T,U}
+    model::T
+    evaluation::U
 end
+
+QuaternionProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = QuaternionProposal(proposal_model, parents(posterior_model, values(proposal_model)...))
+
+QuaternionProposal(proposal_model::AbstractNode, posterior_model::AbstractNode) = QuaternionProposal(sequentialize(proposal_model), posterior_model)
 
 """
     propose(rng, proposal::QuaternionProposal, sample, dims...)
 Inspired by EKFs for IMUs, the perturbation is assumed to be defined in the local frame.
 Together with the Hamiltonian convention, the perturbation is a right side multiplication.
 """
-propose(rng::AbstractRNG, proposal::QuaternionProposal, sample::Sample, dims...) = map_merge((a, b) -> robust_normalize.(a .* b), sample, rand(rng, proposal.models, dims...))
+function propose(proposal::QuaternionProposal, sample::Sample, dims...)
+    # proposal step
+    proposed = map_merge((a, b) -> robust_normalize.(a .* b), sample, rand(proposal.model, dims...))
+    # determinstic evaluation step
+    Sample(evaluate(proposal.evaluation, variables(proposed)))
+end
 
-# symmetric proposal, can be neglected
-transition_probability(proposal::QuaternionProposal, new_sample::Sample, ::Sample) = 0.0
+# symmetric proposal
+transition_probability(proposal::QuaternionProposal, new_sample::Sample, ::Sample) = 0

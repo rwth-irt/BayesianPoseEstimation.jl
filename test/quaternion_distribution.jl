@@ -95,14 +95,20 @@ L = @inferred logdensityof(pert, Q)
 @test isapprox(qrotation(ϕ), MCMCDepth.approx_qrotation(ϕ...))
 
 # QuaternionProposal
-prop = QuaternionProposal(IndependentModel((; a=QuaternionPerturbation(0.01))))
-s1 = Sample((; a=rand(dist)), MCMCDepth.quat_logp)
-s2 = @inferred propose(rng, prop, s1)
+a = BroadcastedNode(:a, rng, QuaternionDistribution, Float32)
+b = DeterministicNode(:b, x -> 2 * x, (; a=a))
+rand(b)
+prop = QuaternionProposal(BroadcastedNode(:a, rng, QuaternionPerturbation, 0.01), b)
+s1 = Sample(rand(b), MCMCDepth.quat_logp)
+s2 = @inferred propose(prop, s1)
+@test variables(s2).a != variables(s1).a
+@test variables(s2).b == 2 * variables(s2).a
 ℓ = @inferred transition_probability(prop, s1, s2)
 @test ℓ == 0
 
 # multiple
-S2 = @inferred propose(rng, prop, s1, 2, 2)
-@test S2.variables.a isa Matrix{QuaternionF64}
+S2 = @inferred propose(prop, s1, 2, 2)
+@test variables(S2).a isa Matrix{QuaternionF64}
+@test variables(S2).b == 2 * variables(S2).a
 L = @inferred transition_probability(prop, s1, S2)
 @test L == 0

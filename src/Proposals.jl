@@ -7,6 +7,7 @@
 Implement common proposal models with the convention of always proposing in the unconstrained domain ℝⁿ.
 """
 
+# TODO Maybe implement specific behaviors via traits? E.g. all symmetric proposals should return 0
 # SymmetricProposal
 
 """
@@ -39,7 +40,7 @@ end
 For symmetric proposals, the forward and backward transition probability cancels out.
 Will be combined with prior and likelihood by broadcasting, so returning a scalar is enough.
 """
-transition_probability(proposal::SymmetricProposal, new_sample::Sample, ::Sample) = 0.0
+transition_probability(proposal::SymmetricProposal, new_sample::Sample, ::Sample) = 0
 
 # IndependentProposal
 
