@@ -140,12 +140,10 @@ abc_ind_sample = @inferred propose(abc_ind_proposal, sample)
 @test variables(abc_ind_sample).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
 @inferred transition_probability(abc_ind_proposal, abc_ind_sample, sample)
-# TODO transform graph?
 abc_ind_model_sample, _ = to_model_domain(abc_ind_sample, bijector(c))
 @test transition_probability(abc_ind_proposal, abc_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(abc_ind_sample).a) .+ logdensityof(transformed(b()), variables(abc_ind_sample).b) .+ logdensityof(transformed(c(variables(abc_ind_model_sample))), variables(abc_ind_sample).c)
 
 # Propose multiple variables multiple times
-# TODO why not type stable but sequentialized.jl is?
 @inferred rand(abc_ind_proposal, 2)
 abc_ind_sample_2 = @inferred propose(abc_ind_proposal, sample, 2)
 @test eltype(variables(abc_ind_sample_2).a) == typeof(variables(sample).a)
