@@ -6,6 +6,7 @@ using Base.Broadcast: broadcasted, instantiate, materialize, Broadcasted
 using Bijectors
 using DensityInterface
 using Distributions
+using Random123: Philox2x, set_counter!
 
 """
     BroadcastedDistribution{T,N,M}
@@ -134,12 +135,16 @@ Base.rand(rng::AbstractRNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcas
 # TODO this fix only works for BroadcastedDistribution of size 0, each KernelDistribution would require a specific implementation to avoid method ambiguities with the AbstractRNG
 # Scalars can not be sampled on the GPU as they result in scalar indexing. Generate on the CPU instead
 function Base.rand(rng::CUDA.RNG, dist::BroadcastedDistribution{<:Any,<:Any,<:Broadcasted{<:Broadcast.DefaultArrayStyle{0}}})
-    # Sample using a CPU rng seeded with the device rng state (counter)
-    cpu_rng = Xoshiro(rng.counter)
+    # Setup CPU version of the Philox2x32 used on the GPU. Convenience constructors are not type stable.
+    cpu_rng = Philox2x{UInt32,7}(0, 0, 0, 0, 0, 0)
+    Random.seed!(cpu_rng, rng.seed)
+    set_counter!(cpu_rng, rng.counter)
+    # Update the CUDA rng
     new_counter = Int64(rng.counter) + 1
     overflow, remainder = fldmod(new_counter, typemax(UInt32))
     rng.seed += overflow
     rng.counter = remainder
+    # Finally generate the random number
     rand(cpu_rng, materialize(marginals(dist)))
 end
 

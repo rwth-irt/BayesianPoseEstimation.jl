@@ -76,7 +76,7 @@ Base.@kwdef struct Parameters
     pixel_θ = 1.0
     mix_exponential = 0.8
     # Pixel association
-    prior_o = fill(0.2, 100, 100)
+    prior_o = 0.6
     proposal_σ_o = 0.01
     # Image Model
     normalize_img = true
