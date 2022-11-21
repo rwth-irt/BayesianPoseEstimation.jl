@@ -59,38 +59,37 @@ a_sym_sample_2 = @inferred propose(a_sym_proposal, sample, 2)
 
 # Propose multiple variables
 b_normal = BroadcastedNode(:b, rng, KernelNormal, fill(0.0f0, 3), fill(1.0f0, 3))
-c_normal = BroadcastedNode(:c, rng, KernelNormal, fill(0.0, 3), fill(1.0, 3))
-abc_sym_proposal = SymmetricProposal((; a=a_normal, b=b_normal, c=c_normal), c)
+ab_sym_proposal = SymmetricProposal((; a=a_normal, b=b_normal), c)
 # WARN does it matter? https://bkamins.github.io/julialang/2021/01/08/typestable.html
-abc_sym_sample = @inferred propose(abc_sym_proposal, sample)
-@test variables(abc_sym_sample).a |> size == ()
-@test variables(abc_sym_sample).a isa Float64
-@test variables(abc_sym_sample).b isa Vector{Float32}
-@test variables(abc_sym_sample).c isa Vector{Float64}
-@test variables(abc_sym_sample).a != variables(sample).a
-@test variables(abc_sym_sample).b != variables(sample).b
-@test variables(abc_sym_sample).c != variables(sample).c
-@test variables(abc_sym_sample).a |> size == ()
-@test variables(abc_sym_sample).b |> size == (3,)
-@test variables(abc_sym_sample).c |> size == (3,)
+ab_sym_sample = @inferred propose(ab_sym_proposal, sample)
+@test variables(ab_sym_sample).a |> size == ()
+@test variables(ab_sym_sample).a isa Float64
+@test variables(ab_sym_sample).b isa Vector{Float32}
+@test variables(abc_sym_sample).c isa Vector{Float32}
+@test variables(ab_sym_sample).a != variables(sample).a
+@test variables(ab_sym_sample).b != variables(sample).b
+@test variables(abc_sym_sample).c == variables(sample).c
+@test variables(ab_sym_sample).a |> size == ()
+@test variables(ab_sym_sample).b |> size == (3,)
+@test variables(ab_sym_sample).c |> size == (3,)
 # Symmetric case: forward equals backward, thus log probability is zero to safe computations
-@inferred transition_probability(abc_sym_proposal, abc_sym_sample, sample)
-@test transition_probability(abc_sym_proposal, abc_sym_sample, sample) == 0
+@inferred transition_probability(ab_sym_proposal, ab_sym_sample, sample)
+@test transition_probability(ab_sym_proposal, ab_sym_sample, sample) == 0
 
 # Propose multiple variables multiple times
-abc_sym_sample_2 = @inferred propose(abc_sym_proposal, sample, 2)
-@test variables(abc_sym_sample_2).a isa Vector{Float64}
-@test variables(abc_sym_sample_2).b isa Matrix{Float32}
-@test variables(abc_sym_sample_2).c isa Matrix{Float64}
-@test variables(abc_sym_sample_2).a != variables(sample).a
-@test variables(abc_sym_sample_2).b != variables(sample).b
-@test variables(abc_sym_sample_2).c != variables(sample).c
-@test variables(abc_sym_sample_2).a |> size == (2,)
-@test variables(abc_sym_sample_2).b |> size == (3, 2)
-@test variables(abc_sym_sample_2).c |> size == (3, 2)
+ab_sym_sample_2 = @inferred propose(ab_sym_proposal, sample, 2)
+@test variables(ab_sym_sample_2).a isa Vector{Float64}
+@test variables(ab_sym_sample_2).b isa Matrix{Float32}
+@test variables(ab_sym_sample_2).c isa Vector{Float32}
+@test variables(ab_sym_sample_2).a != variables(sample).a
+@test variables(ab_sym_sample_2).b != variables(sample).b
+@test variables(ab_sym_sample_2).c == variables(sample).c
+@test variables(ab_sym_sample_2).a |> size == (2,)
+@test variables(ab_sym_sample_2).b |> size == (3, 2)
+@test variables(ab_sym_sample_2).c |> size == (3,)
 # Symmetric case: forward equals backward, thus log probability is zero to safe computations
-@inferred transition_probability(abc_sym_proposal, abc_sym_sample_2, sample)
-@test transition_probability(abc_sym_proposal, abc_sym_sample_2, sample) == 0
+@inferred transition_probability(ab_sym_proposal, ab_sym_sample_2, sample)
+@test transition_probability(ab_sym_proposal, ab_sym_sample_2, sample) == 0
 
 # Independent proposal
 
@@ -126,38 +125,37 @@ a_ind_sample_2 = @inferred propose(a_ind_proposal, sample, 2)
 @test transition_probability(a_ind_proposal, a_ind_sample_2, sample) == logdensityof.(transformed(a()), variables(a_ind_sample_2).a)
 
 # Propose multiple variables
-abc_ind_proposal = IndependentProposal(c, c)
-abc_ind_sample = @inferred propose(abc_ind_proposal, sample)
-@test variables(abc_ind_sample).a |> size == ()
-@test typeof(variables(abc_ind_sample).a) == typeof(variables(sample).a)
-@test typeof(variables(abc_ind_sample).b) == typeof(variables(sample).b)
-@test typeof(variables(abc_ind_sample).c) == typeof(variables(sample).c)
-@test variables(abc_ind_sample).a != variables(sample).a
-@test variables(abc_ind_sample).b != variables(sample).b
-@test variables(abc_ind_sample).c != variables(sample).c
-@test variables(abc_ind_sample).a |> size == ()
-@test variables(abc_ind_sample).b |> size == (3,)
-@test variables(abc_ind_sample).c |> size == (3,)
+ab_ind_proposal = IndependentProposal((; a=a, b=b), c)
+ab_ind_sample = @inferred propose(ab_ind_proposal, sample)
+@test variables(ab_ind_sample).a |> size == ()
+@test typeof(variables(ab_ind_sample).a) == typeof(variables(sample).a)
+@test typeof(variables(ab_ind_sample).b) == typeof(variables(sample).b)
+@test typeof(variables(ab_ind_sample).c) == typeof(variables(sample).c)
+@test variables(ab_ind_sample).a != variables(sample).a
+@test variables(ab_ind_sample).b != variables(sample).b
+@test variables(ab_ind_sample).c == variables(sample).c
+@test variables(ab_ind_sample).a |> size == ()
+@test variables(ab_ind_sample).b |> size == (3,)
+@test variables(ab_ind_sample).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
-@inferred transition_probability(abc_ind_proposal, abc_ind_sample, sample)
-abc_ind_model_sample, _ = to_model_domain(abc_ind_sample, bijector(c))
-@test transition_probability(abc_ind_proposal, abc_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(abc_ind_sample).a) .+ logdensityof(transformed(b()), variables(abc_ind_sample).b) .+ logdensityof(transformed(c(variables(abc_ind_model_sample))), variables(abc_ind_sample).c)
-
+@inferred transition_probability(ab_ind_proposal, ab_ind_sample, sample)
+abc_ind_model_sample, _ = to_model_domain(ab_ind_sample, bijector(c))
+@test transition_probability(ab_ind_proposal, ab_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(ab_ind_sample).a) .+ logdensityof(transformed(b()), variables(ab_ind_sample).b)
 # Propose multiple variables multiple times
-@inferred rand(abc_ind_proposal, 2)
-abc_ind_sample_2 = @inferred propose(abc_ind_proposal, sample, 2)
-@test eltype(variables(abc_ind_sample_2).a) == typeof(variables(sample).a)
-@test eltype(variables(abc_ind_sample_2).b) == eltype(variables(sample).b)
-@test eltype(variables(abc_ind_sample_2).c) == eltype(variables(sample).c)
-@test variables(abc_ind_sample_2).a != variables(sample).a
-@test variables(abc_ind_sample_2).b != variables(sample).b
-@test variables(abc_ind_sample_2).c != variables(sample).c
-@test variables(abc_ind_sample_2).a |> size == (2,)
-@test variables(abc_ind_sample_2).b |> size == (3, 2)
-@test variables(abc_ind_sample_2).c |> size == (3, 2)
+@inferred rand(ab_ind_proposal, 2)
+ab_ind_sample_2 = @inferred propose(ab_ind_proposal, sample, 2)
+@test eltype(variables(ab_ind_sample_2).a) == typeof(variables(sample).a)
+@test eltype(variables(ab_ind_sample_2).b) == eltype(variables(sample).b)
+@test eltype(variables(ab_ind_sample_2).c) == eltype(variables(sample).c)
+@test variables(ab_ind_sample_2).a != variables(sample).a
+@test variables(ab_ind_sample_2).b != variables(sample).b
+@test variables(ab_ind_sample_2).c == variables(sample).c
+@test variables(ab_ind_sample_2).a |> size == (2,)
+@test variables(ab_ind_sample_2).b |> size == (3, 2)
+@test variables(ab_ind_sample_2).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
-@inferred transition_probability(abc_ind_proposal, abc_ind_sample_2, sample)
-@test transition_probability(abc_ind_proposal, abc_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(abc_ind_sample).a) .+ logdensityof(transformed(b()), variables(abc_ind_sample).b) .+ logdensityof(transformed(c(variables(abc_ind_model_sample))), variables(abc_ind_sample).c)
+@inferred transition_probability(ab_ind_proposal, ab_ind_sample_2, sample)
+@test transition_probability(ab_ind_proposal, ab_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(ab_ind_sample).a) .+ logdensityof(transformed(b()), variables(ab_ind_sample).b)
 
 # evaluation of DeterministicNode
 a = BroadcastedNode(:a, rng, KernelExponential, [2.0f0, 1.0f0, 0.5f0])

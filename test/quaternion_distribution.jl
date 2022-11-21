@@ -78,7 +78,7 @@ pert = QuaternionPerturbation(0.1f0)
 q1 = @inferred rand(rng, pert)
 ℓ = @inferred logdensityof(pert, q1)
 @test ℓ == sum(logdensityof.(KernelNormal(0, 0.1f0), imag_part(q1) .* 2))
-@test norm(q1) == 1
+@test norm(q1) ≈ 1
 @test q0 * q1 isa QuaternionF32
 @test q1 * q0 == q1
 q2 = rand(rng, dist)
@@ -97,8 +97,9 @@ L = @inferred logdensityof(pert, Q)
 # QuaternionProposal
 a = BroadcastedNode(:a, rng, QuaternionDistribution, Float32)
 b = DeterministicNode(:b, x -> 2 * x, (; a=a))
+c = DeterministicNode(:c, x -> x, (; b=b))
 rand(b)
-prop = QuaternionProposal(BroadcastedNode(:a, rng, QuaternionPerturbation, 0.01), b)
+prop = QuaternionProposal(BroadcastedNode(:a, rng, QuaternionPerturbation, 0.01), c)
 s1 = Sample(rand(b), MCMCDepth.quat_logp)
 s2 = @inferred propose(prop, s1)
 @test variables(s2).a != variables(s1).a

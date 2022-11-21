@@ -9,6 +9,16 @@ Implement common proposal models with the convention of always proposing in the 
 
 # TODO Maybe implement specific behaviors via traits? E.g. all symmetric proposals should return 0
 # SymmetricProposal
+"""
+    evaluation_nodes(proposal, posterior)
+Extract a SequentializedGraph of the nodes that need to be re-evaluated after proposing the new sample.
+It contains all parents of the `proposal` nodes in the prior of the `posterior` node.
+"""
+function evaluation_nodes(proposal::SequentializedGraph, posterior::AbstractNode{name}) where {name}
+    p = parents(posterior, values(proposal)...)
+    Base.structdiff(p, (; name => ()))
+end
+evaluation_nodes(proposal_model::AbstractNode, posterior_model::AbstractNode) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
 
 """
     SymmetricProposal
@@ -17,11 +27,12 @@ Propose a new sample from the previous one by using a symmetric proposal distrib
 struct SymmetricProposal{T,U}
     model::T
     evaluation::U
+
+    function SymmetricProposal(proposal_model::T, posterior_model) where {T}
+        evaluation_model = evaluation_nodes(proposal_model, posterior_model)
+        new{T,typeof(evaluation_model)}(proposal_model, evaluation_model)
+    end
 end
-
-SymmetricProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = SymmetricProposal(proposal_model, parents(posterior_model, values(proposal_model)...))
-
-SymmetricProposal(proposal_model::AbstractNode, posterior_model::AbstractNode) = SymmetricProposal(sequentialize(proposal_model), posterior_model)
 
 """
     propose(proposal, [sample], [dims...])
@@ -54,9 +65,7 @@ struct IndependentProposal{T,U,B}
     bijectors::B
 end
 
-IndependentProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = IndependentProposal(proposal_model, parents(posterior_model, values(proposal_model)...), map_materialize(bijector(proposal_model)))
-
-IndependentProposal(proposal_model::AbstractNode, posterior_model::AbstractNode) = IndependentProposal(sequentialize(proposal_model), posterior_model)
+IndependentProposal(proposal_model, posterior_model) = IndependentProposal(proposal_model, evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(proposal_model)))
 
 """
     bijector(proposal)

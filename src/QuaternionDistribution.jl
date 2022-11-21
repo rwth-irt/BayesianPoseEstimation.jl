@@ -94,11 +94,12 @@ SymmtericPropsal for quaternions: Uses broadcasted (Hamiltonian) product `.*` op
 struct QuaternionProposal{T,U}
     model::T
     evaluation::U
+
+    function QuaternionProposal(proposal_model::T, posterior_model) where {T}
+        evaluation_model = evaluation_nodes(proposal_model, posterior_model)
+        new{T,typeof(evaluation_model)}(proposal_model, evaluation_model)
+    end
 end
-
-QuaternionProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = QuaternionProposal(proposal_model, parents(posterior_model, values(proposal_model)...))
-
-QuaternionProposal(proposal_model::AbstractNode, posterior_model::AbstractNode) = QuaternionProposal(sequentialize(proposal_model), posterior_model)
 
 """
     propose(rng, proposal::QuaternionProposal, sample, dims...)
