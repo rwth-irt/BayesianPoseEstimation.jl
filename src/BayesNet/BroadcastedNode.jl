@@ -60,7 +60,10 @@ broadcast_model(fn::Function, dims) = (x...) -> BroadcastedDistribution(fn, dims
 # Override generic BayesNet.jl behavior by inserting additional dims as required for broadcasting
 function childvalues(node::BroadcastedNode{<:Any,childnames}, nt::NamedTuple) where {childnames}
     child_values = values(nt[childnames])
-    insertdims.(child_values, node.child_sizes, (node.model_dims,))
+    # WARN Broadcasting not type stable?
+    map(child_values, node.child_sizes) do cv, cs
+        insertdims(cv,  cs , node.model_dims)
+    end
 end
 
 """

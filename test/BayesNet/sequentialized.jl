@@ -34,18 +34,18 @@ nt = @inferred rand(seq_graph)
 
 # Test BroadcastedNode
 a = BroadcastedNode(:a, rng, KernelUniform, 0, fill(1.0f0, 2))
-b = BroadcastedNode(:b, rng, KernelExponential, fill(1.0f0, 2))
+b = BroadcastedNode(:b, rng, KernelExponential, 1.0f0)
 c = BroadcastedNode(:c, rng, KernelNormal, (; a=a, b=b))
 d = BroadcastedNode(:d, rng, KernelNormal, (; c=c, b=b))
 
 seq_graph = sequentialize(d)
 nt = @inferred rand(seq_graph)
 ℓ = @inferred logdensityof(seq_graph, nt)
-@test ℓ ≈ sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d))
+@test ℓ ≈ logdensityof(KernelExponential(), nt.b) + sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d))
 
 nt = @inferred rand(seq_graph, 3)
 ℓ = @inferred logdensityof(seq_graph, nt)
-@test ℓ' ≈ sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelExponential(), nt.b) + logdensityof.(KernelNormal.(nt.a, nt.b), nt.c) + logdensityof.(KernelNormal.(nt.c, nt.b), nt.d); dims=(1,))
+@test ℓ ≈ logdensityof.(KernelExponential(), nt.b) + sum(logdensityof.(KernelUniform(), nt.a) + logdensityof.(KernelNormal.(nt.a, reshape(nt.b, 1, 3)), nt.c) + logdensityof.(KernelNormal.(nt.c, reshape(nt.b, 1, 3)), nt.d); dims=(1,))'
 
 # Type stable evaluate deterministic nodes
 fn(x, ::Any) = x
@@ -64,8 +64,11 @@ nt = @inferred evaluate(seq_graph, (; a=1, b=2.0f0, c=3.0f0, d=4.0f0, e=0.0f0))
 # 2x faster - gets less for larger dims
 @benchmark rand(seq_graph, 100)
 
-# For now no automatic broadcasting of logdensityof
 vars = rand(seq_graph)
 @benchmark logdensityof(d, vars)
 # 3-30x faster
+@benchmark logdensityof(seq_graph, vars)
+
+vars = rand(seq_graph, 100)
+@benchmark logdensityof(d, vars)
 @benchmark logdensityof(seq_graph, vars)
