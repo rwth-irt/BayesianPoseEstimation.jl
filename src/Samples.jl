@@ -51,7 +51,7 @@ The logjac correction is calculated in the same kernel.
 Returns (variables, logabsdetjac)
 """
 function to_model_domain(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) where {T}
-    with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(b, v), map(inverse, bijectors), variables(s))
+    with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(inverse(b), v), bijectors, variables(s))
     tr_vars = map(first, with_logjac)
     model_sample = @set s.variables = merge(s.variables, tr_vars)
     logjac = reduce(.+, values(map(last, with_logjac)); init=0)
