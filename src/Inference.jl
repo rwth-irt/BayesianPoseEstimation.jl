@@ -5,13 +5,36 @@
 using Random
 using SciGL
 
+# TODO cleanup
+
+# TODO move to its own file?
+"""
+    ImageLikelihoodNormalizer
+Use it in a modifier node to normalize the loglikelihood of the image to make it independent from the number of visible pixels in μ. 
+"""
+struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
+    normalization_constant::T
+    μ::M
+end
+
+ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
+
+Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
+using DensityInterface
+function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
+    # Images are always 2D
+    n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
+    ℓ .* model.normalization_constant ./ n_pixel
+end
+
+# TODO remove?
 """
     pose_prior(render_context, scene, object_id, t_model, r_model, o_model)
 Creates a PriorModel for the variables t, r & o which automatically renders μ after in rand.
 """
 pose_prior(render_context::RenderContext, scene::Scene, object_id::Integer, t_model, r_model, o_model) = RenderModel(render_context, scene, object_id, IndependentModel((; t=t_model, r=r_model, o=o_model))) |> PriorModel(model, bijectors)
 
-
+# TODO remove?
 """
     post
 Consist of a `prior_model`, which generates a sample with variables t, r, o & μ.
@@ -36,14 +59,14 @@ function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::Ren
 end
 
 """
-    pixel_mixture(min_depth, max_depth, θ, σ; μ, o)
+    pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
 Mixture distribution for a depth pixel: normal / tail.
 The mixture is weighted by the association o for the normal and 1-o for the tail.
 
 * Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
 * Tail distribution: occlusions (exponential) and random outliers (uniform)
 """
-function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T; μ::T, o::T) where {T<:Real}
+function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
     tail = pixel_tail(min_depth, max_depth, θ, μ)
     KernelBinaryMixture(normal, tail, o, one(o) - o)
@@ -54,7 +77,7 @@ end
     pixel_mixture(parameters)
 Generates a pixel_mixture(μ, o) distribution given the parameters.
 """
-pixel_mixture(parameters::Parameters) = pixel_mixture | (:μ, :o) | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+pixel_mixture(parameters::Parameters) = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
     # TODO Does truncated make a difference?
@@ -67,7 +90,7 @@ function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
 end
 
 """
-    pixel_explicit(min_depth, max_depth, θ, σ; μ, o)
+    pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
 Mixture distribution for a depth pixel which explicitly handles invalid μ.
 In case the expected depth is invalid, only the tail distribution for outliers is evaluated.
 Otherwise, if the measured depth and expected depth are zero, a unreasonably high likelihood would be returned.
@@ -76,12 +99,12 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 * Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
 * Tail distribution: occlusions (exponential) and random outliers (uniform)
 """
-function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T; μ::T, o::T) where {T<:Real}
+function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     if μ > 0
-        pixel_mixture(min_depth, max_depth, θ, σ; μ=μ, o=o)
+        pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
     else
         # Distribution must be of same type for CUDA support so set o to zero to evaluate the tail only
-        pixel_mixture(min_depth, max_depth, θ, σ; μ=μ, o=zero(T))
+        pixel_mixture(min_depth, max_depth, θ, σ, μ, zero(T))
     end
 end
 
@@ -90,4 +113,4 @@ end
     pixel_explicit(parameters)
 Generates a pixel_explicit(μ, o) distribution given the parameters.
 """
-pixel_explicit(parameters::Parameters) = pixel_explicit | (:μ, :o) | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+pixel_explicit(parameters::Parameters) = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)

@@ -139,6 +139,8 @@ export Gibbs
 export MetropolisHastings
 
 # Inference
+export ImageLikelihoodNormalizer
+
 export expected_pixel_count
 export pixel_explicit
 export pixel_mixture
