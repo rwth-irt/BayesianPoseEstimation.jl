@@ -137,17 +137,10 @@ end
 
 """
     prior(node)
-The prior of a node are the leaf children.
+The prior of a node are all the child nodes.
 Returns a SequentializedGraph for the prior 
 """
-prior(node::AbstractNode) =
-    traverse(node, (;)) do current, _
-        if is_leaf(current)
-            return current
-        else
-            return nothing
-        end
-    end
+prior(node::AbstractNode{name}) where {name} = Base.structdiff(sequentialize(node), (; name => ()))
 
 """
     parents(root, node_name)

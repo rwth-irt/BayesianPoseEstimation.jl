@@ -34,7 +34,7 @@ bij = bijector(d)
 
 # prior extraction
 prior_d = prior(d)
-@test prior_d == (; a=a, b=b)
+@test prior_d == (; a=a, b=b, c=c)
 
 # parent extraction
 parent_a = parents(d, :a)
