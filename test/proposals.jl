@@ -24,7 +24,6 @@ sample = Sample(rand(c))
 @test variables(sample).b |> size == (3,)
 @test variables(sample).c |> size == (3,)
 
-# TODO test DeterministicNode
 
 # Propose single variable
 a_normal = BroadcastedNode(:a, rng, KernelNormal, 0, 1.0)
@@ -162,8 +161,74 @@ abc_ind_sample_2 = @inferred propose(abc_ind_proposal, sample, 2)
 @inferred transition_probability(abc_ind_proposal, abc_ind_sample_2, sample)
 @test transition_probability(abc_ind_proposal, abc_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(abc_ind_sample).a) .+ logdensityof(transformed(b()), variables(abc_ind_sample).b) .+ logdensityof(transformed(c(variables(abc_ind_model_sample))), variables(abc_ind_sample).c)
 
-# TODO move to sampler tests # Gibbs
+# evaluation of DeterministicNode
+a = BroadcastedNode(:a, rng, KernelExponential, [2.0f0, 1.0f0, 0.5f0])
+fn(x) = 2 * x
+b = DeterministicNode(:b, fn, (; a=a))
+c = BroadcastedNode(:c, rng, KernelExponential, (; b=b))
+sample = rand(c) |> Sample
 
+# evaluation should update b
+a_sym = SymmetricProposal(BroadcastedNode(:a, rng, KernelNormal, 0, fill(1.0f0, 3)), c)
+proposed = @inferred propose(a_sym, sample, 2)
+@test variables(proposed).a != variables(sample).a
+@test variables(proposed).a isa Array{Float32,2}
+@test variables(proposed).b != variables(sample).b
+@test variables(proposed).b isa Array{Float32,2}
+@test variables(proposed).c == variables(sample).c
+@test variables(proposed).c isa Array{Float32,1}
+
+# evaluation should not update b
+c_sym = SymmetricProposal(BroadcastedNode(:c, rng, KernelNormal, 0, fill(1.0f0, 3)), c)
+proposed = @inferred propose(c_sym, sample, 2)
+@test variables(proposed).a == variables(sample).a
+@test variables(proposed).a isa Array{Float32,1}
+@test variables(proposed).b == variables(sample).b
+@test variables(proposed).b isa Array{Float32,1}
+@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c isa Array{Float32,2}
+
+# evaluation should update b
+ac_sym = SymmetricProposal((; a=BroadcastedNode(:a, rng, KernelNormal, 0, 1fill(1.0f0, 3)), c=BroadcastedNode(:c, rng, KernelNormal, 0, fill(1.0f0, 3))), c)
+proposed = @inferred propose(ac_sym, sample, 2)
+@test variables(proposed).a != variables(sample).a
+@test variables(proposed).a isa Array{Float32,2}
+@test variables(proposed).b != variables(sample).b
+@test variables(proposed).b isa Array{Float32,2}
+@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c isa Array{Float32,2}
+
+# evaluation should update b
+a_ind = IndependentProposal(BroadcastedNode(:a, rng, KernelNormal, 0, 1.0f0), c)
+proposed = @inferred propose(a_ind, sample)
+@test variables(proposed).a != variables(sample).a
+@test variables(proposed).a isa Float32
+@test variables(proposed).b != variables(sample).b
+@test variables(proposed).b isa Float32
+@test variables(proposed).c == variables(sample).c
+@test variables(proposed).c isa Array{Float32,1}
+
+# evaluation should not update b
+c_ind = IndependentProposal(BroadcastedNode(:c, rng, KernelNormal, 0, 1.0f0), c)
+proposed = @inferred propose(c_ind, sample)
+@test variables(proposed).a == variables(sample).a
+@test variables(proposed).a isa Array{Float32,1}
+@test variables(proposed).b == variables(sample).b
+@test variables(proposed).b isa Array{Float32,1}
+@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c isa Float32
+
+# evaluation should update b
+ac_ind = IndependentProposal((; a=BroadcastedNode(:a, rng, KernelNormal, 0, 1.0f0), c=BroadcastedNode(:c, rng, KernelNormal, 0, 1.0f0)), c)
+proposed = @inferred propose(ac_ind, sample)
+@test variables(proposed).a != variables(sample).a
+@test variables(proposed).a isa Float32
+@test variables(proposed).b != variables(sample).b
+@test variables(proposed).b isa Float32
+@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c isa Float32
+
+# TODO move to sampler tests # Gibbs
 # # Simple function that only changes the type of the variable which allows to test the merge inside the Gibbs proposal
 # a_gibbs_fn(sample) = Sample((; a=42.0f0), 42.0)
 # a_gibbs_proposal = GibbsProposal(a_gibbs_fn)

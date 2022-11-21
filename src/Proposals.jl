@@ -18,8 +18,9 @@ struct SymmetricProposal{T,U}
     evaluation::U
 end
 
-# TODO only accept NT of AbstractNode aka SequentializedGraph as proposal_model?
 SymmetricProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = SymmetricProposal(proposal_model, parents(posterior_model, values(proposal_model)...))
+
+SymmetricProposal(proposal_model::AbstractNode, posterior_model::AbstractNode) = SymmetricProposal(sequentialize(proposal_model), posterior_model)
 
 """
     propose(proposal, [sample], [dims...])
