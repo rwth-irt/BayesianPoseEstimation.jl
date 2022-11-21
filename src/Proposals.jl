@@ -7,59 +7,31 @@
 Implement common proposal models with the convention of always proposing in the unconstrained domain ℝⁿ.
 """
 
-"""
-    AbstractProposal
-Has a `model` which supports `rand(rng, model, dims...)` and `logdensityof(model, x)`.
-"""
-abstract type AbstractProposal end
-
-"""
-    model(proposal)
-Get the internal probabilistic model from which the proposals are generated.
-"""
-model(proposal::AbstractProposal) = proposal.model
-
-"""
-    bijector(proposal)
-Get a named tuple of bijectors for the proposal. Assuming that a proposals live in ℝⁿ, the default bijector is empty.
-"""
-Bijectors.bijector(::AbstractProposal) = (;)
-
-
-"""
-    transition_probability(proposal, new_sample, prev_sample)
-For the general case of dependent samples for a previous and the new `Sample`.
-Since the proposal model might be defined in a constrained domain, the sample is transformed and the logjac adjustment added to the logdensity.
-"""
-function transition_probability(proposal, new_sample, prev_sample)
-    diff_sample = new_sample - prev_sample
-    model_sample, logjac = to_model_domain(diff_sample, proposal.bijectors)
-    logdensityof(model(proposal), model_sample) + logjac
-end
-
 # SymmetricProposal
 
 """
     SymmetricProposal
 Propose a new sample from the previous one by using a symmetric proposal distribution.
 """
-struct SymmetricProposal{T} <: AbstractProposal
+struct SymmetricProposal{T,U}
     model::T
-
-    function SymmetricProposal(model::T) where {T}
-        if !is_identity(model)
-            throw(DomainError(model, "Model domain is not is not defined on ℝᴺ"))
-        end
-        new{T}(model)
-    end
+    evaluation::U
 end
 
+# TODO only accept NT of AbstractNode aka SequentializedGraph as proposal_model?
+SymmetricProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = SymmetricProposal(proposal_model, parents(posterior_model, values(proposal_model)...))
+
 """
-    propose(rng, proposal, [sample], [dims...])
+    propose(proposal, [sample], [dims...])
 Generate a new sample using the `proposal` and maybe conditioning on the old `sample`.
 Use dims to sample propose the variables multiple times (vectorization support).
 """
-propose(rng::AbstractRNG, proposal::SymmetricProposal, sample::Sample, dims...) = sample + rand(rng, model(proposal), dims...)
+function propose(proposal::SymmetricProposal, sample::Sample, dims...)
+    # proposal step
+    proposed = sample + rand(proposal.model, dims...)
+    # determinstic evaluation step
+    Sample(evaluate(proposal.evaluation, variables(proposed)))
+end
 
 """
     transition_probability(proposal, new_sample, prev_sample)
@@ -74,12 +46,15 @@ transition_probability(proposal::SymmetricProposal, new_sample::Sample, ::Sample
     IndependentProposal
 Propose samples independent from the previous one.
 """
-struct IndependentProposal{T,B} <: AbstractProposal
+struct IndependentProposal{T,U,B}
     model::T
+    evaluation::U
     bijectors::B
 end
 
-IndependentProposal(model) = IndependentProposal(model, map_materialize(bijector(model)))
+IndependentProposal(proposal_model::SequentializedGraph, posterior_model::AbstractNode) = IndependentProposal(proposal_model, parents(posterior_model, values(proposal_model)...), map_materialize(bijector(proposal_model)))
+
+IndependentProposal(proposal_model::AbstractNode, posterior_model::AbstractNode) = IndependentProposal(sequentialize(proposal_model), posterior_model)
 
 """
     bijector(proposal)
@@ -89,18 +64,26 @@ Independent proposals might be constrained.
 Bijectors.bijector(proposal::IndependentProposal) = proposal.bijectors
 
 """
-    rand(rng, proposal, dims...)
+    rand(proposal, dims...)
 Generate a random sample from the proposal.
 Only makes sense for independent proposals, since they do not require any prior sample.
 Per convention, the generated sample is transformed to ℝⁿ.
 """
-Base.rand(rng::AbstractRNG, proposal::IndependentProposal, dims::Integer...) = to_unconstrained_domain(rand(rng, model(proposal), dims...), proposal.bijectors)
+function Base.rand(proposal::IndependentProposal, dims::Integer...)
+    proposed = rand(proposal.model, dims...) |> Sample
+    to_unconstrained_domain(proposed, bijector(proposal))
+end
 
 """
-    propose(rng, proposal, sample, [dims...])
+    propose(proposal, sample, [dims...])
 Independent samples are just random values from the model.
 """
-propose(rng::AbstractRNG, proposal::IndependentProposal, sample::Sample, dims...) = merge(sample, rand(rng, proposal, dims...))
+function propose(proposal::IndependentProposal, sample::Sample, dims...)
+    # proposal step
+    proposed = merge(sample, rand(proposal, dims...))
+    # determinstic evaluation step
+    Sample(evaluate(proposal.evaluation, variables(proposed)))
+end
 
 """
     transition_probability(proposal, new_sample, prev_sample)
@@ -108,8 +91,6 @@ For independent proposals, the transition probability does not depend on the pre
 Since the proposal model might be defined in a constrained domain, the sample is transformed and the logjac adjustment added to the logdensity.
 """
 function transition_probability(proposal::IndependentProposal, new_sample::Sample, ::Sample)
-    model_sample, logjac = to_model_domain(new_sample, proposal.bijectors)
-    logdensityof(model(proposal), model_sample) + logjac
+    model_sample, logjac = to_model_domain(new_sample, bijector(proposal))
+    logdensityof(proposal.model, variables(model_sample)) + logjac
 end
-
-# TODO Custom quaternion proposal: composition is the quaternion product and normalize
