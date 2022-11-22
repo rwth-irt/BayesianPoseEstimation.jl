@@ -84,13 +84,18 @@ Bijectors.logabsdetjac(b::BroadcastedBijector, x) = sum_and_dropdims(logabsdetja
 Calculate the transformed variables with the logabsdetjac correction in an optimized fashion.
 The logabsdetjac correction is reduced by summing up `b.dims`.
 """
-function Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector, x)
+Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector, x) = with_logabsdet_jacobian_array(b, x)
+Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector{0}, x::AbstractArray) = with_logabsdet_jacobian_array(b, x)
+
+function with_logabsdet_jacobian_array(b, x)
     with_logjac = with_logabsdet_jacobian.(b.bijectors, x)
     y, logjacs = first.(with_logjac), last.(with_logjac)
     y, sum_and_dropdims(logjacs, b.dims)
 end
+
 # Scalar case result in a tuple for with_logjac instead of an array of tples
-Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector{0}, x::Real) = with_logabsdet_jacobian.(b.bijectors, x)
+Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector{0}, x) = with_logabsdet_jacobian.(b.bijectors, x)
+
 
 """
     is_identity(::Bijector)

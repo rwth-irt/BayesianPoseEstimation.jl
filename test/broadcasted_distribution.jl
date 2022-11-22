@@ -244,6 +244,17 @@ X, logjac = @inferred with_logabsdet_jacobian(b, Y)
 @test logjac == logabsdetjac(b, Y)
 @test logdensityof(t_dist, Y) ≈ logdensityof(dist, X) + logjac
 
+# Scalar dist, array value
+dist = BroadcastedDistribution(KernelExponential, ())
+t_dist = transformed(dist)
+Y = rand(rng, t_dist, 3, 2, 1)
+X_invlink = @inferred invlink(dist, Y)
+b = @inferred inverse(bijector(dist))
+X, logjac = @inferred with_logabsdet_jacobian(b, Y)
+@test X_invlink == X
+@test logjac == logabsdetjac(b, Y)
+@test logdensityof(t_dist, Y) ≈ logdensityof(dist, X) + logjac
+
 # CUDA
 cudist = @inferred ProductBroadcastedDistribution(KernelExponential, CuArray([Float64(i) for i = 1:100]))
 t_cudist = transformed(cudist)
@@ -258,7 +269,7 @@ Y = @inferred rand(curng, t_cudist, 3, 2, 2)
 X_invlink = @inferred invlink(cudist, Y)
 b = @inferred inverse(bijector(cudist))
 X, logjac = @inferred with_logabsdet_jacobian(b, Y)
-@test X_invlink == X
+@test X_invlink ≈ X
 @test logjac == logabsdetjac(b, Y)
 @test logdensityof(t_cudist, Y) ≈ logdensityof(cudist, X) + logjac
 
@@ -272,4 +283,4 @@ X = @inferred invlink(cudist, Y)
 B = @inferred ProductBroadcastedDistribution(KernelExponential, CUDA.fill(10.0, 1000))
 B = @inferred BroadcastedDistribution(KernelExponential, (1,), CUDA.fill(10.0, 1000))
 X = rand(CUDA.default_rng(), B, 2)
-logdensityof(B, X)
+@inferred logdensityof(B, X)
