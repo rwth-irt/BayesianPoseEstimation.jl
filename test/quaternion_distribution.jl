@@ -6,6 +6,7 @@
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
+using Bijectors
 using CUDA
 using LinearAlgebra
 using MCMCDepth
@@ -113,3 +114,15 @@ S2 = @inferred propose(prop, s1, 2, 2)
 @test variables(S2).b == 2 * variables(S2).a
 L = @inferred transition_probability(prop, s1, S2)
 @test L == 0
+
+# Bijector
+dist = QuaternionDistribution(Float32)
+q1 = rand(dist)
+b = bijector(dist)
+@test b(q1) == q1
+@test logabsdetjac(b, q1) == 0
+@test logabsdetjac(b, q1) isa Float32
+q2 = rand(dist, 2)
+@test b(q1) == q1
+@test logabsdetjac(b, q1) == 0
+@test logabsdetjac(b, q1) isa Float32

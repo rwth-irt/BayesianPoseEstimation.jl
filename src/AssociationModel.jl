@@ -53,5 +53,5 @@ end
 Base.maximum(dist::PixelAssociation) = max(maximum(dist.dist_is), maximum(dist.dist_not))
 Base.minimum(dist::PixelAssociation) = min(minimum(dist.dist_is), minimum(dist.dist_not))
 # logpdf of the ValidPixels explicitly handles outliers, so no transformation is desired
-Bijectors.bijector(::PixelAssociation) = Bijectors.Identity{0}()
+Bijectors.bijector(::PixelAssociation) = ZeroIdentity()
 Distributions.insupport(dist::PixelAssociation, x::Real) = minimum(dist) < x < maximum(dist)

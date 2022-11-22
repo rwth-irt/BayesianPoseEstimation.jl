@@ -54,7 +54,7 @@ function to_model_domain(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Varar
     with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(inverse(b), v), bijectors, variables(s))
     tr_vars = map(first, with_logjac)
     model_sample = @set s.variables = merge(s.variables, tr_vars)
-    logjac = reduce(.+, values(map(last, with_logjac)); init=0)
+    logjac = reduce(add_logdensity, values(map(last, with_logjac)); init=0)
     model_sample, logjac
 end
 

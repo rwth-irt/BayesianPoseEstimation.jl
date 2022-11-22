@@ -60,12 +60,8 @@ Distributions.logpdf(::QuaternionDistribution{T}, x::Quaternion) where {T} = T(q
 Base.rand(rng::AbstractRNG, ::QuaternionDistribution{T}) where {T} = Quaternion(randn(rng, T), randn(rng, T), randn(rng, T), randn(rng, T)) |> robust_normalize
 
 # Bijectors
-Bijectors.bijector(::QuaternionDistribution) = Identity{0}()
-Bijectors.logabsdetjac(::Identity, ::Quaternion{T}) where {T} = zero(T)
-function Bijectors.logabsdetjac(::Identity, x::AbstractArray{<:Quaternion{T}}) where {T}
-    res = similar(x, T)
-    fill!(res, zero(T))
-end
+Bijectors.bijector(::QuaternionDistribution) = ZeroIdentity()
+Bijectors.logabsdetjac(::ZeroIdentity, ::Union{Quaternion{T},AbstractArray{<:Quaternion{T}}}) where {T} = zero(T)
 
 """
     QuaternionPerturbation
@@ -85,7 +81,7 @@ Distributions.logpdf(dist::QuaternionPerturbation{T}, x::Quaternion) where {T} =
 Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = approx_qrotation(rand(rng, KernelNormal(0, dist.σ_x)), rand(rng, KernelNormal(0, dist.σ_y)), rand(rng, KernelNormal(0, dist.σ_z)))
 
 # Bijectors
-Bijectors.bijector(::QuaternionPerturbation) = Bijectors.Identity{0}()
+Bijectors.bijector(::QuaternionPerturbation) = ZeroIdentity()
 
 """
     QuaternionProposal

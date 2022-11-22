@@ -24,4 +24,4 @@ evaluate_barrier(node::DeterministicNode, variables::NamedTuple) = node.fn(child
 # Do not change the joint probability - log probability of 0
 logdensityof_barrier(node::DeterministicNode, variables::NamedTuple) = varvalue(node, variables) |> eltype |> zero
 
-bijector_barrier(node::DeterministicNode, variables::NamedTuple) = Bijectors.Identity{0}()
+bijector_barrier(node::DeterministicNode, variables::NamedTuple) = ZeroIdentity()
