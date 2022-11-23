@@ -57,74 +57,39 @@ end
 μ_fn = render_fn | (render_context, scene, parameters.object_id)
 μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
-pixel_dist = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
-z = BroadcastedNode(:z, (; μ=μ, o=o), dev_rng, pixel_dist)
-
-s = rand(z, 2);
+# Depth image model
+# Does not handle invalid μ → requires normalization
+pixel_mix = pixel_mixture(parameters)
+# Explicitly handles invalid μ → no normalization
+pixel_expl = pixel_explicit(parameters)
+z = BroadcastedNode(:z, dev_rng, pixel_mix, (; μ=μ, o=o))
+# TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
+# norm_const = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
+z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.precision(10))
+z_seq = sequentialize(z_norm)
+s = rand(z_seq, 2);
 plot(plot_depth_img(Array(s.μ[:, :, 1])), plot_prob_img(Array(s.o[:, :, 1])), plot_depth_img(Array(s.z[:, :, 1])),
     plot_depth_img(Array(s.μ[:, :, 2])), plot_prob_img(Array(s.o[:, :, 2])), plot_depth_img(Array(s.z[:, :, 2])))
-
-
-# TODO
-struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
-    normalization_constant::T
-    μ::M
-end
-
-ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
-
-Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
-using DensityInterface
-function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
-    # Images are always 2D
-    n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
-    ℓ .* model.normalization_constant ./ n_pixel
-end
-
-norm_const = parameters.precision(10)
-z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | norm_const)
-s = rand(z_norm, 2);
-plot(plot_depth_img(Array(s.μ[:, :, 1])), plot_prob_img(Array(s.o[:, :, 1])), plot_depth_img(Array(s.z[:, :, 1])),
-    plot_depth_img(Array(s.μ[:, :, 2])), plot_prob_img(Array(s.o[:, :, 2])), plot_depth_img(Array(s.z[:, :, 2])))
-
-logdensityof(z, s)
-logdensityof(z_norm, s)
-
-seq_z = sequentialize(z_norm)
-
-# TODO remove
-# s = rand(seq_z)
-# logdensityof(seq_z, s)
-# s = rand(seq_z, 2)
-# logdensityof(seq_z, s)
-
-# TODO Extract prior from graph → should be the leafs?
-prior_model = RenderModel(render_context, scene, parameters.object_id, IndependentModel((; t=t_model, r=r_model, o=o_model)))
 
 # Assemble samplers
 # t & r change expected depth, o not
-t_independent = IndependentProposal(IndependentModel((; t=t_model))) |> render_model
-t_ind_mh = MetropolisHastings(t_independent)
+t_ind = IndependentProposal(t, z_norm)
+t_ind_mh = MetropolisHastings(t_ind)
 
-t_sym_dist = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_t) |> cpu_model
-t_symmetric = SymmetricProposal(IndependentModel((; t=t_sym_dist))) |> render_model
-t_sym_mh = MetropolisHastings(t_symmetric)
+t_sym = SymmetricProposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z_norm)
+t_sym_mh = MetropolisHastings(t_sym)
 
-r_independent = IndependentProposal(IndependentModel((; r=r_model))) |> render_model
-r_ind_mh = MetropolisHastings(r_independent)
+r_ind = IndependentProposal(r, z_norm)
+r_ind_mh = MetropolisHastings(r_ind)
 
-# r_proposal = ProductBroadcastedDistribution(KernelNormal, 0, parameters.proposal_σ_r) |> cpu_model
-# r_symmetric = SymmetricProposal(IndependentModel((; r=r_proposal))) |> render_model
-r_sym_dist = r = QuaternionPerturbation(parameters.proposal_σ_r_quat) |> cpu_model
-r_symmetric = QuaternionProposal(IndependentModel((; r=r_sym_dist))) |> render_model
-r_sym_mh = MetropolisHastings(r_symmetric)
+r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z_norm)
+r_sym_mh = MetropolisHastings(r_sym)
 
-o_independent = IndependentProposal(IndependentModel((; o=o_model)))
-o_ind_mh = MetropolisHastings(o_independent)
+o_ind = IndependentProposal(o, z_norm)
+o_ind_mh = MetropolisHastings(o_ind)
 
-o_sym_dist = KernelNormal(0, parameters.proposal_σ_o) |> cpu_model
-o_symmetric = SymmetricProposal(IndependentModel((; o=o_sym_dist)))
-o_sym_mh = MetropolisHastings(o_symmetric)
+o_sym = SymmetricProposal(BroadcastedNode(:o, dev_rng, KernelNormal, 0, parameters.proposal_σ_o), z_norm)
+o_sym_mh = MetropolisHastings(o_sym)
 
 # ComposedSamplers
 ind_sym_sampler = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0, 1.0, 1.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
@@ -132,28 +97,6 @@ ind_sampler = ComposedSampler(t_ind_mh, r_ind_mh, o_ind_mh)
 # TODO works better than combination? Maybe because we do not sample the poles like with RotXYZ
 sym_sampler = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
 
-# Pixel models
-# Does not handle invalid μ → ValidPixel & normalization in observation_model
-pixel_mix = pixel_mixture(parameters)
-# Explicitly handles invalid μ → no normalization
-pixel_expl = pixel_explicit(parameters)
-
-# Observation models
-# TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
-normalization_constant = parameters.precision(10)
-# normalization_constant = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
-normalized_observation = ObservationModel(pixel_mix, normalization_constant)
-explicit_observation = ObservationModel(pixel_expl)
-
-# Fake observation
-# TODO occlusion
-obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj"]
-obs_scene = Scene(obs_params, render_context)
-obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
-obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
-obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
-obs = rand(dev_rng, explicit_observation, Sample((; μ=obs_μ, o=0.8f0)))
-plot_depth_img(Array(obs))
 
 # TODO the interface sucks
 # dist_is(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
@@ -163,28 +106,37 @@ plot_depth_img(Array(obs))
 # o_gibbs = Gibbs(prior_model, o_analytic)
 
 # PosteriorModel
+
+# Fake observation
+# TODO occlusion
+obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj"]
+obs_scene = Scene(obs_params, render_context)
+obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
+obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
+obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
+obs = rand(z, (; μ=obs_μ, o=0.8f0))[(:z,)]
+
 # TODO normalized_posterior seems way better but is a bit slower
-posterior = PosteriorModel((; z=obs), prior_model, normalized_observation)
-explicit_posterior = PosteriorModel((; z=obs), prior_model, explicit_observation)
-# TODO | syntax for AbstractModel
+posterior = PosteriorModel(z_norm, obs)
+
 
 # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-chain = sample(rng, posterior, ind_sym_sampler, 20_000; discard_initial=0_000, thinning=1);
+chain = sample(rng, posterior, ind_sym_sampler, 20_000; discard_initial=0_000, thinning=2);
 
 # TODO separate evaluation from experiments, i.e. save & load
 model_chain = map(chain) do sample
-    s, _ = to_model_domain(sample, bijector(posterior))
+    s, _ = to_model_domain(sample, bijector(z_norm))
     s
 end;
 STEP = 300
 
-plt_t_chain = plot_variable(model_chain, :t, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Position [m]", legend=false)
+plt_t_chain = plot_variable(model_chain, :t, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Position [m]", legend=false);
 plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=:outerright, left_margin=5mm);
 
 plt_r_chain = plot_variable(model_chain, :r, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Orientierung [rad]", legend=false, top_margin=5mm);
 plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientierung [rad]", ylabel="Wahrscheinlichkeit", legend=false);
 
-plot_variable(model_chain, :o, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Zugehörigkeit", legend=false);
+plot_variable(model_chain, :o, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Zugehörigkeit", legend=false)
 density_variable(model_chain, :o; label=["x" "y" "z"], xlabel="Zugehörigkeit [0,1]", ylabel="Wahrscheinlichkeit", legend=false);
 
 plot(
