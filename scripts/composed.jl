@@ -114,14 +114,14 @@ obs_scene = Scene(obs_params, render_context)
 obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
 obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
 obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
-obs = rand(z, (; μ=obs_μ, o=0.8f0))[(:z,)]
+obs = rand(z_norm, (; μ=obs_μ, o=0.8f0))[(:z,)]
 
 # TODO normalized_posterior seems way better but is a bit slower
 posterior = PosteriorModel(z_norm, obs)
 
 
 # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-chain = sample(rng, posterior, ind_sym_sampler, 20_000; discard_initial=0_000, thinning=2);
+chain = sample(rng, posterior, ind_sym_sampler, 20_000; discard_initial=0_000, thinning=1);
 
 # TODO separate evaluation from experiments, i.e. save & load
 model_chain = map(chain) do sample
@@ -136,19 +136,22 @@ plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Posi
 plt_r_chain = plot_variable(model_chain, :r, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Orientierung [rad]", legend=false, top_margin=5mm);
 plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientierung [rad]", ylabel="Wahrscheinlichkeit", legend=false);
 
-plot_variable(model_chain, :o, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Zugehörigkeit", legend=false)
-density_variable(model_chain, :o; label=["x" "y" "z"], xlabel="Zugehörigkeit [0,1]", ylabel="Wahrscheinlichkeit", legend=false);
-
 plot(
     plt_t_chain, plt_t_dens,
     plt_r_chain, plt_r_dens,
     layout=(2, 2)
 )
 
-# scatter_position(model_chain, 100)
+# TODO I would have expected it to converge around 0.8
+density_variable(model_chain, :o; label=["x" "y" "z"], xlabel="Zugehörigkeit [0,1]", ylabel="Wahrscheinlichkeit", legend=false)
+plot_variable(model_chain, :o, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Zugehörigkeit", legend=false);
+
 # plot_logprob(model_chain, STEP)
 
-# # pyplot()
-# polar_histogram_variable(model_chain, :r; nbins=180)
+# anim = @animate for i ∈ 0:5:360
+#     scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:outertopright)
+# end
+# gif(anim, "anim_fps15.gif", fps=15)
+
 # # mean(getproperty.(variables.(model_chain), (:t)))
 # plot_depth_img(render(render_context, scene, parameters.object_id, to_pose(model_chain[end].variables.t, model_chain[end].variables.r)) |> Array)
