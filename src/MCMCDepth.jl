@@ -119,15 +119,9 @@ export ValidPixel
 export PixelAssociation
 export ImageAssociation
 
-export mix_normal_exponential, mix_normal_truncated_exponential
-
 export image_association
 export nonzero_pixels
 export pixel_association
-export pose_depth_model
-export preprocess
-export prior_depth_model
-export random_walk_proposal
 
 export PriorModel
 export PosteriorModel
@@ -138,13 +132,15 @@ export ComposedSampler
 export Gibbs
 export MetropolisHastings
 
-# Inference
+# Models
 export ImageLikelihoodNormalizer
 
 export expected_pixel_count
 export pixel_explicit
 export pixel_mixture
 export pixel_tail
+export valid_pixel_explicit
+export valid_pixel_mixture
 
 # Visualization
 export density_variable

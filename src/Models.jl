@@ -5,9 +5,6 @@
 using Random
 using SciGL
 
-# TODO cleanup
-
-# TODO move to its own file?
 """
     ImageLikelihoodNormalizer
 Use it in a modifier node to normalize the loglikelihood of the image to make it independent from the number of visible pixels in μ. 
@@ -26,22 +23,6 @@ function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
     ℓ .* model.normalization_constant ./ n_pixel
 end
-
-# TODO remove?
-"""
-    pose_prior(render_context, scene, object_id, t_model, r_model, o_model)
-Creates a PriorModel for the variables t, r & o which automatically renders μ after in rand.
-"""
-pose_prior(render_context::RenderContext, scene::Scene, object_id::Integer, t_model, r_model, o_model) = RenderModel(render_context, scene, object_id, IndependentModel((; t=t_model, r=r_model, o=o_model))) |> PriorModel(model, bijectors)
-
-# TODO remove?
-"""
-    post
-Consist of a `prior_model`, which generates a sample with variables t, r, o & μ.
-The `observation_model` is a function of (μ, o) which creates a ObservationModel.
-The observation itself is the `z` variable of the sample.
-"""
-pose_posterior(render_context::RenderContext, scene::Scene, object_id::Integer, t_model, r_model, o_model, z_model) = PosteriorModel(prior, ConditionedModel(likelihood, (; z=observation)))
 
 """
     expected_pixel_count(rng, prior_model, render_context, scene, parameters)
@@ -72,16 +53,12 @@ function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) wh
     KernelBinaryMixture(normal, tail, o, one(o) - o)
 end
 
-# TODO autogenerate (:μ, :o) via PPL?
-"""
-    pixel_mixture(parameters)
-Generates a pixel_mixture(μ, o) distribution given the parameters.
-"""
-pixel_mixture(parameters::Parameters) = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+valid_pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
-    # TODO Does truncated make a difference?
-    # truncate: lower <= upper → max(min_depth, μ)
+    # TODO Does truncated make a difference? Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
+    # exponential = KernelExponential
+    # truncated must satisfy: lower <= upper → max(min_depth, μ)
     # TODO what about the μ in the association model?
     exponential = truncated(KernelExponential(θ), min_depth, max(min_depth, μ))
     uniform = KernelUniform(zero(T), max_depth)
@@ -108,9 +85,4 @@ function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) w
     end
 end
 
-# TODO autogenerate (:μ, :o) via PPL?
-"""
-    pixel_explicit(parameters)
-Generates a pixel_explicit(μ, o) distribution given the parameters.
-"""
-pixel_explicit(parameters::Parameters) = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+valid_pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))

@@ -81,6 +81,7 @@ Base.@kwdef struct Parameters
     # Image Model
     normalize_img = true
     n_normalization_samples = 20_000
+    normalization_constant = 10
 
     # Pose Model
     mean_t = [0.0, 0.0, 2.0]
@@ -159,6 +160,7 @@ Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :m
 
 Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.precision.(getfield(p, :prior_o))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.precision.(getfield(p, :proposal_σ_o))
+Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.precision.(getfield(p, :normalization_constant))
 Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.precision.(getfield(p, :pixel_σ))
 Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.precision.(getfield(p, :pixel_θ))
 Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.precision.(getfield(p, :mix_exponential))

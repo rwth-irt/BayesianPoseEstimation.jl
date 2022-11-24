@@ -12,7 +12,8 @@ Given gen_f(;a,b), gen_f | (; a=1) returns a function generator of the form gen_
 
 Based on ideas from PartialFunctions.jl https://github.com/archermarx/PartialFunctions.jl/blob/master/src/PartialFunctions.jl
 
-# TODO this has proven difficult using chained anonymous functions
+# WARN 
+This has proven difficult using chained anonymous functions
 Main difference is that mapping the kwargs to args is more flexible and possible in any step of the partial application
 """
 
@@ -20,6 +21,9 @@ Main difference is that mapping the kwargs to args is more flexible and possible
     ManipulatedFunction
 Keep track of the original function and the arguments which are manipulated.
 Partial application using anonymous functions leads to ambiguous signatures.
+
+# WARN
+Multiple functions with the same name might cause dynamic function invocations which do not work with CUDA.
 """
 struct ManipulatedFunction{names,F<:Function,G<:Callable,T<:Tuple,U<:NamedTuple} <: Function
     # Parametric names required for type stable for moving kwargs to args
