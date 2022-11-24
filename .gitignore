@@ -4,3 +4,7 @@
 .ipynb_checkpoints
 plots
 scratchpad
+
+*.gif
+*.svg
+*.png

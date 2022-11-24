@@ -38,7 +38,7 @@ include("RenderContext.jl")
 include("ObservationModel.jl")
 include("AssociationModel.jl")
 include("RenderModel.jl")
-include("Inference.jl")
+include("Models.jl")
 
 # Common
 export array_for_rng
