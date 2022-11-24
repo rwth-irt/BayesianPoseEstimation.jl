@@ -18,7 +18,25 @@ using Plots.PlotMeasures
 pyplot()
 MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
 
-function run_inference(parameters::Parameters; kwargs...)
+parameters = Parameters()
+parameters = @set parameters.device = :CUDA
+render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
+
+function fake_observation(parameters::Parameters, render_context::RenderContext, occlusion::Real)
+    # nominal scene
+    obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj", "meshes/cube.obj"]
+    obs_scene = Scene(obs_params, render_context)
+    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
+    obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
+    obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion, 0, 1.6)
+    obs_scene = @set obs_scene.meshes[3].scale = Scale(0.7, 0.7, 0.7)
+    obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
+    # add noise
+    pixel_model = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+    (; z=rand(device_rng(parameters), BroadcastedDistribution(pixel_model, (), obs_μ, 0.8f0)))
+end
+
+function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # Device
     if parameters.device === :CUDA
         CUDA.allowscalar(false)
@@ -27,36 +45,24 @@ function run_inference(parameters::Parameters; kwargs...)
     rng = cpu_rng(parameters)
     dev_rng = device_rng(parameters)
 
-    # Render context
-    render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
-    scene = Scene(parameters, render_context)
-    render_model = RenderModel | (render_context, scene, parameters.object_id)
-
     # Model specification
-    # TODO separate function
     # Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
-    # TODO Show robustness for different o by estimating it
-    # o = BroadcastedNode(:o, rng, Dirac, parameters.precision(0.7))
-    # TODO works but takes longer to converge
-    o = BroadcastedNode(:o, dev_rng, KernelUniform, parameters.precision)
+    # TODO takes longer to converge than Dirac and does not work well if actual occlusion is present. Occlusion should lead to low o which leads to low confidence in the data
+    o = BroadcastedNode(:o, dev_rng, Dirac, 0.6f0)
+    # o = BroadcastedNode(:o, dev_rng, KernelUniform, parameters.precision)
 
-    function render_fn(render_context, scene, object_id, t, r)
-        p = to_pose(t, r)
-        render(render_context, scene, object_id, p)
-    end
-    μ_fn = render_fn | (render_context, scene, parameters.object_id)
+    μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
     # Depth image model
     # Explicitly handles invalid μ → no normalization
     # TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
     # norm_const = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
-
     # TODO ValidPixel is required for occlusions? Combined with pixel_explicit even better?
-    valid_z = MCMCDepth.valid_pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, valid_z, (; μ=μ, o=o))
+    pixel_model = valid_pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+    z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
     # Assemble samplers
@@ -81,8 +87,8 @@ function run_inference(parameters::Parameters; kwargs...)
 
     # ComposedSamplers
     # TODO sampling scalar o is relatively cheap
-    ind_sym_sampler = ComposedSampler(Weights([0.01, 0.01, 0.01, 1.0, 1.0, 2.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
-    #TODO ind_sym_sampler = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    #TODO ind_sym_sampler = ComposedSampler(Weights([0.01, 0.01, 0.01, 1.0, 1.0, 2.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
+    ind_sym_sampler = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
     ind_sampler = ComposedSampler(t_ind_mh, r_ind_mh, o_ind_mh)
     # TODO works better than combination? Maybe because we do not sample the poles like with RotXYZ
     sym_sampler = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
@@ -96,18 +102,6 @@ function run_inference(parameters::Parameters; kwargs...)
     # o_gibbs = Gibbs(prior_model, o_analytic)
 
     # PosteriorModel
-
-    # Fake observation
-    # TODO separate function
-    obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj", "meshes/cube.obj"]
-    obs_scene = Scene(obs_params, render_context)
-    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
-    obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
-    obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.5, 0, 1.6)
-    obs_scene = @set obs_scene.meshes[3].scale = Scale(0.5, 0.5, 0.5)
-    obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
-    obs = rand(z, (; μ=obs_μ, o=0.8f0))[(:z,)]
-    plot_depth_img(Array(obs.z))
 
     # TODO normalized_posterior seems way better but is a bit slower
     # TODO Occlusions: Diverges to the occluding object for z_norm
@@ -123,13 +117,13 @@ function run_inference(parameters::Parameters; kwargs...)
     end
 end
 
-parameters = Parameters()
-parameters = @set parameters.device = :CUDA
+obs = fake_observation(parameters, render_context, 0.5)
+plot_depth_img(Array(obs.z))
+
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
+model_chain = run_inference(parameters, render_context, obs; thinning=2);
 
-model_chain = run_inference(parameters; thinning=2);
-
-STEP = 300
+STEP = 200
 plt_t_chain = plot_variable(model_chain, :t, STEP; label=["x" "y" "z"], xlabel="Iteration [÷ $(STEP)]", ylabel="Position [m]", legend=false);
 plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=false, left_margin=5mm);
 
@@ -155,4 +149,4 @@ plot(
 # gif(anim, "anim_fps15.gif", fps=20)
 
 # # mean(getproperty.(variables.(model_chain), (:t)))
-plot_depth_img(render(render_context, scene, parameters.object_id, to_pose(model_chain[end].variables.t, model_chain[end-10_000].variables.r)) |> Array)
+# plot_depth_img(render(render_context, scene, parameters.object_id, to_pose(model_chain[end].variables.t, model_chain[end-10_000].variables.r)) |> Array)
