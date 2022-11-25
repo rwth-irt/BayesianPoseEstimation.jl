@@ -35,3 +35,9 @@ nt = rand(c, 2)
 # Test that evaluate only calls the DeterministicNode
 nt = evaluate(c, (; a=1, b=2, c=3))
 @test nt == (; a=1, b=2, c=1)
+
+# Deterministic as leaf
+d = DeterministicNode(:d, () -> fill(42, 42), (;))
+s = @inferred rand(d)
+@test logdensityof(d, s) == 0
+@test s.d == fill(42, 42)
