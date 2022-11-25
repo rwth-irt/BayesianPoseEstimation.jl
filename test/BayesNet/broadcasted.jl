@@ -77,6 +77,6 @@ d_bij = bijector(ProductBroadcastedDistribution(KernelNormal, 0, fill(1.0f0, 3, 
 
 # Do the bijectors work for multiple samples?
 @test a_bij(nt.a) == bijector(KernelUniform(0, 1.0f0)).(nt.a)
-b_bij(nt.b) == bijector(KernelExponential(1.0f0)).(nt.b)
-c_bij(nt.c) == bijector(KernelNormal(0, 1.0f0)).(nt.c)
-d_bij(nt.d) == bijector(KernelNormal(0, 1.0f0)).(nt.d)
+@test b_bij(nt.b) == bijector(KernelExponential(1.0f0)).(nt.b)
+@test c_bij(nt.c) == bijector(KernelNormal(0, 1.0f0)).(nt.c)
+@test d_bij(nt.d) == bijector(KernelNormal(0, 1.0f0)).(nt.d)

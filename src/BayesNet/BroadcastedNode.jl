@@ -17,10 +17,8 @@ struct BroadcastedNode{name,child_names,C<:NamedTuple{child_names},R<:AbstractRN
 end
 
 # Convenience constructor for moving name to the parametric type.
-# Named differently to avoid ambiguities with params... constructor
-BroadcastedNode_(name::Symbol, children::C, rng::R, model::M, model_dims::Dims{N}, child_sizes::D) where {child_names,C<:NamedTuple{child_names},R<:AbstractRNG,M<:Union{Distribution,Function},N,D<:Tuple{Vararg{Dims}}} = BroadcastedNode{name,child_names,C,R,M,N,D}(children, rng, model, model_dims, child_sizes)
+BroadcastedNode(name::Symbol, rng::R, model::M, model_dims::Dims{N}, children::C, child_sizes::D) where {child_names,C<:NamedTuple{child_names},R<:AbstractRNG,M<:Union{Distribution,Function},N,D<:Tuple{Vararg{Dims}}} = BroadcastedNode{name,child_names,C,R,M,N,D}(children, rng, model, model_dims, child_sizes)
 
-# Construct as parent
 """
     BroadcastedNode(name, rng, distribution, children)
 Construct a node which automatically broadcasts the `distribution` over the parameters given by the `children`.
@@ -30,13 +28,13 @@ function BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution::Base.Call
     # Generate one sample to calculate dimensions of the node and children. Empty Dims because they are unknown and don't make a difference for a single sample generation.
     sacrifice_model = broadcast_model(distribution, ())
     sacrifice_child_sizes = ntuple(_ -> (), length(children))
-    sacrifice_node = BroadcastedNode_(name, children, rng, sacrifice_model, (), sacrifice_child_sizes)
+    sacrifice_node = BroadcastedNode(name, rng, sacrifice_model, (), children, sacrifice_child_sizes)
     sacrifice_nt = rand(sacrifice_node)
 
     model_dims = param_dims(varvalue(sacrifice_node, sacrifice_nt))
     child_sizes = size.(childvalues(sacrifice_node, sacrifice_nt))
     node_model = broadcast_model(distribution, model_dims)
-    BroadcastedNode_(name, children, rng, node_model, model_dims, child_sizes)
+    BroadcastedNode(name, rng, node_model, model_dims, children, child_sizes)
 end
 
 # Construct as leaf
@@ -46,7 +44,7 @@ end
 Construct the node as leaf (no children) by broadcasting the `distribution` over the `params`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims of the `params`.
 """
-BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution, params...) = BroadcastedNode_(name, (;), rng, ProductBroadcastedDistribution(distribution, params...), param_dims(params...), ())
+BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution, params...) = BroadcastedNode(name, rng, ProductBroadcastedDistribution(distribution, params...), param_dims(params...), (;), ())
 
 
 # WARN Manipulated function not type stable for Type as arg
@@ -62,7 +60,7 @@ function childvalues(node::BroadcastedNode{<:Any,childnames}, nt::NamedTuple) wh
     child_values = values(nt[childnames])
     # WARN Broadcasting not type stable?
     map(child_values, node.child_sizes) do cv, cs
-        insertdims(cv,  cs , node.model_dims)
+        insertdims(cv, cs, node.model_dims)
     end
 end
 
