@@ -32,7 +32,7 @@ The `prior` is required for the association probability `o`.
 Finally, provide the `observation` on which the model can be conditioned.
 """
 function image_association(dist_is, dist_not, prior, observation, association_name=:o, expectation_name=:μ)
-    expectation_node = DeterministicNode(expectation_name, () -> nothing, (;))
+    expectation_node = DeterministicNode(expectation_name, () -> zero(observation), (;))
     pix_ass = pixel_association | (dist_is, dist_not, prior)
     DeterministicNode(association_name, (expectation) -> pix_ass.(expectation, observation), (; expectation_name => expectation_node))
 end

@@ -11,7 +11,7 @@ Implement common proposal models with the convention of always proposing in the 
     proposal(T, proposal_model, posterior_model)
 Helps with the correct construction of some proposal type `T(proposal_model, evaluation, bijectors)`.
 """
-proposal(::Type{T}, proposal_model, posterior_model) where {T} = T(proposal_model, evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(prior(posterior_model))))
+proposal(::Type{T}, proposal_model, posterior_model) where {T} = T(proposal_model, evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(proposal_model)))
 
 """
     evaluation_nodes(proposal, posterior)
