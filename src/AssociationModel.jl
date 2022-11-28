@@ -6,52 +6,33 @@ using DensityInterface
 using Distributions
 
 """
-    ImageAssociation
-Broadcasts the analytic PixelAssociation over images given the expected depth `μ` and a prior association `prior`.
-Each PixelAssociation consists of a distribution `dist_is(z|μ)` for the probability of a pixel belonging to the object of interest and `dist_not(z|μ)` which models the probability of the pixel not belonging to this object.
+    pixel_association(dist_is, dist_not, prior, μ, z)
+Consists of a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
+Moreover, a `prior` is required for the association probability `o`.
+The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
 """
-function ImageAssociation(dist_is, dist_not, prior, μ)
-    # Make PixelAssociation broadcastable over q and μ
-    pixel_association(q, μ) = PixelAssociation(q, dist_is(μ), dist_not(μ))
-    # No reduction wanted → dims=()
-    BroadcastedDistribution(pixel_association, (), prior, μ)
-end
-
-# Per pixel association
-
-"""
-    PixelAssociation
-Consists of a distribution `dist_is` for the probability of a pixel belonging to the object of interest and `dist_not` which models the probability of the pixel not belonging to this object.
-Moreover, a prior `prior` is required for the association probability.
-Typically both distributions are conditioned on the expected depth μ of the pixel.
-The logpdf is calculated analytically by marginalizing the two distributions.
-"""
-struct PixelAssociation{T,I<:ValidPixel,N<:ValidPixel} <: AbstractKernelDistribution{T,Continuous}
-    prior::T
-    dist_is::I
-    dist_not::N
-end
-
-function Distributions.logpdf(dist::PixelAssociation, x)
+function pixel_association(dist_is, dist_not, prior, μ, z)
     # Internal ValidPixels handle outliers by returning 1.0 as probability which will result in the prior q without too much overhead
-    p_is = pdf(dist.dist_is, x)
-    p_not = pdf(dist.dist_not, x)
-    nominator = dist.prior * p_is
+    p_is = pdf(dist_is(μ), z)
+    p_not = pdf(dist_not(μ), z)
+    nominator = prior * p_is
     # Marginalize Bernoulli distributed by summing out o
-    marginal = nominator + (1 - dist.prior) * p_not
+    marginal = nominator + (1 - prior) * p_not
     # Normalized posterior
     nominator / marginal
 end
 
-function Base.rand(rng::AbstractRNG, dist::PixelAssociation)
-    # Sample from the prior
-    mix = KernelBinaryMixture(dist.dist_is, dist.dist_not, dist.prior, (1 - dist.prior))
-    rand(rng, mix)
-end
+"""
+    ImageAssociation(dist_is, dist_not, prior, observation, [association_name=:o, expectation_name=:μ])
+Creates a image_association for the given parameters which does not execute any reduction, so the logdensity returns the whole image.
 
-# The support of a mixture is the union of the support of its components
-Base.maximum(dist::PixelAssociation) = max(maximum(dist.dist_is), maximum(dist.dist_not))
-Base.minimum(dist::PixelAssociation) = min(minimum(dist.dist_is), minimum(dist.dist_not))
-# logpdf of the ValidPixels explicitly handles outliers, so no transformation is desired
-Bijectors.bijector(::PixelAssociation) = ZeroIdentity()
-Distributions.insupport(dist::PixelAssociation, x::Real) = minimum(dist) < x < maximum(dist)
+Internally, the `pixel_association` function is broadcasted in a DeterministicNode.
+Provide a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
+The `prior` is required for the association probability `o`.
+Finally, provide the `observation` on which the model can be conditioned.
+"""
+function image_association(dist_is, dist_not, prior, observation, association_name=:o, expectation_name=:μ)
+    expectation_node = DeterministicNode(expectation_name, () -> nothing, (;))
+    pix_ass = pixel_association | (dist_is, dist_not, prior)
+    DeterministicNode(association_name, (expectation) -> pix_ass.(expectation, observation), (; expectation_name => expectation_node))
+end

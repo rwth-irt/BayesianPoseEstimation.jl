@@ -112,20 +112,15 @@ export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
 export RenderContext
 export render
 
-# Models
+# TODO move Models
 export ObservationModel
 export ValidPixel
-
-export PixelAssociation
-export ImageAssociation
 
 export image_association
 export nonzero_pixels
 export pixel_association
 
-export PriorModel
 export PosteriorModel
-export RenderModel
 
 # Samplers
 export ComposedSampler
@@ -139,8 +134,11 @@ export expected_pixel_count
 export pixel_explicit
 export pixel_mixture
 export pixel_tail
+export render_fn
 export valid_pixel_explicit
 export valid_pixel_mixture
+export valid_pixel_normal
+export valid_pixel_tail
 
 # Visualization
 export density_variable
