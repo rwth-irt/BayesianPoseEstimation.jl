@@ -77,7 +77,7 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # o_norm = ModifierNode(o, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
     # TODO which one makes sense?
-    z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o_norm))
+    z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
     posterior = PosteriorModel(z, obs)
