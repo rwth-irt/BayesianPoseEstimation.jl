@@ -18,210 +18,210 @@ b = BroadcastedNode(:b, rng, KernelExponential, [2.0f0, 1.0f0, 0.5f0])
 rand(b)
 c = BroadcastedNode(:c, rng, KernelNormal, (; a=a, b=b))
 
-sample = Sample(rand(c))
+s = Sample(rand(c))
 
-@test variables(sample).a |> size == ()
-@test variables(sample).b |> size == (3,)
-@test variables(sample).c |> size == (3,)
+@test variables(s).a |> size == ()
+@test variables(s).b |> size == (3,)
+@test variables(s).c |> size == (3,)
 
 
 # Propose single variable
 a_normal = BroadcastedNode(:a, rng, KernelNormal, 0, 1.0)
 a_sym_proposal = SymmetricProposal((; a=a_normal), c)
-a_sym_sample = @inferred propose(a_sym_proposal, sample)
+a_sym_sample = @inferred propose(a_sym_proposal, s)
 @test variables(a_sym_sample).a isa Float64
-@test typeof(variables(a_sym_sample).b) == typeof(variables(sample).b)
-@test typeof(variables(a_sym_sample).c) == typeof(variables(sample).c)
-@test variables(a_sym_sample).a != variables(sample).a
-@test variables(a_sym_sample).b == variables(sample).b
-@test variables(a_sym_sample).c == variables(sample).c
+@test typeof(variables(a_sym_sample).b) == typeof(variables(s).b)
+@test typeof(variables(a_sym_sample).c) == typeof(variables(s).c)
+@test variables(a_sym_sample).a != variables(s).a
+@test variables(a_sym_sample).b ≈ variables(s).b
+@test variables(a_sym_sample).c == variables(s).c
 @test variables(a_sym_sample).a |> size == ()
 @test variables(a_sym_sample).b |> size == (3,)
 @test variables(a_sym_sample).c |> size == (3,)
 # Symmetric case: forward equals backward, thus log probability is zero to safe computations
-@inferred transition_probability(a_sym_proposal, a_sym_sample, sample)
-@test transition_probability(a_sym_proposal, a_sym_sample, sample) == 0
+@inferred transition_probability(a_sym_proposal, a_sym_sample, s)
+@test transition_probability(a_sym_proposal, a_sym_sample, s) == 0
 
 # Propose single variable multiple times
-a_sym_sample_2 = @inferred propose(a_sym_proposal, sample, 2)
+a_sym_sample_2 = @inferred propose(a_sym_proposal, s, 2)
 @test variables(a_sym_sample_2).a isa Vector{Float64}
-@test typeof(variables(a_sym_sample_2).b) == typeof(variables(sample).b)
-@test typeof(variables(a_sym_sample_2).c) == typeof(variables(sample).c)
-@test variables(a_sym_sample_2).a != variables(sample).a
-@test variables(a_sym_sample_2).b == variables(sample).b
-@test variables(a_sym_sample_2).c == variables(sample).c
+@test typeof(variables(a_sym_sample_2).b) == typeof(variables(s).b)
+@test typeof(variables(a_sym_sample_2).c) == typeof(variables(s).c)
+@test variables(a_sym_sample_2).a != variables(s).a
+@test variables(a_sym_sample_2).b ≈ variables(s).b
+@test variables(a_sym_sample_2).c == variables(s).c
 @test variables(a_sym_sample_2).a |> size == (2,)
 @test variables(a_sym_sample_2).b |> size == (3,)
 @test variables(a_sym_sample_2).c |> size == (3,)
 # Symmetric case: forward equals backward, thus log probability is zero to safe computations
-@inferred transition_probability(a_sym_proposal, a_sym_sample_2, sample)
-@test transition_probability(a_sym_proposal, a_sym_sample_2, sample) == 0
+@inferred transition_probability(a_sym_proposal, a_sym_sample_2, s)
+@test transition_probability(a_sym_proposal, a_sym_sample_2, s) == 0
 
 # Propose multiple variables
 b_normal = BroadcastedNode(:b, rng, KernelNormal, fill(0.0f0, 3), fill(1.0f0, 3))
 ab_sym_proposal = SymmetricProposal((; a=a_normal, b=b_normal), c)
 # WARN does it matter? https://bkamins.github.io/julialang/2021/01/08/typestable.html
-ab_sym_sample = @inferred propose(ab_sym_proposal, sample)
+ab_sym_sample = @inferred propose(ab_sym_proposal, s)
 @test variables(ab_sym_sample).a |> size == ()
 @test variables(ab_sym_sample).a isa Float64
 @test variables(ab_sym_sample).b isa Vector{Float32}
-@test variables(abc_sym_sample).c isa Vector{Float32}
-@test variables(ab_sym_sample).a != variables(sample).a
-@test variables(ab_sym_sample).b != variables(sample).b
-@test variables(abc_sym_sample).c == variables(sample).c
+@test variables(ab_sym_sample).c isa Vector{Float32}
+@test variables(ab_sym_sample).a != variables(s).a
+@test variables(ab_sym_sample).b != variables(s).b
+@test variables(ab_sym_sample).c == variables(s).c
 @test variables(ab_sym_sample).a |> size == ()
 @test variables(ab_sym_sample).b |> size == (3,)
 @test variables(ab_sym_sample).c |> size == (3,)
 # Symmetric case: forward equals backward, thus log probability is zero to safe computations
-@inferred transition_probability(ab_sym_proposal, ab_sym_sample, sample)
-@test transition_probability(ab_sym_proposal, ab_sym_sample, sample) == 0
+@inferred transition_probability(ab_sym_proposal, ab_sym_sample, s)
+@test transition_probability(ab_sym_proposal, ab_sym_sample, s) == 0
 
 # Propose multiple variables multiple times
-ab_sym_sample_2 = @inferred propose(ab_sym_proposal, sample, 2)
+ab_sym_sample_2 = @inferred propose(ab_sym_proposal, s, 2)
 @test variables(ab_sym_sample_2).a isa Vector{Float64}
 @test variables(ab_sym_sample_2).b isa Matrix{Float32}
 @test variables(ab_sym_sample_2).c isa Vector{Float32}
-@test variables(ab_sym_sample_2).a != variables(sample).a
-@test variables(ab_sym_sample_2).b != variables(sample).b
-@test variables(ab_sym_sample_2).c == variables(sample).c
+@test variables(ab_sym_sample_2).a != variables(s).a
+@test variables(ab_sym_sample_2).b != variables(s).b
+@test variables(ab_sym_sample_2).c == variables(s).c
 @test variables(ab_sym_sample_2).a |> size == (2,)
 @test variables(ab_sym_sample_2).b |> size == (3, 2)
 @test variables(ab_sym_sample_2).c |> size == (3,)
 # Symmetric case: forward equals backward, thus log probability is zero to safe computations
-@inferred transition_probability(ab_sym_proposal, ab_sym_sample_2, sample)
-@test transition_probability(ab_sym_proposal, ab_sym_sample_2, sample) == 0
+@inferred transition_probability(ab_sym_proposal, ab_sym_sample_2, s)
+@test transition_probability(ab_sym_proposal, ab_sym_sample_2, s) == 0
 
 # Independent proposal
 
 # Propose single variable
 a_ind_proposal = IndependentProposal((; a=a), c)
-a_ind_sample = @inferred propose(a_ind_proposal, sample)
+a_ind_sample = @inferred propose(a_ind_proposal, s)
 @test variables(a_ind_sample).a isa Float16
-@test typeof(variables(a_ind_sample).b) == typeof(variables(sample).b)
-@test typeof(variables(a_ind_sample).c) == typeof(variables(sample).c)
-@test variables(a_ind_sample).a != variables(sample).a
-@test variables(a_ind_sample).b ≈ variables(sample).b
-@test variables(a_ind_sample).c ≈ variables(sample).c
+@test typeof(variables(a_ind_sample).b) == typeof(variables(s).b)
+@test typeof(variables(a_ind_sample).c) == typeof(variables(s).c)
+@test variables(a_ind_sample).a != variables(s).a
+@test variables(a_ind_sample).b ≈ variables(s).b
+@test variables(a_ind_sample).c == variables(s).c
 @test variables(a_ind_sample).a |> size == ()
 @test variables(a_ind_sample).b |> size == (3,)
 @test variables(a_ind_sample).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
-@inferred transition_probability(a_ind_proposal, a_ind_sample, sample)
-@test transition_probability(a_ind_proposal, a_ind_sample, sample) == logdensityof(transformed(a()), variables(a_ind_sample).a)
+ℓ = @inferred transition_probability(a_ind_proposal, a_ind_sample, s)
+@test ℓ == logdensityof(transformed(a()), variables(a_ind_sample).a)
 
 # Propose single variable multiple times
-a_ind_sample_2 = @inferred propose(a_ind_proposal, sample, 2)
+a_ind_sample_2 = @inferred propose(a_ind_proposal, s, 2)
 @test variables(a_ind_sample_2).a isa Vector{Float16}
-@test variables(a_ind_sample_2).b isa typeof(variables(sample).b)
-@test variables(a_ind_sample_2).c isa typeof(variables(sample).c)
-@test variables(a_ind_sample_2).a != variables(sample).a
-@test variables(a_ind_sample_2).b ≈ variables(sample).b
-@test variables(a_ind_sample_2).c ≈ variables(sample).c
+@test variables(a_ind_sample_2).b isa typeof(variables(s).b)
+@test variables(a_ind_sample_2).c isa typeof(variables(s).c)
+@test variables(a_ind_sample_2).a != variables(s).a
+@test variables(a_ind_sample_2).b ≈ variables(s).b
+@test variables(a_ind_sample_2).c == variables(s).c
 @test variables(a_ind_sample_2).a |> size == (2,)
 @test variables(a_ind_sample_2).b |> size == (3,)
 @test variables(a_ind_sample_2).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
-@inferred transition_probability(a_ind_proposal, a_ind_sample_2, sample)
-@test transition_probability(a_ind_proposal, a_ind_sample_2, sample) == logdensityof.(transformed(a()), variables(a_ind_sample_2).a)
+@inferred transition_probability(a_ind_proposal, a_ind_sample_2, s)
+@test transition_probability(a_ind_proposal, a_ind_sample_2, s) == logdensityof.(transformed(a()), variables(a_ind_sample_2).a)
 
 # Propose multiple variables
 ab_ind_proposal = IndependentProposal((; a=a, b=b), c)
-ab_ind_sample = @inferred propose(ab_ind_proposal, sample)
+ab_ind_sample = @inferred propose(ab_ind_proposal, s)
 @test variables(ab_ind_sample).a |> size == ()
-@test typeof(variables(ab_ind_sample).a) == typeof(variables(sample).a)
-@test typeof(variables(ab_ind_sample).b) == typeof(variables(sample).b)
-@test typeof(variables(ab_ind_sample).c) == typeof(variables(sample).c)
-@test variables(ab_ind_sample).a != variables(sample).a
-@test variables(ab_ind_sample).b != variables(sample).b
-@test variables(ab_ind_sample).c == variables(sample).c
+@test typeof(variables(ab_ind_sample).a) == typeof(variables(s).a)
+@test typeof(variables(ab_ind_sample).b) == typeof(variables(s).b)
+@test typeof(variables(ab_ind_sample).c) == typeof(variables(s).c)
+@test variables(ab_ind_sample).a != variables(s).a
+@test variables(ab_ind_sample).b != variables(s).b
+@test variables(ab_ind_sample).c == variables(s).c
 @test variables(ab_ind_sample).a |> size == ()
 @test variables(ab_ind_sample).b |> size == (3,)
 @test variables(ab_ind_sample).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
-@inferred transition_probability(ab_ind_proposal, ab_ind_sample, sample)
+@inferred transition_probability(ab_ind_proposal, ab_ind_sample, s)
 abc_ind_model_sample, _ = to_model_domain(ab_ind_sample, bijector(c))
-@test transition_probability(ab_ind_proposal, ab_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(ab_ind_sample).a) .+ logdensityof(transformed(b()), variables(ab_ind_sample).b)
+@test transition_probability(ab_ind_proposal, ab_ind_sample, s) ≈ logdensityof(transformed(a()), variables(ab_ind_sample).a) .+ logdensityof(transformed(b()), variables(ab_ind_sample).b)
 # Propose multiple variables multiple times
 @inferred rand(ab_ind_proposal, 2)
-ab_ind_sample_2 = @inferred propose(ab_ind_proposal, sample, 2)
-@test eltype(variables(ab_ind_sample_2).a) == typeof(variables(sample).a)
-@test eltype(variables(ab_ind_sample_2).b) == eltype(variables(sample).b)
-@test eltype(variables(ab_ind_sample_2).c) == eltype(variables(sample).c)
-@test variables(ab_ind_sample_2).a != variables(sample).a
-@test variables(ab_ind_sample_2).b != variables(sample).b
-@test variables(ab_ind_sample_2).c == variables(sample).c
+ab_ind_sample_2 = @inferred propose(ab_ind_proposal, s, 2)
+@test eltype(variables(ab_ind_sample_2).a) == typeof(variables(s).a)
+@test eltype(variables(ab_ind_sample_2).b) == eltype(variables(s).b)
+@test eltype(variables(ab_ind_sample_2).c) == eltype(variables(s).c)
+@test variables(ab_ind_sample_2).a != variables(s).a
+@test variables(ab_ind_sample_2).b != variables(s).b
+@test variables(ab_ind_sample_2).c == variables(s).c
 @test variables(ab_ind_sample_2).a |> size == (2,)
 @test variables(ab_ind_sample_2).b |> size == (3, 2)
 @test variables(ab_ind_sample_2).c |> size == (3,)
 # Logdensity of independent components is the sum of all the components
-@inferred transition_probability(ab_ind_proposal, ab_ind_sample_2, sample)
-@test transition_probability(ab_ind_proposal, ab_ind_sample, sample) ≈ logdensityof(transformed(a()), variables(ab_ind_sample).a) .+ logdensityof(transformed(b()), variables(ab_ind_sample).b)
+@inferred transition_probability(ab_ind_proposal, ab_ind_sample_2, s)
+@test transition_probability(ab_ind_proposal, ab_ind_sample, s) ≈ logdensityof(transformed(a()), variables(ab_ind_sample).a) .+ logdensityof(transformed(b()), variables(ab_ind_sample).b)
 
 # evaluation of DeterministicNode
 a = BroadcastedNode(:a, rng, KernelExponential, [2.0f0, 1.0f0, 0.5f0])
 fn(x) = 2 * x
 b = DeterministicNode(:b, fn, (; a=a))
 c = BroadcastedNode(:c, rng, KernelExponential, (; b=b))
-sample = rand(c) |> Sample
+s = rand(c) |> Sample
 
 # evaluation should update b
 a_sym = SymmetricProposal(BroadcastedNode(:a, rng, KernelNormal, 0, fill(1.0f0, 3)), c)
-proposed = @inferred propose(a_sym, sample, 2)
-@test variables(proposed).a != variables(sample).a
+proposed = @inferred propose(a_sym, s, 2)
+@test variables(proposed).a != variables(s).a
 @test variables(proposed).a isa Array{Float32,2}
-@test variables(proposed).b != variables(sample).b
+@test variables(proposed).b != variables(s).b
 @test variables(proposed).b isa Array{Float32,2}
-@test variables(proposed).c == variables(sample).c
+@test variables(proposed).c == variables(s).c
 @test variables(proposed).c isa Array{Float32,1}
 
 # evaluation should not update b
 c_sym = SymmetricProposal(BroadcastedNode(:c, rng, KernelNormal, 0, fill(1.0f0, 3)), c)
-proposed = @inferred propose(c_sym, sample, 2)
-@test variables(proposed).a == variables(sample).a
+proposed = @inferred propose(c_sym, s, 2)
+@test variables(proposed).a ≈ variables(s).a
 @test variables(proposed).a isa Array{Float32,1}
-@test variables(proposed).b == variables(sample).b
+@test variables(proposed).b == variables(s).b
 @test variables(proposed).b isa Array{Float32,1}
-@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c != variables(s).c
 @test variables(proposed).c isa Array{Float32,2}
 
 # evaluation should update b
 ac_sym = SymmetricProposal((; a=BroadcastedNode(:a, rng, KernelNormal, 0, 1fill(1.0f0, 3)), c=BroadcastedNode(:c, rng, KernelNormal, 0, fill(1.0f0, 3))), c)
-proposed = @inferred propose(ac_sym, sample, 2)
-@test variables(proposed).a != variables(sample).a
+proposed = @inferred propose(ac_sym, s, 2)
+@test variables(proposed).a != variables(s).a
 @test variables(proposed).a isa Array{Float32,2}
-@test variables(proposed).b != variables(sample).b
+@test variables(proposed).b != variables(s).b
 @test variables(proposed).b isa Array{Float32,2}
-@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c != variables(s).c
 @test variables(proposed).c isa Array{Float32,2}
 
 # evaluation should update b
-a_ind = IndependentProposal(BroadcastedNode(:a, rng, KernelNormal, 0, 1.0f0), c)
-proposed = @inferred propose(a_ind, sample)
-@test variables(proposed).a != variables(sample).a
-@test variables(proposed).a isa Float32
-@test variables(proposed).b != variables(sample).b
+a_ind = IndependentProposal(BroadcastedNode(:a, rng, KernelExponential, 1.0f0), c)
+proposed = @inferred propose(a_ind, s)
+@test variables(proposed).a != variables(s).a
+@test variables(proposed).a isa Vector{Float32}
+@test variables(proposed).b != variables(s).b
 @test variables(proposed).b isa Float32
-@test variables(proposed).c == variables(sample).c
+@test variables(proposed).c == variables(s).c
 @test variables(proposed).c isa Array{Float32,1}
 
 # evaluation should not update b
-c_ind = IndependentProposal(BroadcastedNode(:c, rng, KernelNormal, 0, 1.0f0), c)
-proposed = @inferred propose(c_ind, sample)
-@test variables(proposed).a == variables(sample).a
+c_ind = IndependentProposal(BroadcastedNode(:c, rng, KernelExponential, 1.0f0), c)
+proposed = @inferred propose(c_ind, s)
+@test variables(proposed).a ≈ variables(s).a
 @test variables(proposed).a isa Array{Float32,1}
-@test variables(proposed).b == variables(sample).b
+@test variables(proposed).b == variables(s).b
 @test variables(proposed).b isa Array{Float32,1}
-@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c != variables(s).c
 @test variables(proposed).c isa Float32
 
 # evaluation should update b
-ac_ind = IndependentProposal((; a=BroadcastedNode(:a, rng, KernelNormal, 0, 1.0f0), c=BroadcastedNode(:c, rng, KernelNormal, 0, 1.0f0)), c)
-proposed = @inferred propose(ac_ind, sample)
-@test variables(proposed).a != variables(sample).a
-@test variables(proposed).a isa Float32
-@test variables(proposed).b != variables(sample).b
+ac_ind = IndependentProposal((; a=BroadcastedNode(:a, rng, KernelExponential, 1.0f0), c=BroadcastedNode(:c, rng, KernelExponential, 1.0f0)), c)
+proposed = @inferred propose(ac_ind, s)
+@test variables(proposed).a != variables(s).a
+@test variables(proposed).a isa Vector{Float32}
+@test variables(proposed).b != variables(s).b
 @test variables(proposed).b isa Float32
-@test variables(proposed).c != variables(sample).c
+@test variables(proposed).c != variables(s).c
 @test variables(proposed).c isa Float32
 
 # TODO move to sampler tests # Gibbs
