@@ -64,6 +64,9 @@ DensityInterface.logdensityof(graph::SequentializedGraph{names}, nt::NamedTuple)
     end)
 # still don't get why reduce(.+, map...) is type stable but mapreduce(.+,...) not
 
+# Support for empty models (e.g. no prior)
+DensityInterface.logdensityof(graph::SequentializedGraph{()}, nt::NamedTuple) = 0
+
 """
     bijector(node)
 Infer the bijectors of the sequentialized graph.
