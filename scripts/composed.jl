@@ -129,10 +129,10 @@ end
 
 obs = fake_observation(parameters, render_context, 0.4)
 
-parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-# TODO
-parameters = @set parameters.pixel_σ = 0.1
-parameters = @set parameters.normalization_constant = 25
+parameters = @set parameters
+# NOTE optimal parameter values seem to be inversely correlated
+parameters = @set parameters.pixel_σ = 0.01
+parameters = @set parameters.normalization_constant = 15
 model_chain = run_inference(parameters, render_context, obs; thinning=2);
 plot_pose_chain(model_chain)
 
