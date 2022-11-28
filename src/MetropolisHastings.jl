@@ -30,7 +30,7 @@ function AbstractMCMC.step(::AbstractRNG, model::PosteriorModel, sampler::Metrop
     # rand on PosteriorModel samples from prior in unconstrained domain
     prior_sample = rand(model)
     # initial evaluation of the posterior logdensity
-    ℓ_sample = Sample(variables(prior_sample), Float64(logdensityof(model, prior_sample)))
+    ℓ_sample = Sample(variables(prior_sample), logdensityof(model, prior_sample))
     # sample, state are the same for MH
     ℓ_sample, ℓ_sample
 end
@@ -40,13 +40,8 @@ end
 Implementing the AbstractMCMC interface for steps given a state from the last step.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
-    # If previous was Gibbs, it has an infinite probability to be accepted -> calulate the actual logdensity
-    if isinf(logprob(state))
-        state = Sample(variables(state), Float64(logdensityof(model, state)))
-    end
-    # propose new sample after calculating the logdensity of the previous one since the render buffer is overwritten
     proposed = propose(sampler.proposal, state)
-    sample = Sample(variables(proposed), Float64(logdensityof(model, proposed)))
+    sample = Sample(variables(proposed), logdensityof(model, proposed))
     # acceptance ratio
     α = (logprob(sample) -
          logprob(state) +
