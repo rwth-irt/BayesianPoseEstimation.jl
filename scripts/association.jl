@@ -92,7 +92,7 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    # TODO the regular pixel_σ leads to almost no association prob
+    # NOTE the regular pixel_σ leads to almost no association prob
     dist_is = valid_pixel_normal | (10 * parameters.pixel_σ)
     dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
     o_image = image_association(dist_is, dist_not, parameters.prior_o, obs.z, :o, :μ)
@@ -113,11 +113,10 @@ end
 obs = fake_observation(parameters, render_context, 0.4)
 # plot_depth_img(Array(obs.z))
 model_chain = run_inference(parameters, render_context, obs; thinning=2);
-# TODO looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
+# NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain)
 
-# TODO this does not look too bad
+# NOTE This does not look too bad. The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_prob_img(mean_image(model_chain, :o) |> Array)
 plot_prob_img(model_chain[end-100].variables.o |> Array)
-# The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_logprob(model_chain, 200)
