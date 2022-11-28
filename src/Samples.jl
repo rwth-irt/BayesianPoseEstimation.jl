@@ -12,10 +12,12 @@ using Bijectors
 Consists of the state `variables` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
 Samples are typed by `T,V` as the internal named tuple for the variable names types.
 """
-struct Sample{T,V}
-    variables::NamedTuple{T,V}
+struct Sample{T<:NamedTuple}
+    variables::T
     logp::Float64
 end
+# Explicit conversion
+Sample(variables::NamedTuple, logp) = Sample(variables, Float64(logp))
 
 """
     Sample(variables)
@@ -30,13 +32,13 @@ Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logprob(s
     names(sample)
 Returns a tuple of the variable names.
 """
-names(::Sample{T}) where {T} = T
+names(::Sample{<:NamedTuple{T}}) where {T} = T
 
 """
     types(sample)
 Returns a tuple of the variable types.
 """
-types(::Sample{<:Any,V}) where {V} = V
+types(::Sample{<:NamedTuple{<:Any,T}}) where {T} = T
 
 """
     variables(sample)
@@ -50,7 +52,7 @@ Transforms the sample to the model domain by using the inverse transform of the 
 The logjac correction is calculated in the same kernel.
 Returns (variables, logabsdetjac)
 """
-function to_model_domain(s::Sample{T}, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}}) where {T}
+function to_model_domain(s::Sample, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}})
     with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(inverse(b), v), bijectors, variables(s))
     tr_vars = map(first, with_logjac)
     model_sample = @set s.variables = merge(s.variables, tr_vars)
