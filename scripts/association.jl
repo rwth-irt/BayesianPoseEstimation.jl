@@ -51,12 +51,6 @@ function plot_pose_chain(model_chain, step=200)
     )
 end
 
-function plot_o_chain(model_chain, step=200)
-    plt_o_chain = plot_variable(model_chain, :o, step; label="o", xlabel="Iteration [÷ $(step)]", ylabel="Zugehörigkeit", legend=false)
-    plt_o_dens = density_variable(model_chain, :o; label="o", xlabel="Zugehörigkeit [0,1]", ylabel="Wahrscheinlichkeit", legend=false)
-    plot(plt_o_chain, plt_o_dens)
-end
-
 function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # Device
     if parameters.device === :CUDA
@@ -70,25 +64,18 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
-    # TODO takes longer to converge than Dirac and does not work well if actual occlusion is present. Occlusion should lead to low o which leads to low confidence in the data
-    o = BroadcastedNode(:o, dev_rng, Dirac, parameters.prior_o)
-    # TODO o = BroadcastedNode(:o, dev_rng, KernelUniform, parameters.precision)
+    o_0 = array_for_rng(dev_rng, parameters.precision, parameters.width, parameters.height)
+    o_0 .= 0
+    o = BroadcastedNode(:o, dev_rng, KernelUniform, o_0, 1)
 
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
     # Depth image model
-    # Explicitly handles invalid μ → no normalization
-    # TODO Using the actual number of pixels makes the model overconfident due to the seemingly large amount of data compared to the prior. Make this adaptive or formalize it?
-    # norm_const = expected_pixel_count(rng, prior_model, render_context, scene, parameters)
-    # TODO ValidPixel is required for occlusions? Combined with pixel_explicit even better?
     pixel_model = valid_pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
-    # TODO normalized_posterior seems way better but is a bit slower
-    # TODO Occlusions: Diverges to the occluding object for z_norm
-    # TODO ValidPixel Diverges to max_depth without normalization
     posterior = PosteriorModel(z_norm, obs)
 
     # Assemble samplers
@@ -105,24 +92,17 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    o_ind = IndependentProposal(o, z)
-    o_ind_mh = MetropolisHastings(o_ind)
+    # TODO the regular pixel_σ leads to almost no association prob
+    dist_is = valid_pixel_normal | (10 * parameters.pixel_σ)
+    dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
+    o_image = image_association(dist_is, dist_not, parameters.prior_o, obs.z, :o, :μ)
+    o_gibbs = Gibbs(o_image, z)
 
-    o_sym = SymmetricProposal(BroadcastedNode(:o, dev_rng, KernelNormal, 0, parameters.proposal_σ_o), z)
-    o_sym_mh = MetropolisHastings(o_sym)
-
-    # ComposedSamplers
-    # TODO sampling scalar o is relatively cheap but struggles when occluded
-    ind_mh = ComposedSampler(t_ind_mh, r_ind_mh, o_ind_mh)
-    # TODO works better than combination? Maybe because we do not sample the poles like with RotXYZ
-    sym_mh = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
-
-    # ind_sym = ComposedSampler(Weights([0.1, 0.1, 0.1, 0.1, 1.0, 0.1]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
-    # TODO Sampling mostly r_sym_mh seems to converge faster?
-    ind_sym = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    # ComposedSampler
+    ind_sym_gibbs = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0, 0.1]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh, o_gibbs)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    chain = sample(rng, posterior, ind_sym, 10_000; discard_initial=0_000, thinning=1, kwargs...)
+    chain = sample(rng, posterior, ind_sym_gibbs, 10_000; discard_initial=0_000, thinning=1, kwargs...)
 
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(z))
@@ -130,21 +110,14 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     end
 end
 
-obs = fake_observation(parameters, render_context, 0.6)
-# 
+obs = fake_observation(parameters, render_context, 0.4)
+# plot_depth_img(Array(obs.z))
 model_chain = run_inference(parameters, render_context, obs; thinning=2);
+# TODO looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain)
 
+# TODO this does not look too bad
+plot_prob_img(mean_image(model_chain, :o) |> Array)
+plot_prob_img(model_chain[end-100].variables.o |> Array)
+# The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_logprob(model_chain, 200)
-# TODO I would have expected it to converge around 0.8
-plot_o_chain(model_chain, 200)
-
-# gr()
-# anim = @animate for i ∈ 0:2:360
-#     scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:outertop)
-# end
-# gif(anim, "anim_fps15.gif", fps=20)
-
-plot(
-    plot_depth_img(obs.z |> Array),
-    plot_depth_img(model_chain[end].variables.μ |> Array))

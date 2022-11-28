@@ -66,6 +66,12 @@ function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
     KernelBinaryMixture(exponential, uniform, one(T), one(T))
 end
 
+valid_pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, μ))
+
+pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
+valid_pixel_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
+
+
 """
     pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
 Mixture distribution for a depth pixel which explicitly handles invalid μ.
@@ -86,3 +92,12 @@ function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) w
 end
 
 valid_pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
+
+"""
+    render_fn(render_context, scene, object_id, t, r)
+Function can be conditioned on the render_context, scene & object_id to be used in a model node to render different poses for t & r.
+"""
+function render_fn(render_context, scene, object_id, t, r)
+    p = to_pose(t, r)
+    render(render_context, scene, object_id, p)
+end

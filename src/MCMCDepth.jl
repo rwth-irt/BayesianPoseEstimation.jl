@@ -30,7 +30,7 @@ include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
 include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
-# TODO include("Gibbs.jl")
+include("Gibbs.jl")
 include("Visualization.jl")
 # Plumbing together the depth image based pose estimator
 include("Parameters.jl")
@@ -92,7 +92,6 @@ export RngModel
 
 # Proposals
 export IndependentProposal
-export Proposal
 export SymmetricProposal
 
 export propose
@@ -133,6 +132,7 @@ export ImageLikelihoodNormalizer
 export expected_pixel_count
 export pixel_explicit
 export pixel_mixture
+export pixel_normal
 export pixel_tail
 export render_fn
 export valid_pixel_explicit

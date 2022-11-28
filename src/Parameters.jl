@@ -81,7 +81,7 @@ Base.@kwdef struct Parameters
     # Image Model
     normalize_img = true
     n_normalization_samples = 20_000
-    normalization_constant = 10
+    normalization_constant = 25
 
     # Pose Model
     mean_t = [0.0, 0.0, 2.0]

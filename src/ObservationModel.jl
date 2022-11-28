@@ -99,10 +99,11 @@ end
 
 function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
     # TODO Does the insupport dist(dist, x) help or not?
-    if iszero(dist.μ)
+    if !insupport(dist, dist.μ)
         # If the expected value is invalid, it does not provide any information
         zero(T)
     else
+        # clamp to avoid NaNs
         logdensityof(dist.model, clamp(x, minimum(dist), maximum(dist)))
     end
 end
@@ -118,7 +119,7 @@ function Base.rand(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
 end
 
 # Depth pixels can have any positive value not like radar
-Base.maximum(::ValidPixel{T}) where {T} = typemax(T)
+Base.maximum(dist::ValidPixel{T}) where {T} = maximum(dist.model)
 # Negative measurements do not make any sense, all others might, depending on the underlying model.
 Base.minimum(dist::ValidPixel{T}) where {T} = max(zero(T), minimum(dist.model))
 # logpdf explicitly handles outliers, so no transformation is desired
