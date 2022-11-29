@@ -21,14 +21,17 @@ struct PosteriorModel{B<:NamedTuple,D<:NamedTuple,P<:SequentializedGraph,L<:Sequ
 end
 
 function PosteriorModel(node::AbstractNode, data::NamedTuple{data_names}) where {data_names}
+    sequentialized = sequentialize(node)
     # Only sample variables which are not conditioned on data
-    prior_model = Base.structdiff(prior(node), data)
+    prior_model = Base.structdiff(sequentialized, data)
     # Eagerly evaluate any lazily broadcasted bijectors
     bijectors = prior_model |> bijector |> map_materialize
     # Data conditioned nodes form the likelihood and are not transformed for sampling
-    likelihood_model = sequentialize(node)[data_names]
+    likelihood_model = sequentialized[data_names]
     PosteriorModel(bijectors, data, prior_model, likelihood_model)
 end
+
+Bijectors.bijector(posterior::PosteriorModel) = posterior.bijectors
 
 """
     rand(rng, posterior, dims...)

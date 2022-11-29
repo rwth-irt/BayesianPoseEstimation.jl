@@ -23,11 +23,13 @@ parameters = @set parameters.device = :CUDA
 render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 
 function fake_observation(parameters::Parameters, render_context::RenderContext, occlusion::Real)
-    # nominal scene
+    # Nominal scene
     obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj", "meshes/cube.obj"]
     obs_scene = Scene(obs_params, render_context)
-    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
-    obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
+    # Background
+    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0, 0, 3)
+    obs_scene = @set obs_scene.meshes[2].scale = Scale(3, 3, 1)
+    # Occlusion
     obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion, 0, 1.6)
     obs_scene = @set obs_scene.meshes[3].scale = Scale(0.7, 0.7, 0.7)
     obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
@@ -68,19 +70,15 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
-    # Depth image model
-    pixel_model = valid_pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+    # NOTE valid_pixel diverges without normalization
+    pixel_model = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 
-    # TODO Do I need to normalize this likelihood, too? How to pass μ to it? wrapper function?
-    # normalizable_uniform(μ) = KernelUniform(Float32)
-    # o = BroadcastedNode(:o, dev_rng, normalizable_uniform, (; μ=μ))
-    # o_norm = ModifierNode(o, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
-
-    # TODO which one makes sense?
+    # NOTE normalization does not seem to be required or is even worse
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
-    z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
     posterior = PosteriorModel(z, obs)
+    # TODO More formal way?
+    posterior = @set posterior.bijectors.o = ZeroIdentity()
 
     # Assemble samplers
     # t & r change expected depth, o not
@@ -96,13 +94,20 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    dist_is = valid_pixel_normal | parameters.pixel_σ
-    dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
+    # NOTE the σ of the association must be larger than the one for the pose estimation
+    dist_is = pixel_normal | parameters.association_σ
+    dist_not = pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
+    # TODO any nicer workaround to make these variables local?
+    # mind, maxd = parameters.min_depth, parameters.max_depth
+    # dist_not = (μ) -> ValidPixel(μ, KernelUniform(mind, maxd))
+    # pixel_θ = parameters.pixel_θ
+    # dist_not = (μ) -> ValidPixel(μ, KernelExponential(pixel_θ))
     o_image = image_association(dist_is, dist_not, parameters.prior_o, obs.z, :o, :μ)
     o_gibbs = Gibbs(o_image, z)
 
     # ComposedSampler
-    ind_sym_gibbs = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh, o_gibbs)
+    # TODO Gibbs after every step?
+    ind_sym_gibbs = ComposedSampler(Weights([0.1, 0.0, 0.1, 1.0, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh, o_gibbs)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
     chain = sample(rng, posterior, ind_sym_gibbs, 10_000; discard_initial=0_000, thinning=1, kwargs...)
@@ -116,13 +121,14 @@ end
 obs = fake_observation(parameters, render_context, 0.4)
 # plot_depth_img(Array(obs.z))
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-model_chain = run_inference(parameters, render_context, obs; thinning=2);
+parameters = @set parameters.pixel_σ = 0.01
+model_chain = run_inference(parameters, render_context, obs; thinning=3);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain)
 
 # NOTE This does not look too bad. The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_prob_img(mean_image(model_chain, :o) |> Array)
-plot_prob_img(model_chain[end-100].variables.o |> Array)
+plot_prob_img(model_chain[end-11].variables.o |> Array)
 
 # TODO why so low? Shouldn't logdensityof(KernelUniform(), x) return 0? Logabsdetjac?
 plot_logprob(model_chain, 200)
