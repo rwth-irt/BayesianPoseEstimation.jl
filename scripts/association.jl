@@ -97,20 +97,17 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # NOTE the σ of the association must be larger than the one for the pose estimation
     dist_is = pixel_normal | parameters.association_σ
     dist_not = pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
-    # TODO any nicer workaround to make these variables local?
-    # mind, maxd = parameters.min_depth, parameters.max_depth
-    # dist_not = (μ) -> ValidPixel(μ, KernelUniform(mind, maxd))
-    # pixel_θ = parameters.pixel_θ
-    # dist_not = (μ) -> ValidPixel(μ, KernelExponential(pixel_θ))
     o_image = image_association(dist_is, dist_not, parameters.prior_o, obs.z, :o, :μ)
+    # TODO use mean instead of most recent one?
     o_gibbs = Gibbs(o_image, z)
 
     # ComposedSampler
     # TODO Gibbs after every step?
-    ind_sym_gibbs = ComposedSampler(Weights([0.1, 0.0, 0.1, 1.0, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh, o_gibbs)
+    # NOTE Independent should have low weights because almost no samples will be accepted
+    composed_sampler = ComposedSampler(Weights([0.01, 0.01, 0.1, 1.0, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh, o_gibbs)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    chain = sample(rng, posterior, ind_sym_gibbs, 10_000; discard_initial=0_000, thinning=1, kwargs...)
+    chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
 
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(z))
@@ -121,14 +118,13 @@ end
 obs = fake_observation(parameters, render_context, 0.4)
 # plot_depth_img(Array(obs.z))
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-parameters = @set parameters.pixel_σ = 0.01
-model_chain = run_inference(parameters, render_context, obs; thinning=3);
+model_chain = run_inference(parameters, render_context, obs; discard_initial=0_000, thinning=4);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain)
 
 # NOTE This does not look too bad. The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_prob_img(mean_image(model_chain, :o) |> Array)
-plot_prob_img(model_chain[end-11].variables.o |> Array)
+plot_prob_img(model_chain[end].variables.o |> Array)
 
 # TODO why so low? Shouldn't logdensityof(KernelUniform(), x) return 0? Logabsdetjac?
 plot_logprob(model_chain, 200)

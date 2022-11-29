@@ -23,11 +23,13 @@ parameters = @set parameters.device = :CUDA
 render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 
 function fake_observation(parameters::Parameters, render_context::RenderContext, occlusion::Real)
-    # nominal scene
+    # Nominal scene
     obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj", "meshes/cube.obj"]
     obs_scene = Scene(obs_params, render_context)
-    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0.1, 0, 3)
-    obs_scene = @set obs_scene.meshes[2].scale = Scale(1.8, 1.5, 1)
+    # Background
+    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0, 0, 3)
+    obs_scene = @set obs_scene.meshes[2].scale = Scale(3, 3, 1)
+    # Occlusion
     obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion, 0, 1.6)
     obs_scene = @set obs_scene.meshes[3].scale = Scale(0.7, 0.7, 0.7)
     obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
@@ -110,16 +112,13 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
 
     # ComposedSamplers
     # NOTE sampling scalar o is relatively cheap but struggles when occluded
-    ind_mh = ComposedSampler(t_ind_mh, r_ind_mh, o_ind_mh)
-    # NOTE works better than combination? Maybe because we do not sample the poles like with RotXYZ
-    sym_mh = ComposedSampler(t_sym_mh, r_sym_mh, o_sym_mh)
-
-    # ind_sym = ComposedSampler(Weights([0.1, 0.1, 0.1, 0.1, 1.0, 0.1]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
+    # NOTE Symmetric works better than combination? Maybe because we do not sample the poles like with RotXYZ
     # NOTE Sampling mostly r_sym_mh seems to converge faster?
-    ind_sym = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    # NOTE Most uncertainty in r so use most of the compute for it
+    composed_sampler = ComposedSampler(Weights([0.01, 0.01, 0.0, 0.1, 1.0, 0.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    chain = sample(rng, posterior, ind_sym, 10_000; discard_initial=0_000, thinning=1, kwargs...)
+    chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
 
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(z))
@@ -129,10 +128,8 @@ end
 
 obs = fake_observation(parameters, render_context, 0.4)
 
-parameters = @set parameters
-# NOTE optimal parameter values seem to be inversely correlated
-parameters = @set parameters.pixel_σ = 0.01
-parameters = @set parameters.normalization_constant = 15
+parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
+# NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated
 model_chain = run_inference(parameters, render_context, obs; thinning=2);
 plot_pose_chain(model_chain)
 
