@@ -4,6 +4,7 @@
 
 using AbstractMCMC
 using DensityInterface
+using Random
 
 """
     Gibbs

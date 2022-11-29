@@ -58,7 +58,7 @@ function plot_o_chain(model_chain, step=200)
     plot(plt_o_chain, plt_o_dens)
 end
 
-function run_inference(parameters::Parameters, render_context, obs; kwargs...)
+function run_inference(parameters::Parameters, render_context, observation; kwargs...)
     # Device
     if parameters.device === :CUDA
         CUDA.allowscalar(false)
@@ -88,7 +88,7 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
     # NOTE normalized_posterior seems way better but is a bit slower. Occlusions: Diverges to the occluding object for z_norm. ValidPixel Diverges to max_depth without normalization
-    posterior = PosteriorModel(z_norm, obs)
+    posterior = PosteriorModel(z_norm, observation)
 
     # Assemble samplers
     # t & r change expected depth, o not
@@ -115,7 +115,7 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # NOTE Symmetric works better than combination? Maybe because we do not sample the poles like with RotXYZ
     # NOTE Sampling mostly r_sym_mh seems to converge faster?
     # NOTE Most uncertainty in r so use most of the compute for it
-    composed_sampler = ComposedSampler(Weights([0.01, 0.01, 0.0, 0.1, 1.0, 0.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
+    composed_sampler = ComposedSampler(Weights([0.1, 0.01, 0.0, 0.1, 1.0, 0.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
     chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
@@ -139,7 +139,7 @@ plot_o_chain(model_chain, 200)
 
 # gr()
 # anim = @animate for i ∈ 0:2:360
-#     scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:outertop)
+#     scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 # end
 # gif(anim, "anim_fps15.gif", fps=20)
 # pyplot()

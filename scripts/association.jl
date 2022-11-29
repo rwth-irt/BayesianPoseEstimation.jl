@@ -52,7 +52,7 @@ function plot_pose_chain(model_chain, step=200)
     )
 end
 
-function run_inference(parameters::Parameters, render_context, obs; kwargs...)
+function run_inference(parameters::Parameters, render_context, observation; kwargs...)
     # Device
     if parameters.device === :CUDA
         CUDA.allowscalar(false)
@@ -65,20 +65,24 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     # Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
-    o = BroadcastedNode(:o, dev_rng, KernelUniform, zero(array_for_rng(dev_rng, parameters.precision, parameters.width, parameters.height)), 1)
 
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
+    # NOTE the σ of the association must be larger than the one for the pose estimation
+    dist_is = valid_pixel_normal | parameters.association_σ
+    dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
+    association_fn = pixel_association | (dist_is, dist_not, parameters.prior_o)
+    o = DeterministicNode(:o, (expectation) -> association_fn.(expectation, observation.z), (; μ=μ))
+
     # NOTE valid_pixel diverges without normalization
-    pixel_model = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+    pixel_model = valid_pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 
     # NOTE normalization does not seem to be required or is even worse
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
+    z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 
-    posterior = PosteriorModel(z, obs)
-    # TODO More formal way?
-    posterior = @set posterior.bijectors.o = ZeroIdentity()
+    posterior = PosteriorModel(z_norm, observation)
 
     # Assemble samplers
     # t & r change expected depth, o not
@@ -94,17 +98,9 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    # NOTE the σ of the association must be larger than the one for the pose estimation
-    dist_is = pixel_normal | parameters.association_σ
-    dist_not = pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
-    o_image = image_association(dist_is, dist_not, parameters.prior_o, obs.z, :o, :μ)
-    # TODO use mean instead of most recent one?
-    o_gibbs = Gibbs(o_image, z)
-
     # ComposedSampler
-    # TODO Gibbs after every step?
     # NOTE Independent should have low weights because almost no samples will be accepted
-    composed_sampler = ComposedSampler(Weights([0.01, 0.01, 0.1, 1.0, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh, o_gibbs)
+    composed_sampler = ComposedSampler(Weights([0.1, 0.01, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
     chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
@@ -115,16 +111,21 @@ function run_inference(parameters::Parameters, render_context, obs; kwargs...)
     end
 end
 
-obs = fake_observation(parameters, render_context, 0.4)
+observation = fake_observation(parameters, render_context, 0.4)
 # plot_depth_img(Array(obs.z))
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-model_chain = run_inference(parameters, render_context, obs; discard_initial=0_000, thinning=4);
+model_chain = run_inference(parameters, render_context, observation; discard_initial=0_000, thinning=2);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain)
+plot_logprob(model_chain, 200)
 
 # NOTE This does not look too bad. The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_prob_img(mean_image(model_chain, :o) |> Array)
 plot_prob_img(model_chain[end].variables.o |> Array)
 
-# TODO why so low? Shouldn't logdensityof(KernelUniform(), x) return 0? Logabsdetjac?
-plot_logprob(model_chain, 200)
+gr()
+anim = @animate for i ∈ 0:2:360
+    scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+end
+gif(anim, "anim_fps15.gif", fps=20)
+pyplot()
