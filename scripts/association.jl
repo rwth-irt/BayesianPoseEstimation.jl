@@ -69,6 +69,7 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
+    # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z) 
     # NOTE the σ of the association must be larger than the one for the pose estimation
     dist_is = valid_pixel_normal | parameters.association_σ
     dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
@@ -100,6 +101,7 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
 
     # ComposedSampler
     # NOTE Independent should have low weights because almost no samples will be accepted
+    # NOTE These parameters seem to be quite important for convergence, especially r_ind_mh ≪ r_sym_mh
     composed_sampler = ComposedSampler(Weights([0.1, 0.01, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
