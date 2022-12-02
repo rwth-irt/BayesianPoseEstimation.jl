@@ -16,12 +16,6 @@ end
 Base.show(io::IO, ::MetropolisHastings) = print(io, "MetropolisHastings")
 
 """
-    proposal(mh)
-Get the proposal model of the Sampler.
-"""
-nodes(mh::MetropolisHastings) = mh.proposal
-
-"""
     step(rng, model, sampler)
 Implementing the AbstractMCMC interface for the initial step.
 Proposes one sample from the prior of the sampler.
@@ -45,8 +39,8 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Met
     # acceptance ratio
     α = (logprob(sample) -
          logprob(state) +
-         transition_probability(nodes(sampler), state, sample) -
-         transition_probability(nodes(sampler), sample, state))
+         transition_probability(sampler.proposal, state, sample) -
+         transition_probability(sampler.proposal, sample, state))
     if log(rand(rng)) > α
         # reject
         return state, state
