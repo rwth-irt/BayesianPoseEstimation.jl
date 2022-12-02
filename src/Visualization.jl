@@ -95,14 +95,14 @@ function scatter_position(M::AbstractMatrix; c_grad=:viridis, kwargs...)
     mz = [1:length(M[1, :])+1...]
     s = size(M)
     s = size(mz)
-    scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), label="Sample Number", markersize=3, xlabel="x", ylabel="y", zlabel="z", kwargs...)
+    scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), markersize=3, xlabel="x", ylabel="y", zlabel="z", kwargs...)
 end
 
 """
     scatter_position(chains, [step]; c_grad, kwargs...)
 Creates a 3D scatter plot of the chain for the given variable.
 """
-scatter_position(chains::AbstractVector, step=1; c_grad=:viridis, kwargs...) = scatter_position(Base.convert(Matrix, chains, :t, step); c_grad=c_grad, kwargs...)
+scatter_position(chains::AbstractVector, step=1; c_grad=:viridis, kwargs...) = scatter_position(Base.convert(Matrix, chains, :t, step); c_grad=c_grad, label="sample number [÷$(step)]", kwargs...)
 
 """
     density_variable(chains, var_name, [step]; kwargs...)
