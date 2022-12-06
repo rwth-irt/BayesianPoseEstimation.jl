@@ -18,7 +18,6 @@ include("BayesNet/SimpleNode.jl")
 # Model primitives
 include("Samples.jl")
 include("FunctionManipulation.jl")
-include("ModelInterface.jl")
 include("Proposals.jl")
 include("PosteriorModel.jl")
 # Extensions
@@ -83,12 +82,6 @@ export KernelUniform
 export ProductBroadcastedDistribution
 export BroadcastedDistribution
 export DiscreteBroadcastedDistribution
-
-# ModelInterface
-export ComposedModel
-export ConditionedModel
-export IndependentModel
-export RngModel
 
 # Proposals
 export additive_proposal
