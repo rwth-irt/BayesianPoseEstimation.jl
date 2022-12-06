@@ -110,8 +110,5 @@ is_identity(bijectors::Union{Bijector,AbstractArray{<:Bijector}}...) = mapreduce
 
 
 # Wrapper
-
 is_identity(dist::Distribution) = is_identity(bijector(dist))
-is_identity(model::IndependentModel) = is_identity(bijector.(values(models(model)))...)
-is_identity(model::ComposedModel) = is_identity(models(model))
-is_identity(rng_model::RngModel) = is_identity(model(rng_model))
+

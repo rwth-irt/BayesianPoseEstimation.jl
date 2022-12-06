@@ -6,6 +6,73 @@ using Random
 using SciGL
 
 """
+# ObservationModel
+Model to compare rendered and observed depth images.
+
+# Pixel Distribution
+Each pixel is assumed to be independent and the measurement can be described by a distribution `pixel_dist(μ, o)`.
+`μ` is the expected depth and `o` is the object association probability.
+Therefore, the image logdensity for the measurement `z` is calculated by summing the pixel logdensities.
+Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
+
+# Normalization
+If a normalization_constant is provided, `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
+This effectively changes the number of data points evaluated in the sum of the image loglikelihood for different views.
+Thus, the algorithm might prefer (incorrect) poses further or closer to the object, which depends if the pixel loglikelihood is positive or negative.
+
+To remove the sensitivity to the number of valid expected pixels, the images is normalized by diving the sum of the pixel loglikelihood by the number of valid pixels.
+The `normalization_constant` is multiplied afterwards, a reasonable constant is the expected number of visible pixels for the views from the prior.
+
+# Alternatives to Normalization
+* proper preprocessing by cropping or segmenting the image
+* a pixel_dist which handles the tail distribution by providing a reasonable likelihood for invalid expected values
+"""
+
+"""
+    ValidPixel
+Takes care of missing values in the expected depth `μ == 0` by setting the logdensity to zero, effectively ignoring these pixels in the sum.
+Consequently, the sum of the image likelihood must be normalized by dividing through the number of valid pixels, since the likelihood is very sensitive to the number of evaluated data points.
+"""
+struct ValidPixel{T<:Real,D} <: AbstractKernelDistribution{T,Continuous}
+    # Should not cause memory overhead if used in lazily broadcasted context
+    μ::T
+    # Do not constrain M<:AbstractKernelDistribution{T} because it might be transformed / truncated
+    model::D
+end
+
+function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
+    # TODO Does the insupport dist(dist, x) help or not?
+    if !insupport(dist, dist.μ)
+        # If the expected value is invalid, it does not provide any information
+        zero(T)
+    else
+        # clamp to avoid NaNs
+        logdensityof(dist.model, clamp(x, minimum(dist), maximum(dist)))
+    end
+end
+
+function Base.rand(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
+    if !insupport(dist, dist.μ)
+        zero(T)
+    else
+        depth = rand(rng, dist.model)
+        # maximum is inf
+        clamp(depth, minimum(dist), maximum(dist))
+    end
+end
+
+# Depth pixels can have any positive value not like radar
+Base.maximum(dist::ValidPixel{T}) where {T} = maximum(dist.model)
+# Negative measurements do not make any sense, all others might, depending on the underlying model.
+Base.minimum(dist::ValidPixel{T}) where {T} = max(zero(T), minimum(dist.model))
+# logpdf explicitly handles outliers, so no transformation is desired
+Bijectors.bijector(dist::ValidPixel) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
+Distributions
+# Depth pixels can have any positive value, zero and negative are invalid
+Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
+
+
+"""
     ImageLikelihoodNormalizer
 Use it in a modifier node to normalize the loglikelihood of the image to make it independent from the number of visible pixels in μ. 
 """
@@ -38,6 +105,12 @@ function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::Ren
     end
     mean(n_pixel)
 end
+
+"""
+    nonzero_pixels(images, dims)
+Calculates the number of nonzero pixels for each image with the given dims.
+"""
+nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
 
 """
     pixel_mixture(min_depth, max_depth, θ, σ, μ, o)

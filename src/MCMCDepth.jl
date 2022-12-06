@@ -35,7 +35,6 @@ include("MultipleTry.jl")
 include("Visualization.jl")
 include("Parameters.jl")
 include("RenderContext.jl")
-include("ObservationModel.jl")
 include("AssociationModel.jl")
 include("Models.jl")
 
@@ -107,14 +106,7 @@ export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
 export RenderContext
 export render
 
-# TODO move Models
-export ObservationModel
-export ValidPixel
-
-export image_association
-export nonzero_pixels
-export pixel_association
-
+# PosteriorModel
 export PosteriorModel
 
 # Samplers
@@ -124,8 +116,12 @@ export MetropolisHastings
 
 # Models
 export ImageLikelihoodNormalizer
+export ValidPixel
 
 export expected_pixel_count
+export image_association
+export nonzero_pixels
+export pixel_association
 export pixel_explicit
 export pixel_mixture
 export pixel_normal
