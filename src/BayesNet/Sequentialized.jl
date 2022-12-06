@@ -22,6 +22,7 @@ sequentialize(node::AbstractNode) =
     traverse(node, (;)) do node, _
         node
     end
+sequentialize(graph::SequentializedGraph) = graph
 
 """
     rand(graph, [variables, dims...])

@@ -76,6 +76,12 @@ end
 logprob(sample::Sample) = sample.logp
 
 """
+    getindex(sample, idx)
+Returns a sample with only a subset of the variables.
+"""
+Base.getindex(sample::Sample, ::Val{T}) where {T} = Sample(sample.variables[T], -Inf)
+
+"""
     merge(a, b)
 Left-to-Right merges the samples.
 This means the the rightmost variables are kept.
