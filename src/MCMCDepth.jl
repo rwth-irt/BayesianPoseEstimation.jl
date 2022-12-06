@@ -92,8 +92,11 @@ export IndependentModel
 export RngModel
 
 # Proposals
-export IndependentProposal
-export SymmetricProposal
+export additive_proposal
+export independent_proposal
+export quaternion_additive
+export quaternion_symmetric
+export symmetric_proposal
 
 export propose
 export transition_probability

@@ -31,29 +31,28 @@ end
 # Probabilistic model: domain [0,∞) for bijector test
 target = Gamma(3.0, 1.0)
 model = SimpleNode(:z, rng, Gamma, 3.0, 1.0)
-@run posterior = PosteriorModel(model, (;))
+posterior = PosteriorModel(model, (;))
 
 # Requires adjustment of prior
-sym_proposal = SymmetricProposal(SimpleNode(:z, rng, Normal, 0, 0.1), model)
+sym_proposal = symmetric_proposal(SimpleNode(:z, rng, Normal, 0, 0.1), model)
 sym_mh = MetropolisHastings(sym_proposal)
 sym_chain = sample(rng, posterior, sym_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), sym_chain, bijector(posterior), target)
 
 # Requires adjustment of prior
-# TODO bijector should be the one of the proposal, remove manual constructor and imlement in Poropsals.jl
-ind_proposal = IndependentProposal(SimpleNode(:z, rng, Normal), model)
+ind_proposal = independent_proposal(SimpleNode(:z, rng, Normal), model)
 ind_mh = MetropolisHastings(ind_proposal)
 ind_chain = sample(rng, posterior, ind_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), ind_chain, bijector(posterior), target)
 
 # Requires adjustment of prior & proposal
-ind_proposal = IndependentProposal(SimpleNode(:z, rng, Uniform), model)
+ind_proposal = independent_proposal(SimpleNode(:z, rng, Uniform), model)
 ind_mh = MetropolisHastings(ind_proposal)
 ind_chain = sample(rng, posterior, ind_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), ind_chain, bijector(posterior), target)
 
 # Requires adjustment of prior & proposal
-ind_proposal = IndependentProposal(SimpleNode(:z, rng, Exponential), model)
+ind_proposal = independent_proposal(SimpleNode(:z, rng, Exponential), model)
 ind_mh = MetropolisHastings(ind_proposal)
 ind_chain = sample(rng, posterior, ind_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), ind_chain, bijector(posterior), target)

@@ -83,31 +83,23 @@ Base.rand(rng::AbstractRNG, dist::QuaternionPerturbation{T}) where {T} = approx_
 # Bijectors
 Bijectors.bijector(::QuaternionPerturbation) = ZeroIdentity()
 
-"""
-    QuaternionProposal
-SymmtericPropsal for quaternions: Uses broadcasted (Hamiltonian) product `.*` operator instead of sum `+` and normalizes the result.
-"""
-struct QuaternionProposal{T,U}
-    model::T
-    evaluation::U
-
-    function QuaternionProposal(proposal_model::T, posterior_model) where {T}
-        evaluation_model = evaluation_nodes(proposal_model, posterior_model)
-        new{T,typeof(evaluation_model)}(proposal_model, evaluation_model)
-    end
+# Proposals
+function propose_quaternion_perturbation(proposal::Proposal, previous_sample, dims...)
+    # Propose in unconstrained domain, perturbation is the quaternion product
+    proposed = map_merge((a, b) -> robust_normalize.(a .* b), previous_sample, rand(proposal.model, dims...))
+    # Evaluate in model domain
+    model_sample, _ = to_model_domain(proposed, proposal.posterior_bijectors)
+    evaluated = evaluate(proposal.evaluation, variables(model_sample))
+    # Sampling in unconstrained domain
+    to_unconstrained_domain(Sample(evaluated), proposal.posterior_bijectors)
 end
 
-"""
-    propose(rng, proposal::QuaternionProposal, sample, dims...)
-Inspired by EKFs for IMUs, the perturbation is assumed to be defined in the local frame.
-Together with the Hamiltonian convention, the perturbation is a right side multiplication.
-"""
-function propose(proposal::QuaternionProposal, sample::Sample, dims...)
-    # proposal step
-    proposed = map_merge((a, b) -> robust_normalize.(a .* b), sample, rand(proposal.model, dims...))
-    # determinstic evaluation step
-    Sample(evaluate(proposal.evaluation, variables(proposed)))
+# difference is the inverse quaternion product
+function transition_probability_quaternion_perturbation(proposal::Proposal{names}, new_sample, previous_sample) where {names}
+    diff_sample = map_merge((a, b) -> robust_normalize.(a ./ b), new_sample[Val(names)], previous_sample)
+    logdensityof(proposal.model, variables(diff_sample))
 end
 
-# symmetric proposal
-transition_probability(proposal::QuaternionProposal, new_sample::Sample, ::Sample) = 0
+quaternion_additive(proposal_model, posterior_model) = Proposal(proposal_model, posterior_model, propose_quaternion_perturbation, transition_probability_quaternion_perturbation)
+
+quaternion_symmetric(proposal_model, posterior_model) = Proposal(proposal_model, posterior_model, propose_quaternion_perturbation, transition_probability_symmetric)

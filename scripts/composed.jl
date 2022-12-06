@@ -38,6 +38,8 @@ function fake_observation(parameters::Parameters, render_context::RenderContext,
     (; z=rand(device_rng(parameters), BroadcastedDistribution(pixel_model, (), obs_μ, 0.8f0)))
 end
 
+observation = fake_observation(parameters, render_context, 0.4)
+
 function plot_pose_chain(model_chain, step=200)
     plt_t_chain = plot_variable(model_chain, :t, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Position [m]", legend=false)
     plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=false, left_margin=5mm)
@@ -92,22 +94,22 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
 
     # Assemble samplers
     # t & r change expected depth, o not
-    t_ind = IndependentProposal(t, z)
+    t_ind = independent_proposal(t, z)
     t_ind_mh = MetropolisHastings(t_ind)
 
-    t_sym = SymmetricProposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
+    t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
     t_sym_mh = MetropolisHastings(t_sym)
 
-    r_ind = IndependentProposal(r, z)
+    r_ind = independent_proposal(r, z)
     r_ind_mh = MetropolisHastings(r_ind)
 
-    r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
+    r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    o_ind = IndependentProposal(o, z)
+    o_ind = independent_proposal(o, z)
     o_ind_mh = MetropolisHastings(o_ind)
 
-    o_sym = SymmetricProposal(BroadcastedNode(:o, dev_rng, KernelNormal, 0, parameters.proposal_σ_o), z)
+    o_sym = symmetric_proposal(BroadcastedNode(:o, dev_rng, KernelNormal, 0, parameters.proposal_σ_o), z)
     o_sym_mh = MetropolisHastings(o_sym)
 
     # ComposedSamplers
@@ -115,22 +117,20 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     # NOTE Symmetric works better than combination? Maybe because we do not sample the poles like with RotXYZ
     # NOTE Sampling mostly r_sym_mh seems to converge faster?
     # NOTE Most uncertainty in r so use most of the compute for it
-    composed_sampler = ComposedSampler(Weights([0.1, 0.01, 0.0, 0.1, 1.0, 0.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
+    composed_sampler = ComposedSampler(Weights([0.1, 0.1, 0.0, 0.1, 1.0, 0.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
     chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
-
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(z))
         s
     end
 end
 
-obs = fake_observation(parameters, render_context, 0.4)
-
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-# NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated
-model_chain = run_inference(parameters, render_context, obs; thinning=2);
+# NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
+parameters = @set parameters.normalization_constant = 15
+model_chain = run_inference(parameters, render_context, observation; thinning=2);
 plot_pose_chain(model_chain)
 
 plot_logprob(model_chain, 200)

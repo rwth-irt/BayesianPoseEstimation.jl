@@ -95,18 +95,36 @@ L = @inferred logdensityof(pert, Q)
 ϕ = rand(KernelNormal(0, 0.01f0), 3)
 @test isapprox(qrotation(ϕ), MCMCDepth.approx_qrotation(ϕ...))
 
-# QuaternionProposal
+# Additive Quaternion proposal
 a = BroadcastedNode(:a, rng, QuaternionDistribution, Float32)
 b = DeterministicNode(:b, x -> 2 * x, (; a=a))
 c = DeterministicNode(:c, x -> x, (; b=b))
-rand(b)
-prop = QuaternionProposal(BroadcastedNode(:a, rng, QuaternionPerturbation, 0.01), c)
+prop = quaternion_additive(BroadcastedNode(:a, rng, QuaternionPerturbation, 0.01), c)
+s1 = Sample(rand(b), MCMCDepth.quat_logp)
+s2 = @inferred propose(prop, s1)
+@test variables(s2).a != variables(s1).a
+@test variables(s2).b == 2 * variables(s2).a
+ℓ = @inferred transition_probability(prop, s1, s2)
+@test ℓ != 0
+@test ℓ == transition_probability(prop, s2, s1)
+
+# multiple
+S2 = @inferred propose(prop, s1, 2, 2)
+@test variables(S2).a isa Matrix{QuaternionF64}
+@test variables(S2).b == 2 * variables(S2).a
+L = @inferred transition_probability(prop, s1, S2)
+@test L != 0
+@test L == transition_probability(prop, S2, s1)
+
+# Symmetric Quaternion proposal
+prop = quaternion_symmetric(BroadcastedNode(:a, rng, QuaternionPerturbation, 0.01), c)
 s1 = Sample(rand(b), MCMCDepth.quat_logp)
 s2 = @inferred propose(prop, s1)
 @test variables(s2).a != variables(s1).a
 @test variables(s2).b == 2 * variables(s2).a
 ℓ = @inferred transition_probability(prop, s1, s2)
 @test ℓ == 0
+@test ℓ == transition_probability(prop, s2, s1)
 
 # multiple
 S2 = @inferred propose(prop, s1, 2, 2)
@@ -114,6 +132,7 @@ S2 = @inferred propose(prop, s1, 2, 2)
 @test variables(S2).b == 2 * variables(S2).a
 L = @inferred transition_probability(prop, s1, S2)
 @test L == 0
+@test L == transition_probability(prop, S2, s1)
 
 # Bijector
 dist = QuaternionDistribution(Float32)

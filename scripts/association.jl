@@ -69,7 +69,7 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
-    # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z) 
+    # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
     # NOTE the σ of the association must be larger than the one for the pose estimation
     dist_is = valid_pixel_normal | parameters.association_σ
     dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
@@ -87,22 +87,22 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
 
     # Assemble samplers
     # t & r change expected depth, o not
-    t_ind = IndependentProposal(t, z)
+    t_ind = independent_proposal(t, z)
     t_ind_mh = MetropolisHastings(t_ind)
 
-    t_sym = SymmetricProposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
+    t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
     t_sym_mh = MetropolisHastings(t_sym)
 
-    r_ind = IndependentProposal(r, z)
+    r_ind = independent_proposal(r, z)
     r_ind_mh = MetropolisHastings(r_ind)
 
-    r_sym = QuaternionProposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
+    r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
     # ComposedSampler
     # NOTE Independent should have low weights because almost no samples will be accepted
     # NOTE These parameters seem to be quite important for convergence, especially r_ind_mh ≪ r_sym_mh
-    composed_sampler = ComposedSampler(Weights([0.1, 0.01, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    composed_sampler = ComposedSampler(Weights([0.1, 1.0, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
     chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
@@ -115,6 +115,8 @@ end
 
 observation = fake_observation(parameters, render_context, 0.4)
 # plot_depth_img(Array(obs.z))
+# NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
+parameters = @set parameters.normalization_constant = 15
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 model_chain = run_inference(parameters, render_context, observation; discard_initial=0_000, thinning=2);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
