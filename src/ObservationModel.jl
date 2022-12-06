@@ -6,6 +6,7 @@ using Base.Broadcast: broadcasted
 using Base: Callable
 using SciGL
 
+# TODO keep doc somewhere
 """
     ObservationModel(pixel_dist, normalization_constant)
 Model to compare rendered and observed depth images.
@@ -28,6 +29,7 @@ The `normalization_constant` is multiplied afterwards, a reasonable constant is 
 * proper preprocessing by cropping or segmenting the image
 * a pixel_dist which handles the tail distribution by providing a reasonable likelihood for invalid expected values
 """
+# TODO remove
 struct ObservationModel{normalized,P<:ManipulatedFunction,T}
     pixel_dist::P
     normalization_constant::T
@@ -123,7 +125,7 @@ Base.maximum(dist::ValidPixel{T}) where {T} = maximum(dist.model)
 # Negative measurements do not make any sense, all others might, depending on the underlying model.
 Base.minimum(dist::ValidPixel{T}) where {T} = max(zero(T), minimum(dist.model))
 # logpdf explicitly handles outliers, so no transformation is desired
-Bijectors.bijector(::ValidPixel) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
+Bijectors.bijector(dist::ValidPixel) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
 Distributions
 # Depth pixels can have any positive value, zero and negative are invalid
 Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
