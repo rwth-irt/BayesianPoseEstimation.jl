@@ -86,6 +86,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Ind
     # Select proposed and evaluated variables
     selected_vars = select_variables_dim(variables(proposed), sampler.proposal, selected_index)
     selected = Sample(selected_vars, ℓ_model[selected_index])
+
     # From previous step, IndependentProposal so prev_sample can be anything
     state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)
     proposed_weights[selected_index] = state_weight

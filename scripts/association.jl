@@ -38,6 +38,8 @@ function fake_observation(parameters::Parameters, render_context::RenderContext,
     (; z=rand(device_rng(parameters), BroadcastedDistribution(pixel_model, (), obs_μ, 0.8f0)))
 end
 
+observation = fake_observation(parameters, render_context, 0.4)
+
 function plot_pose_chain(model_chain, step=200)
     plt_t_chain = plot_variable(model_chain, :t, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Position [m]", legend=false)
     plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=false, left_margin=5mm)
@@ -52,7 +54,7 @@ function plot_pose_chain(model_chain, step=200)
     )
 end
 
-function run_inference(parameters::Parameters, render_context, observation; kwargs...)
+function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_tries=250; kwargs...)
     # Device
     if parameters.device === :CUDA
         CUDA.allowscalar(false)
@@ -89,23 +91,32 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     # t & r change expected depth, o not
     t_ind = independent_proposal(t, z)
     t_ind_mh = MetropolisHastings(t_ind)
+    t_ind_mtm = MultipleTry(t_ind, n_tries)
 
     t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
     t_sym_mh = MetropolisHastings(t_sym)
 
+    t_add = additive_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
+    t_add_mtm = MultipleTry(t_add, n_tries)
+
     r_ind = independent_proposal(r, z)
     r_ind_mh = MetropolisHastings(r_ind)
+    r_ind_mtm = MultipleTry(r_ind, n_tries)
 
     r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
+    r_add = quaternion_additive(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
+    r_add_mtm = MultipleTry(r_add, n_tries)
+
     # ComposedSampler
     # NOTE Independent should have low weights because almost no samples will be accepted
     # NOTE These parameters seem to be quite important for convergence, especially r_ind_mh ≪ r_sym_mh
-    composed_sampler = ComposedSampler(Weights([0.1, 1.0, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    composed_sampler = ComposedSampler(Weights([0.1, 0.1, 1.0, 1.0]), t_ind_mtm, r_ind_mtm, t_add_mtm, r_add_mtm)
+    # composed_sampler = ComposedSampler(Weights([0.1, 1.0, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
+    chain = sample(rng, posterior, composed_sampler, n_steps; discard_initial=0_000, thinning=1, kwargs...)
 
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(z))
@@ -113,15 +124,14 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     end
 end
 
-observation = fake_observation(parameters, render_context, 0.4)
 # plot_depth_img(Array(obs.z))
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-parameters = @set parameters.normalization_constant = 15
+parameters = @set parameters.normalization_constant = 10
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-model_chain = run_inference(parameters, render_context, observation; discard_initial=0_000, thinning=2);
+model_chain = run_inference(parameters, render_context, observation, 500, 100; thinning=1);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
-plot_pose_chain(model_chain)
-plot_logprob(model_chain, 200)
+plot_pose_chain(model_chain, length(model_chain) ÷ 50)
+plot_logprob(model_chain, length(model_chain) ÷ 50)
 
 # NOTE This does not look too bad. The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_prob_img(mean_image(model_chain, :o) |> Array)

@@ -110,7 +110,6 @@ For the general case of additive proposals, where the forward and backward trans
 """
 transition_probability_additive(proposal::Proposal{names}, new_sample, previous_sample) where {names} = logdensityof(proposal.model, variables(new_sample[Val(names)] - previous_sample))
 
-
 """
     transition_probability_independent(proposal, new_sample, prev_sample)
 For independent proposals, the transition probability does not depend on the previous sample.

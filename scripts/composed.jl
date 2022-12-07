@@ -137,7 +137,7 @@ end
 
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-parameters = @set parameters.normalization_constant = 15
+parameters = @set parameters.normalization_constant = 10
 model_chain = run_inference(parameters, render_context, observation, 1_000, 50; thinning=1);
 plot_pose_chain(model_chain, length(model_chain) ÷ 50)
 
