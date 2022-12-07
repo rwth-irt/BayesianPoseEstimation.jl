@@ -60,7 +60,7 @@ function plot_o_chain(model_chain, step=200)
     plot(plt_o_chain, plt_o_dens)
 end
 
-function run_inference(parameters::Parameters, render_context, observation; kwargs...)
+function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_tries=250; kwargs...)
     # Device
     if parameters.device === :CUDA
         CUDA.allowscalar(false)
@@ -96,15 +96,23 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     # t & r change expected depth, o not
     t_ind = independent_proposal(t, z)
     t_ind_mh = MetropolisHastings(t_ind)
+    t_ind_mtm = MultipleTry(t_ind, n_tries)
 
     t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
     t_sym_mh = MetropolisHastings(t_sym)
 
+    t_add = additive_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
+    t_add_mtm = MultipleTry(t_add, n_tries)
+
     r_ind = independent_proposal(r, z)
     r_ind_mh = MetropolisHastings(r_ind)
+    r_ind_mtm = MultipleTry(r_ind, n_tries)
 
     r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
+
+    r_add = quaternion_additive(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
+    r_add_mtm = MultipleTry(r_add, n_tries)
 
     o_ind = independent_proposal(o, z)
     o_ind_mh = MetropolisHastings(o_ind)
@@ -117,10 +125,10 @@ function run_inference(parameters::Parameters, render_context, observation; kwar
     # NOTE Symmetric works better than combination? Maybe because we do not sample the poles like with RotXYZ
     # NOTE Sampling mostly r_sym_mh seems to converge faster?
     # NOTE Most uncertainty in r so use most of the compute for it
-    composed_sampler = ComposedSampler(Weights([0.1, 0.1, 0.0, 0.1, 1.0, 0.0]), t_ind_mh, r_ind_mh, o_ind_mh, t_sym_mh, r_sym_mh, o_sym_mh)
+    composed_sampler = ComposedSampler(Weights([0.1, 0.1, 0.0, 1.0, 1.0, 0.0]), t_ind_mtm, r_ind_mtm, o_ind_mh, t_add_mtm, r_add_mtm, o_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    chain = sample(rng, posterior, composed_sampler, 10_000; discard_initial=0_000, thinning=1, kwargs...)
+    chain = sample(rng, posterior, composed_sampler, n_steps; discard_initial=0_000, thinning=1, kwargs...)
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(z))
         s
@@ -130,12 +138,12 @@ end
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
 parameters = @set parameters.normalization_constant = 15
-model_chain = run_inference(parameters, render_context, observation; thinning=2);
-plot_pose_chain(model_chain)
+model_chain = run_inference(parameters, render_context, observation, 1_000, 50; thinning=1);
+plot_pose_chain(model_chain, length(model_chain) ÷ 50)
 
-plot_logprob(model_chain, 200)
+plot_logprob(model_chain, length(model_chain) ÷ 50)
 # NOTE I would have expected it to converge around 0.8
-plot_o_chain(model_chain, 200)
+plot_o_chain(model_chain, length(model_chain) ÷ 50)
 
 # gr()
 # anim = @animate for i ∈ 0:2:360

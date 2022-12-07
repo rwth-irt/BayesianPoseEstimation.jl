@@ -113,6 +113,7 @@ export PosteriorModel
 export ComposedSampler
 export Gibbs
 export MetropolisHastings
+export MultipleTry
 
 # Models
 export ImageLikelihoodNormalizer

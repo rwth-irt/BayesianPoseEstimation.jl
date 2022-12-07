@@ -66,7 +66,7 @@ Base.@kwdef struct Parameters
     # Camera
     width = 100
     height = 100
-    depth = 500
+    depth = 1_000
     f_x = 120
     f_y = 120
     c_x = 50

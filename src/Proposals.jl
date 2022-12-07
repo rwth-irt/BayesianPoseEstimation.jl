@@ -18,7 +18,7 @@ function evaluation_nodes(proposal::SequentializedGraph, posterior::AbstractNode
 end
 evaluation_nodes(proposal_model::AbstractNode, posterior_model::AbstractNode) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
 
-struct Proposal{names,F,G,M<:SequentializedGraph{names},E,B<:NamedTuple{names},C}
+struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B<:NamedTuple{names},C}
     propose_fn::F
     transition_probability_fn::G
     model::M
@@ -28,6 +28,12 @@ struct Proposal{names,F,G,M<:SequentializedGraph{names},E,B<:NamedTuple{names},C
 end
 
 Proposal(proposal_model, posterior_model, propose_fn, transition_probability_fn) = Proposal(propose_fn, transition_probability_fn, sequentialize(proposal_model), evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(proposal_model)), map_materialize(bijector(posterior_model)))
+
+"""
+    updated_variables(proposal)
+Returns a Val{(names...,)} with all updated variables including the proposed and evaluated ones.
+"""
+updated_variables(::Proposal{names,<:Any,<:Any,<:Any,<:SequentializedGraph{evaluated}}) where {names,evaluated} = Val((names..., evaluated...))
 
 # Convenience constructors
 

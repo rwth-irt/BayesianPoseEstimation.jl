@@ -2,16 +2,13 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO logdensity interface idea: Simply add tiles to parameters
-# logdensity(model, samples, tiles)
-
 using AbstractMCMC
 using LogExpFunctions
 using Random
 
 """
     MultipleTry
-TODO dispatch based on proposal type
+# TODO
 """
 struct MultipleTry{Q} <: AbstractMCMC.AbstractSampler
     # TODO In this case the symmetric simplification does not hold anymore, use AdditiveProposal
@@ -19,6 +16,11 @@ struct MultipleTry{Q} <: AbstractMCMC.AbstractSampler
     n_tries::Int64
 end
 
+"""
+    IndependentMultipleTry
+# TODO
+"""
+const IndependentMultipleTry = MultipleTry{<:Proposal{<:Any,typeof(propose_independent)}}
 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry)
     # rand on PosteriorModel samples from prior in unconstrained domain
@@ -42,7 +44,8 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     proposed_weights = ℓ_model .- ℓ_transition
 
     selected_index = gumbel_index(rng, proposed_weights)
-    selected_vars = select_variables_dim(proposed, variables(n_proposal), selected_index)
+    # Select proposed and evaluated variables
+    selected_vars = select_variables_dim(variables(proposed), sampler.proposal, selected_index)
     selected = Sample(selected_vars, ℓ_model[selected_index])
 
     # Propose the N-1 auxiliary variables samples
@@ -67,8 +70,9 @@ end
 """
     step(rng, model, sampler, state)
 Simplification for independent proposals: I-MTM
+TODO
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry{<:IndependentProposal}, state::Sample)
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, state::Sample)
     # Propose one sample via a kind of importance sampling
     proposed = propose(sampler.proposal, state, sampler.n_tries)
     ℓ_model = logdensityof(model, proposed)
@@ -79,7 +83,8 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
 
     # Replace a sample according to its weight with the previous sample
     selected_index = gumbel_index(rng, proposed_weights)
-    selected_vars = select_variables_dim(proposed, variables(n_proposal), selected_index)
+    # Select proposed and evaluated variables
+    selected_vars = select_variables_dim(variables(proposed), sampler.proposal, selected_index)
     selected = Sample(selected_vars, ℓ_model[selected_index])
     # From previous step, IndependentProposal so prev_sample can be anything
     state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)
@@ -105,15 +110,19 @@ The Gumbel-max trick is used to stay in the log domain and avoid numerical unsta
 """
 gumbel_index(rng, log_weights) = argmax(log_weights .+ rand(rng, Gumbel(), size(log_weights)))
 
+select_variables_dim(variables::NamedTuple, proposal::Proposal, index) = select_variables_dim(variables, updated_variables(proposal), index)
+
 """
-    select_variables_dim(variables, proposal, index)
+    select_variables_dim(variables, graph_nodes, index)
 For `variables` which contain multiple vectorized proposals.
-Selects the `index` of the last dim only for `variables` from the `proposal`.
+Selects the `index` of the last dim only for `variables` in the graph.
 """
-function select_variables_dim(variables, proposal, index)
-    # TODO interface functions for proposal model & evaluation
-    var_names = proposal_varnames(proposal.model, proposal.evaluation)
-    selected_vars = map(x -> selectdim(x, ndims(x), index), variables[var_names])
+function select_variables_dim(variables::NamedTuple, ::Val{names}, index) where {names}
+    selected_vars = map(x -> select_var_dim(x, index), variables[names])
     # return sample where the proposed variables are replaced
+    # TODO not only the proposed but also the evaluated ones
     merge(variables, selected_vars)
 end
+
+select_var_dim(x::AbstractVector, index) = x[index]
+select_var_dim(x::AbstractArray, index) = selectdim(x, ndims(x), index)
