@@ -50,10 +50,11 @@ nt = @inferred rand(seq_graph, 3)
 # Type stable evaluate deterministic nodes
 fn(x, ::Any) = x
 c = DeterministicNode(:c, fn, (; a=a, b=b))
-d = BroadcastedNode(:d, rng, KernelNormal, (; c=c, b=b))
+# Test propagation of child nodes
+d = DeterministicNode(:d, fn, (; c=c, b=b))
 seq_graph = sequentialize(d)
 nt = @inferred evaluate(seq_graph, (; a=1, b=2.0f0, c=3.0f0, d=4.0f0, e=0.0f0))
-@test nt == (; a=1, b=2.0f0, c=1.0f0, d=4.0f0, e=0.0f0)
+@test nt == (; a=1, b=2.0f0, c=1, d=1, e=0.0f0)
 
 # WARN non-simplified implementations are not type stable
 @benchmark rand(d)

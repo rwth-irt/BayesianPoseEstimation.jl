@@ -48,11 +48,15 @@ end
 Type stable version to only the deterministic nodes in the `graph` given the random `variables`.
 All required random variables are assumed to be available.
 """
-function evaluate(graph::SequentializedGraph, variables::NamedTuple)
-    nt = map(graph) do node
-        evaluate_barrier(node, variables)
+evaluate(graph::SequentializedGraph, variables::NamedTuple) = evaluate_unroll(values(graph), variables)
+
+# unroll required for type stability
+@unroll function evaluate_unroll(graph, variables)
+    @unroll for node in graph
+            value = evaluate_barrier(node, variables)
+            variables = merge_value(variables, node, value)
     end
-    merge(variables, nt)
+    variables
 end
 
 """
