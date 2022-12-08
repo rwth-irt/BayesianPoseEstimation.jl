@@ -12,12 +12,10 @@ using Bijectors
 Consists of the state `variables` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
 Samples are typed by `T,V` as the internal named tuple for the variable names types.
 """
-struct Sample{T<:NamedTuple}
+struct Sample{T<:NamedTuple,L}
     variables::T
-    logp::Float64
+    logp::L
 end
-# Explicit conversion
-Sample(variables::NamedTuple, logp) = Sample(variables, Float64(logp))
 
 """
     Sample(variables)
