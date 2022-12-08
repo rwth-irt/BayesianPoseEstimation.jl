@@ -93,8 +93,9 @@ function with_logabsdet_jacobian_array(b, x)
     y, sum_and_dropdims(logjacs, b.dims)
 end
 
-# Scalar case result in a tuple for with_logjac instead of an array of tples
+# Scalar case results in a tuple for with_logjac instead of an array of tuples
 Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector{0}, x) = with_logabsdet_jacobian.(b.bijectors, x)
+Bijectors.with_logabsdet_jacobian(b::BroadcastedBijector{0}, x::AbstractArray{<:Any,0}) = with_logabsdet_jacobian.(b.bijectors, x)
 
 
 """
