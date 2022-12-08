@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using AbstractMCMC
+using EllipsisNotation
 using LogExpFunctions
 using Random
 
@@ -119,11 +120,8 @@ For `variables` which contain multiple vectorized proposals.
 Selects the `index` of the last dim only for `variables` in the graph.
 """
 function select_variables_dim(variables::NamedTuple, ::Val{names}, index) where {names}
-    selected_vars = map(x -> select_var_dim(x, index), variables[names])
+    # Select index of last dim using EllipsisNotation.jl
+    selected_vars = map(x -> @view(x[.., index]), variables[names])
     # return sample where the proposed variables are replaced
-    # TODO not only the proposed but also the evaluated ones
     merge(variables, selected_vars)
 end
-
-select_var_dim(x::AbstractVector, index) = x[index]
-select_var_dim(x::AbstractArray, index) = selectdim(x, ndims(x), index)

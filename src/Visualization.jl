@@ -4,7 +4,6 @@
 
 using ColorSchemes
 using CoordinateTransformations: SphericalFromCartesian
-using Images
 using IterTools: partition
 using Plots
 using Plots.PlotMeasures
