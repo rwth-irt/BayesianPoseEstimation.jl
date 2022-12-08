@@ -37,7 +37,17 @@ function vectorized_mh(rng::AbstractRNG, proposal::Proposal, proposed::Sample, p
     reject = log.(rand(rng, N)) .> α
 end
 
-accept_reject_vectorized!(reject::AbstractVector{Bool}, proposed::AbstractArray{T,N}, previous::AbstractArray{T,N}) where {T,N} = @views proposed[.., reject] = previous[.., reject]
+# TODO reject vector must be transferred to device where appropiate
+function accept_reject_vectorized!(reject::AbstractVector{Bool}, proposed::AbstractArray{T,N}, previous::AbstractArray{T,N}) where {T,N}
+    @views proposed[.., reject] = previous[.., reject]
+    proposed
+end
+
+accept_reject_vectorized!(reject::Vector{Bool}, proposed::CuArray{T,N}, previous::CuArray{T,N}) where {T,N} = accept_reject_vectorized!(CuArray(reject), proposed, previous)
+
+# Scalar case
+accept_reject_vectorized!(reject::Bool, proposed, previous) = reject ? previous : proposed
+
 
 # TODO test if @views works for inline function
 
@@ -47,3 +57,9 @@ prev_sample
 cpy = copy(new_sample)
 accept_reject_vectorized!(reject, cpy, prev_sample)
 cpy == merged_sample
+
+
+# TEST scalar
+α = log(0.5) .- log(0.1) .+ log(0.2) .- log(0.5)
+reject = log.(rand()) .> α
+accept_reject_vectorized!(false, [1, 2, 3], [4, 5, 6]) == [1, 2, 3]
