@@ -71,7 +71,6 @@ end
 """
     step(rng, model, sampler, state)
 Simplification for independent proposals: I-MTM
-TODO
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, state::Sample)
     # Propose one sample via a kind of importance sampling
