@@ -27,6 +27,8 @@ include("KernelDistributions.jl")
 include("BroadcastedDistribution.jl")
 include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
+include("Tempering.jl")
+
 include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
 include("Gibbs.jl")
@@ -108,6 +110,13 @@ export render
 
 # PosteriorModel
 export PosteriorModel
+
+# Tempering
+export ConstantSchedule
+export ExponentialSchedule
+export LinearSchedule
+
+export increment_temperature
 
 # Samplers
 export ComposedSampler
