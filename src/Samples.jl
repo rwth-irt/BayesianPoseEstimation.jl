@@ -27,6 +27,13 @@ Sample(variables::NamedTuple) = Sample(variables, -Inf)
 Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logprob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
+    set_logp(sample, logp)
+Immutable update the log probability of the sample.
+The original is untouched and a new sample returned. 
+"""
+set_logp(sample::Sample, logp) = @set sample.logp = logp
+
+"""
     names(sample)
 Returns a tuple of the variable names.
 """

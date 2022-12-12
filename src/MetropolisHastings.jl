@@ -22,11 +22,11 @@ Proposes one sample from the prior of the sampler.
 """
 function AbstractMCMC.step(::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings)
     # rand on PosteriorModel samples from prior in unconstrained domain
-    prior_sample = rand(model)
+    s = rand(model)
     # initial evaluation of the posterior logdensity
-    ℓ_sample = Sample(variables(prior_sample), logdensityof(model, prior_sample))
+    s = set_logp(s, logdensityof(model, s))
     # sample, state are the same for MH
-    ℓ_sample, ℓ_sample
+    s, s
 end
 
 """
@@ -35,8 +35,8 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
     proposed = propose(sampler.proposal, state)
-    proposed_with_ℓ = Sample(variables(proposed), logdensityof(model, proposed))
-    result = mh_kernel!(rng, sampler.proposal, proposed_with_ℓ, state)
+    proposed = set_logp(proposed, logdensityof(model, proposed))
+    result = mh_kernel!(rng, sampler.proposal, proposed, state)
     # sample, state
     result, result
 end

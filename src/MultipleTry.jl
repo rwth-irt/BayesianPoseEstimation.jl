@@ -25,11 +25,11 @@ const IndependentMultipleTry = MultipleTry{<:Proposal{<:Any,typeof(propose_indep
 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry)
     # rand on PosteriorModel samples from prior in unconstrained domain
-    prior_sample = rand(model)
+    s = rand(model)
     # initial evaluation of the posterior logdensity
-    ℓ_sample = Sample(variables(prior_sample), logdensityof(model, prior_sample))
-    # sample, state are the same for MH
-    ℓ_sample, ℓ_sample
+    s = set_logp(s, logdensityof(model, s))
+    # sample, state are the same for MTM
+    s, s
 end
 
 """
