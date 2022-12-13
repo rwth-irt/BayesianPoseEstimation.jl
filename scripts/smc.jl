@@ -84,39 +84,37 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # Assemble samplers
     # TODO thinning
     # temp_schedule = ConstantSchedule()
-    temp_schedule = ExponentialSchedule(n_steps, 0.9999)
-    # temp_schedule = LinearSchedule(n_steps)
+    # temp_schedule = ExponentialSchedule(n_steps, 0.9999)
+    temp_schedule = LinearSchedule(n_steps)
 
-    t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
-    t_smc_fp = ForwardProposalKernel(t_sym)
-    t_smc_mh = MhKernel(t_sym, rng)
+    ind_proposal = independent_proposal((; t=t, r=r), z)
+    ind_smc_fp = ForwardProposalKernel(ind_proposal)
     # TODO parameter for ESS
-    t_smc = SequentialMonteCarlo(t_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
-    # t_smc = SequentialMonteCarlo(t_smc_mh, temp_schedule, n_particles, log(0.5 * n_particles))
+    ind_smc = SequentialMonteCarlo(ind_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
 
-    r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
-    r_smc_fp = ForwardProposalKernel(r_sym)
-    r_smc_mh = MhKernel(r_sym, rng)
-    r_smc = SequentialMonteCarlo(r_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
-    # r_smc = SequentialMonteCarlo(r_smc_mh, temp_schedule, n_particles, log(0.5 * n_particles))
+    t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t)
+    r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat)
+    sym_proposal = symmetric_proposal((; t=t_sym, r=r_sym), z)
+    sym_smc_fp = ForwardProposalKernel(sym_proposal)
+    # TODO parameter for ESS
+    sym_smc = SequentialMonteCarlo(sym_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
 
-    # ComposedSampler
-    # TODO resampling step destroys the distribution of the other variable
-    composed_sampler = ComposedSampler(Weights([1.0, 1.0]), t_smc, r_smc)
-    # composed_sampler = ComposedSampler(Weights([0.1, 1.0, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    # TODO ComposedSampler for individual components will not result in a proper distribution since other components might get resampled away
+    # TODO ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
+    composed = ComposedSampler(Weights([0.1, 1.0]), ind_smc, sym_smc)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    sample(rng, posterior, composed_sampler, n_steps; discard_initial=0_000, thinning=1, kwargs...)
+    sample(rng, posterior, sym_smc, n_steps; discard_initial=0_000, thinning=1, kwargs...)
 end
 
 # plot_depth_img(Array(obs.z))
 # NOTE SMC: tempering is essential? Use higher normalization_constant since it will be tempered
-parameters = @set parameters.normalization_constant = 20
+parameters = @set parameters.normalization_constant = 30
 parameters = @set parameters.proposal_σ_r_quat = 0.2
-parameters = @set parameters.proposal_σ_t = [0.02, 0.02, 0.02]
+parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01]
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 # TODO out of memory, Do not use AbstractMCMC?
-chain = run_inference(parameters, render_context, observation, 200, 100; thinning=1);
+chain = run_inference(parameters, render_context, observation, 200, 200; thinning=1);
 plot([s.log_evidence for s in chain])
 final = last(chain).sample;
 density(transpose(final.variables.t); fill=true, fillalpha=0.4, trim=true)
