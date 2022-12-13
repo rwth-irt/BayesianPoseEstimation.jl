@@ -33,6 +33,8 @@ include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
 include("Gibbs.jl")
 include("MultipleTry.jl")
+include("SequentialMonteCarlo.jl")
+
 # Plumbing together the depth image based pose estimator
 include("Visualization.jl")
 include("Parameters.jl")
@@ -123,6 +125,10 @@ export ComposedSampler
 export Gibbs
 export MetropolisHastings
 export MultipleTry
+
+export SequentialMonteCarlo
+export ForwardProposalKernel
+export MhKernel
 
 # Models
 export ImageLikelihoodNormalizer

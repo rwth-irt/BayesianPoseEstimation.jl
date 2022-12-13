@@ -13,7 +13,7 @@ Sample from the untempered posterior p(θ|z) ∝ p(z|θ)¹ p(θ)
 """
 struct ConstantSchedule end
 
-increment_temperature(schedule::ConstantSchedule, temperature) = 1
+increment_temperature(schedule::ConstantSchedule, temperature) = one(temperature)
 
 """
     LinearSchedule(n_steps)
