@@ -59,9 +59,10 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
 
     # Update weights using backward kernel
     incr_weights = incremental_weights(sampler.kernel, new_sample, old_state.sample, new_temp, old_state.temperature)
-    new_weights = normalize_log_weights(old_state.log_weights .+ incr_weights)
-    new_evidence = old_state.log_evidence + logsumexp(incr_weights)
-    new_state = SmcState(new_sample, new_weights, new_evidence, new_temp)
+    new_weights = (old_state.log_weights .+ incr_weights)
+    new_evidence = old_state.log_evidence + logsumexp(new_weights)
+    normalized_weights = normalize_log_weights(new_weights)
+    new_state = SmcState(new_sample, normalized_weights, new_evidence, new_temp)
 
     resampled = maybe_resample(rng, new_state, sampler.log_resample_threshold)
     # sample, state
@@ -108,6 +109,7 @@ end
 proposal(kernel::MhKernel) = kernel.proposal
 forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel!(kernel.rng, proposal(kernel), new_sample, old_sample)
 
+# TODO is this the problem? I suppose it only makes a minor difference, heavy lifting should be done by the mh kernel
 """
     increment_weights(kernel, new_sample, old_state, new_temp, old_temp)
 Calculate the unnormalized incremental log using an MCMC Kernel (Sequential Monte Carlo Samplers, Del Moral 2006).

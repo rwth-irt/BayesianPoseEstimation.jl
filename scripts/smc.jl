@@ -19,9 +19,7 @@ pyplot()
 MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
 
 parameters = Parameters()
-parameters = @set parameters.device = :CUDA
-# TODO many particles need more space on GPU
-render_context = RenderContext(parameters.width, parameters.height, 5_000, device_array_type(parameters))
+render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 
 function fake_observation(parameters::Parameters, render_context::RenderContext, occlusion::Real)
     # Nominal scene
@@ -86,17 +84,21 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # Assemble samplers
     # TODO thinning
     # temp_schedule = ConstantSchedule()
-    temp_schedule = ExponentialSchedule(n_steps, 0.999)
+    temp_schedule = ExponentialSchedule(n_steps, 0.9999)
     # temp_schedule = LinearSchedule(n_steps)
 
     t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
-    t_smc_kernel = ForwardProposalKernel(t_sym)
+    t_smc_fp = ForwardProposalKernel(t_sym)
+    t_smc_mh = MhKernel(t_sym, rng)
     # TODO parameter for ESS
-    t_smc = SequentialMonteCarlo(t_smc_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
+    t_smc = SequentialMonteCarlo(t_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
+    # t_smc = SequentialMonteCarlo(t_smc_mh, temp_schedule, n_particles, log(0.5 * n_particles))
 
     r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
-    r_smc_kernel = ForwardProposalKernel(r_sym)
-    r_smc = SequentialMonteCarlo(r_smc_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
+    r_smc_fp = ForwardProposalKernel(r_sym)
+    r_smc_mh = MhKernel(r_sym, rng)
+    r_smc = SequentialMonteCarlo(r_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
+    # r_smc = SequentialMonteCarlo(r_smc_mh, temp_schedule, n_particles, log(0.5 * n_particles))
 
     # ComposedSampler
     # TODO resampling step destroys the distribution of the other variable
@@ -109,12 +111,12 @@ end
 
 # plot_depth_img(Array(obs.z))
 # NOTE SMC: tempering is essential? Use higher normalization_constant since it will be tempered
-parameters = @set parameters.normalization_constant = 10
-# NOTE Should be able to increase σ in SMC
+parameters = @set parameters.normalization_constant = 20
 parameters = @set parameters.proposal_σ_r_quat = 0.2
 parameters = @set parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-chain = run_inference(parameters, render_context, observation, 10, 5_000; thinning=1);
+# TODO out of memory, Do not use AbstractMCMC?
+chain = run_inference(parameters, render_context, observation, 200, 100; thinning=1);
 plot([s.log_evidence for s in chain])
 final = last(chain).sample;
 density(transpose(final.variables.t); fill=true, fillalpha=0.4, trim=true)
@@ -122,6 +124,6 @@ M = map(final.variables.r) do q
     r_q = QuatRotation(q)
     r_xyz = RotXYZ(r_q)
     [r_xyz.theta1, r_xyz.theta2, r_xyz.theta3]
-end
-M = hcat(M...)
+end;
+M = hcat(M...);
 density(M'; fill=true, fillalpha=0.4, trim=true)
