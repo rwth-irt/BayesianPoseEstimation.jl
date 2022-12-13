@@ -91,7 +91,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # t & r change expected depth, o not
     t_ind = independent_proposal(t, z)
     t_ind_mh = MetropolisHastings(t_ind)
-    t_ind_mtm = MultipleTry(t_ind, n_tries)
+    # TODO twice the compute budget
+    t_ind_mtm = MultipleTry(t_ind, n_tries * 2)
 
     t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
     t_sym_mh = MetropolisHastings(t_sym)
@@ -101,7 +102,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 
     r_ind = independent_proposal(r, z)
     r_ind_mh = MetropolisHastings(r_ind)
-    r_ind_mtm = MultipleTry(r_ind, n_tries)
+    # TODO twice the compute budget
+    r_ind_mtm = MultipleTry(r_ind, n_tries * 2)
 
     r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
@@ -112,8 +114,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # ComposedSampler
     # NOTE Independent should have low weights because almost no samples will be accepted
     # NOTE These parameters seem to be quite important for convergence, especially r_ind_mh ≪ r_sym_mh
-    composed_sampler = ComposedSampler(Weights([0.1, 0.1, 1.0, 1.0]), t_ind_mtm, r_ind_mtm, t_add_mtm, r_add_mtm)
-    # composed_sampler = ComposedSampler(Weights([0.1, 1.0, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
+    # composed_sampler = ComposedSampler(Weights([0.1, 0.1, 0.1, 1.0]), t_ind_mtm, r_ind_mtm, t_add_mtm, r_add_mtm)
+    composed_sampler = ComposedSampler(Weights([0.1, 1.0, 0.1, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
     chain = sample(rng, posterior, composed_sampler, n_steps; discard_initial=0_000, thinning=1, kwargs...)
@@ -126,9 +128,12 @@ end
 
 # plot_depth_img(Array(obs.z))
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-parameters = @set parameters.normalization_constant = 10
+parameters = @set parameters.normalization_constant = 15
+# NOTE Should be able to increase σ in MTM
+parameters = @set parameters.proposal_σ_r_quat = 0.3
+parameters = @set parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-model_chain = run_inference(parameters, render_context, observation, 500, 100; thinning=1);
+model_chain = run_inference(parameters, render_context, observation, 10_000, 50; thinning=1);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain, length(model_chain) ÷ 50)
 plot_logprob(model_chain, length(model_chain) ÷ 50)
