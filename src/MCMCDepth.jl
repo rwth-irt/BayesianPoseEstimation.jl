@@ -129,6 +129,7 @@ export MultipleTry
 export SequentialMonteCarlo
 export ForwardProposalKernel
 export MhKernel
+export smc_step
 
 # Models
 export ImageLikelihoodNormalizer

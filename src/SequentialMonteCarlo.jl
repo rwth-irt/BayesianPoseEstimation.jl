@@ -10,7 +10,7 @@ using Random
     SequentialMonteCarlo
 Sequential Monte Carlo with systematic resampling and 
 """
-struct SequentialMonteCarlo{K,S} <: AbstractMCMC.AbstractSampler
+struct SequentialMonteCarlo{K,S}
     # TODO In this case the symmetric simplification does not hold anymore, use AdditiveProposal
     kernel::K
     temp_scheduler::S
@@ -27,7 +27,7 @@ struct SmcState{S<:Sample}
 end
 
 
-function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
+function smc_step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
     # NOTE This is an IS step
     # rand on PosteriorModel samples from prior in unconstrained domain
     s = rand(model, sampler.n_particles)
@@ -39,15 +39,14 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     # IS normalizing constant: 1/n * ∑ₙ wᵢ = n_particles / n_particles = 1 → log(1) = 0
     state = SmcState(s, normalized_log_weights, 0.0, 0.0)
 
-    # sample, state are the same for MH
-    state, state
+    state.sample, state
 end
 
 """
     step(rng, model, sampler, state)
 Generic SMC sampler according to 3.1.1. (Sequential Monte Carol Samplers, Del Moral 2006)
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo, old_state::SmcState)
+function smc_step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo, old_state::SmcState)
     # TODO Does a mutable SmcState make sense?
     # Schedule the likelihood tempering
     new_temp = increment_temperature(sampler.temp_scheduler, old_state.temperature)
@@ -65,8 +64,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     new_state = SmcState(new_sample, normalized_weights, new_evidence, new_temp)
 
     resampled = maybe_resample(rng, new_state, sampler.log_resample_threshold)
-    # sample, state
-    resampled, resampled
+    resampled.sample, resampled
 end
 
 # SmcKernels, implement:
@@ -101,9 +99,9 @@ function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, 
 end
 
 
-struct MhKernel{Q,R}
-    proposal::Q
+struct MhKernel{R,Q}
     rng::R
+    proposal::Q
 end
 
 proposal(kernel::MhKernel) = kernel.proposal
@@ -115,6 +113,7 @@ forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel!(kernel.rng, propo
 Calculate the unnormalized incremental log using an MCMC Kernel (Sequential Monte Carlo Samplers, Del Moral 2006).
 For a likelihood tempered target γ = p(z|θ)ᵠp(θ) the formula simplifies to γ₂/γ₁ = p(z/θ₁)^(ϕ₂ - ϕ₁) (Efficient Sequential Monte-Carlo Samplers for Bayesian Inference, Nguyen 2016)
 """
+# BUG This should not be logprob but the likelihood of the previous sample. Either store the likelihood somehow or re-evaluate the old sample
 incremental_weights(::MhKernel, new_sample::Sample, old_sample::Sample, new_temp, old_temp) = (new_temp - old_temp) .* logprob(old_sample)
 
 # Resampling

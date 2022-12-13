@@ -14,6 +14,7 @@ using MCMCDepth
 using Random
 using Plots
 using Plots.PlotMeasures
+using ProgressLogging
 
 pyplot()
 MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
@@ -82,7 +83,6 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     posterior = PosteriorModel(z_norm, observation)
 
     # Assemble samplers
-    # TODO thinning
     # temp_schedule = ConstantSchedule()
     # temp_schedule = ExponentialSchedule(n_steps, 0.9999)
     temp_schedule = LinearSchedule(n_steps)
@@ -98,27 +98,31 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     sym_smc_fp = ForwardProposalKernel(sym_proposal)
     # TODO parameter for ESS
     sym_smc = SequentialMonteCarlo(sym_smc_fp, temp_schedule, n_particles, log(0.5 * n_particles))
+    sym_smc_mh = MhKernel(rng, sym_proposal)
+    # TODO sym_smc = SequentialMonteCarlo(sym_smc_mh, temp_schedule, n_particles, log(0.5 * n_particles))
 
     # TODO ComposedSampler for individual components will not result in a proper distribution since other components might get resampled away
     # TODO ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
-    composed = ComposedSampler(Weights([0.1, 1.0]), ind_smc, sym_smc)
+    # composed = ComposedSampler(Weights([0.1, 1.0]), ind_smc, sym_smc)
 
-    # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    sample(rng, posterior, sym_smc, n_steps; discard_initial=0_000, thinning=1, kwargs...)
+    sample, state = smc_step(rng, posterior, sym_smc)
+    @progress for n in 1:n_steps
+        sample, state = smc_step(rng, posterior, sym_smc, state)
+    end
+    sample, state
 end
 
-# plot_depth_img(Array(obs.z))
 # NOTE SMC: tempering is essential? Use higher normalization_constant since it will be tempered
-parameters = @set parameters.normalization_constant = 30
-parameters = @set parameters.proposal_σ_r_quat = 0.2
+parameters = @set parameters.normalization_constant = 20
+parameters = @set parameters.proposal_σ_r_quat = 0.1
 parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01]
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 # TODO out of memory, Do not use AbstractMCMC?
-chain = run_inference(parameters, render_context, observation, 200, 200; thinning=1);
-plot([s.log_evidence for s in chain])
-final = last(chain).sample;
-density(transpose(final.variables.t); fill=true, fillalpha=0.4, trim=true)
-M = map(final.variables.r) do q
+sample, state = run_inference(parameters, render_context, observation, 500, 50);
+
+println("Final log-evidence: $(state.log_evidence)")
+density(transpose(variables(sample).t); fill=true, fillalpha=0.4, trim=true)
+M = map(variables(sample).r) do q
     r_q = QuatRotation(q)
     r_xyz = RotXYZ(r_q)
     [r_xyz.theta1, r_xyz.theta2, r_xyz.theta3]
