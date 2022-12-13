@@ -48,9 +48,9 @@ Uses the first sampler to propose the initial sample.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::ComposedSampler)
     # All samplers use the prior of the PosteriorModel
-    new_sample, _ = AbstractMCMC.step(rng, model, first(sampler.samplers))
+    new_sample, new_state = AbstractMCMC.step(rng, model, first(sampler.samplers))
     # sample, state
-    new_sample, new_sample
+    new_sample, new_state
 end
 
 """
@@ -60,11 +60,7 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::ComposedSampler, state)
     index = sample(rng, sampler.weights)
     # TODO Different states like multiple weighted samples not supported yet
-    new_sample, _ = AbstractMCMC.step(rng, model, sampler.samplers[index], state)
-    if new_sample !== state
-        # TODO implement acceptance rate tracking? 
-        # @info "Accepted sampler $(index)"
-    end
+    new_sample, new_state = AbstractMCMC.step(rng, model, sampler.samplers[index], state)
     # sample, state
-    new_sample, new_sample
+    new_sample, new_state
 end
