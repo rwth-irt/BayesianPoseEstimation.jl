@@ -105,10 +105,10 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # TODO twice the compute budget
     r_ind_mtm = MultipleTry(r_ind, n_tries * 2)
 
-    r_sym = quaternion_symmetric(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
+    r_sym = symmetric_proposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    r_add = quaternion_additive(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
+    r_add = additive_proposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)
     r_add_mtm = MultipleTry(r_add, n_tries)
 
     # ComposedSampler
