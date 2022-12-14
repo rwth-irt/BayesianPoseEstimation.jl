@@ -36,7 +36,7 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
     proposed = propose(sampler.proposal, state)
     proposed = set_logp(proposed, logdensityof(model, proposed))
-    result = mh_kernel!(rng, sampler.proposal, proposed, state)
+    result = mh_kernel(rng, sampler.proposal, proposed, state)
     # sample, state
     result, result
 end
@@ -45,15 +45,13 @@ end
     mh_kernel!(rng, proposal, proposed, previous)
 Metropolis-Hastings transition kernel for the `proposed` and `previous` sample.
 For both samples, `logprob(sample)` must be valid.
-Vectorization for multiple proposals is supported out of box and mutates the `proposed` sample.
-
-**WARN:** Always use the returned sample since the values of the proposed sample are immutable in the scalar case.
+Vectorization for multiple proposals is supported out of box.
 """
-function mh_kernel!(rng, proposal, proposed, previous)
+function mh_kernel(rng, proposal, proposed, previous)
     α = acceptance_ratio(proposal, proposed, previous)
     # Easier to calculate and more natural to mutate the proposed instead of the previous sample
     rejected = should_reject(rng, α)
-    reject_barrier!(rejected, proposed, previous)
+    reject_barrier(rejected, proposed, previous)
 end
 
 """
@@ -78,20 +76,20 @@ should_reject(rng::AbstractRNG, log_α::AbstractArray) = log.(rand(rng, length(l
 should_reject(rng::AbstractRNG, log_α::Real) = log(rand(rng)) > log_α
 
 """
-    reject_barrier!(reject)
+    reject_barrier(reject)
 Type stable implementation for single and multiple proposals.
 """
-function reject_barrier!(rejected::AbstractArray{Bool}, proposed, previous)
+function reject_barrier(rejected::AbstractArray{Bool}, proposed, previous)
     vars = map_intersect(variables(proposed), variables(previous)) do prop, prev
-        # WARN copying both to avoid weird
-        reject_vectorized!(rejected, prop, prev)
+        # WARN copying both to avoid weird illegal access errors if previous<:SubArray{<:Any,<:Any,<:CuArray}
+        reject_vectorized!(rejected, copy(prop), copy(prev))
     end
-    ℓ = reject_vectorized!(rejected, logprob(proposed), logprob(previous))
+    ℓ = reject_vectorized!(rejected, copy(logprob(proposed)), logprob(previous))
     # No mutation in scalar case...
     Sample(vars, ℓ)
 end
 # Scalar case
-reject_barrier!(rejected::Bool, proposed, previous) = rejected ? previous : proposed
+reject_barrier(rejected::Bool, proposed, previous) = rejected ? previous : proposed
 
 """
     reject_vectorized!(rejected, proposed, previous)
@@ -100,10 +98,8 @@ The selection is done along the last dimension of the arrays.
 """
 function reject_vectorized!(rejected::AbstractVector{Bool}, proposed::AbstractArray, previous::AbstractArray)
     if ndims(proposed) == ndims(previous)
-        # TODO maybe broadcasting
         @views proposed[.., rejected] .= previous[.., rejected]
     elseif ndims(proposed) > ndims(previous)
-        # TODO does this make sense?
         @view(proposed[.., rejected]) .= previous
     else
         throw(ArgumentError("Rejecting ndims(proposed)=$(ndims(proposed)) < ndims(previous)=$(ndims(previous)) not possible"))
@@ -119,6 +115,3 @@ end
 # Move rejected vector to the GPU
 reject_vectorized!(rejected::Vector{Bool}, proposed::CuArray, previous::AbstractArray) = reject_vectorized!(CuArray(rejected), proposed, previous)
 reject_vectorized!(rejected::Vector{Bool}, proposed::CuArray, previous::Real) = reject_vectorized!(CuArray(rejected), proposed, previous)
-
-# Avoid illegal access errors if the array is wrapped
-reject_vectorized!(rejected::AbstractVector{Bool}, proposed::CuArray, previous::SubArray{<:Any,<:Any,<:CuArray}) = reject_vectorized!(CuArray(rejected), CuArray(proposed), CuArray(previous))
