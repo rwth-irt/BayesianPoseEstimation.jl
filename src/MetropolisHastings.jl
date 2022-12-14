@@ -83,6 +83,7 @@ Type stable implementation for single and multiple proposals.
 """
 function reject_barrier!(rejected::AbstractArray{Bool}, proposed, previous)
     vars = map_intersect(variables(proposed), variables(previous)) do prop, prev
+        # WARN copying both to avoid weird
         reject_vectorized!(rejected, prop, prev)
     end
     ℓ = reject_vectorized!(rejected, logprob(proposed), logprob(previous))
@@ -99,7 +100,8 @@ The selection is done along the last dimension of the arrays.
 """
 function reject_vectorized!(rejected::AbstractVector{Bool}, proposed::AbstractArray, previous::AbstractArray)
     if ndims(proposed) == ndims(previous)
-        @views proposed[.., rejected] = previous[.., rejected]
+        # TODO maybe broadcasting
+        @views proposed[.., rejected] .= previous[.., rejected]
     elseif ndims(proposed) > ndims(previous)
         # TODO does this make sense?
         @view(proposed[.., rejected]) .= previous
@@ -115,4 +117,8 @@ function reject_vectorized!(rejected::AbstractVector{Bool}, proposed::AbstractAr
 end
 
 # Move rejected vector to the GPU
-reject_vectorized!(rejected::Vector{Bool}, proposed::CuArray, previous) = reject_vectorized!(CuArray(rejected), proposed, previous)
+reject_vectorized!(rejected::Vector{Bool}, proposed::CuArray, previous::AbstractArray) = reject_vectorized!(CuArray(rejected), proposed, previous)
+reject_vectorized!(rejected::Vector{Bool}, proposed::CuArray, previous::Real) = reject_vectorized!(CuArray(rejected), proposed, previous)
+
+# Avoid illegal access errors if the array is wrapped
+reject_vectorized!(rejected::AbstractVector{Bool}, proposed::CuArray, previous::SubArray{<:Any,<:Any,<:CuArray}) = reject_vectorized!(CuArray(rejected), CuArray(proposed), CuArray(previous))
