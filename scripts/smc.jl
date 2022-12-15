@@ -87,6 +87,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # Assemble samplers
     # temp_schedule = ConstantSchedule()
     # temp_schedule = ExponentialSchedule(n_steps, 0.9999)
+    # NOTE LinearSchedule seems reasonable
     temp_schedule = LinearSchedule(n_steps)
 
     ind_proposal = independent_proposal((; t=t, r=r), z)
@@ -113,9 +114,9 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)
 
     # sampler = composed_sampler
-    # sampler = sym_smc_mh
+    sampler = sym_smc_mh
     # sampler = sym_smc_fp
-    sampler = sym_smc_boot
+    # sampler = sym_smc_boot
 
     sample, state = step(rng, posterior, sampler)
     @progress for n in 1:n_steps
@@ -125,14 +126,14 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 end
 
 # NOTE SMC: tempering is essential? 
-# NOTE MCMC Kernel: Use higher normalization_constant since it will be tempered
+# NOTE MCMC Kernel: Use higher normalization_constant since it will be tempered, resampling not that often... maybe set ESS threshold higher?
 # NOTE FP & Bootstrap: Lower normalization seems beneficial
-parameters = @set parameters.normalization_constant = 15
-parameters = @set parameters.proposal_σ_r_quat = 0.1
-parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01]
-parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
+parameters = @set parameters.normalization_constant = 15;
+parameters = @set parameters.proposal_σ_r_quat = 0.1;
+parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01];
+parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples while MCMC kernels tend to perform better with more steps
-final_sample, final_state = run_inference(parameters, render_context, observation, 500, 100);
+final_sample, final_state = run_inference(parameters, render_context, observation, 1_000, 50);
 
 # TODO generalize plots
 println("Final log-evidence: $(final_state.log_evidence)")
@@ -144,3 +145,5 @@ M = map(variables(final_sample).r) do q
 end;
 M = hcat(M...);
 density(M'; fill=true, fillalpha=0.4, trim=true)
+
+# TODO diagnostics: Accepted steps, resampling steps

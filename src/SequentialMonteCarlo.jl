@@ -107,7 +107,7 @@ The weights are updated similarly to a Metropolis-Hastings acceptance ratio.
 function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState)
     forward = transition_probability(kernel.proposal, new_sample, old_state.sample)
     backward = transition_probability(kernel.proposal, old_state.sample, new_sample)
-    logprob(new_sample) .+ backward - logprob(old_state.sample) .- forward
+    logprob(new_sample) .+ backward .- logprob(old_state.sample) .- forward
 end
 
 struct MhKernel{R,Q}
@@ -123,10 +123,7 @@ forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel(kernel.rng, propos
 Calculate the unnormalized incremental log using an MCMC Kernel (Sequential Monte Carlo Samplers, Del Moral 2006).
 For a likelihood tempered target γᵢ = p(z|θ)ᵠp(θ) the incremental weight formula simplifies to γ₂/γ₁ = p(z|θ₁)^(ϕ₂ - ϕ₁) (Efficient Sequential Monte-Carlo Samplers for Bayesian Inference, Nguyen 2016)
 """
-# TODO revert to log_likelihood and do not temper in PosteriorModel since there is almost no expected performance gain since only ϕ₀=0
 incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* old_state.log_likelihood
-# TODO why is ith so much better?
-# incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* new_likelihood
 
 """
     BootstrapKernel(proposal)
