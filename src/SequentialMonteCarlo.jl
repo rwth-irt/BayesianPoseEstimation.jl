@@ -129,7 +129,24 @@ incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, ol
 # incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* new_likelihood
 
 """
-incremental_weights(::MhKernel, new_sample::Sample, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* old_state.log_likelihood
+    BootstrapKernel(proposal)
+Kernel which results in a bootstrap SIR particle filter.
+Uses the transition prior probability as importance function and the weight increment is the likelihood.
+(An invitation to sequential Monte Carlo samplers, Dai 2022)
+"""
+struct BootstrapKernel{Q}
+    proposal::Q
+end
+
+proposal(kernel::BootstrapKernel) = kernel.proposal
+forward(kernel::BootstrapKernel, new_sample, old_sample) = new_sample
+
+"""
+    increment_weights(kernel, new_sample, tempered_likelihood, new_temp, old_state)
+Bootstrap particle filter: tempered likelihood is the weight increment.
+"""
+incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = new_likelihood
+
 
 # Resampling
 

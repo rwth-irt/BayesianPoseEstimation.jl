@@ -126,9 +126,10 @@ export Gibbs
 export MetropolisHastings
 export MultipleTry
 
-export SequentialMonteCarlo
+export BootstrapKernel
 export ForwardProposalKernel
 export MhKernel
+export SequentialMonteCarlo
 export smc_step
 
 # Models
