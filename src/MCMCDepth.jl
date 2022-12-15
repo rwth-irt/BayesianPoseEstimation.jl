@@ -2,115 +2,186 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+__precompile__()
+
 module MCMCDepth
 
-# lib includes
-include("Variables.jl")
+# Common functions on Base & CUDA types
+include("Common.jl")
+# BayesNet
+include("BayesNet/BayesNet.jl")
+include("BayesNet/BroadcastedNode.jl")
+include("BayesNet/DeterministicNode.jl")
+include("BayesNet/ModifierNode.jl")
+include("BayesNet/Sequentialized.jl")
+include("BayesNet/SimpleNode.jl")
+# Model primitives
 include("Samples.jl")
-include("MeasureTheoryAdapter.jl")
-include("Proposals.jl")
-include("Parameters.jl")
 include("FunctionManipulation.jl")
-include("Models.jl")
-include("MetropolisHastings.jl")
-include("Gibbs.jl")
-include("Visualization.jl")
+include("Proposals.jl")
+include("PosteriorModel.jl")
 # Extensions
-include("TransformVariablesExtensions.jl")
-include("MeasureTheoryExtensions.jl")
-include("GpuMeasures.jl")
-# Inference
-include("Main.jl")
+include("BijectorsExtensions.jl")
+# Distributions
+include("KernelDistributions.jl")
+include("BroadcastedDistribution.jl")
+include("QuaternionDistribution.jl")
+# Inference / Sampling algorithms
+include("Tempering.jl")
 
-# SampleVariables
-export ModelVariable
-export SampleVariable
-export model_value
-export raw_value
+include("MetropolisHastings.jl")
+include("ComposedSampler.jl")
+include("Gibbs.jl")
+include("MultipleTry.jl")
+include("SequentialMonteCarlo.jl")
+
+# Plumbing together the depth image based pose estimator
+include("Visualization.jl")
+include("Parameters.jl")
+include("RenderContext.jl")
+include("AssociationModel.jl")
+include("Models.jl")
+
+# Common
+export array_for_rng
+export flatten
+export map_intersect
+export norm_dims, normalize_dims!, normalize_dims
+export sum_and_dropdims
+export to_rotation, to_translation, to_pose
+
+# BayesNet
+export BroadcastedNode
+export DeterministicNode
+export ModifierNode
+export SimpleNode
+
+export evaluate
+export parents
+export prior
+export sequentialize
 
 # Samples
 export Sample
 
-export flatten
-export logp
+export logprob
 export merge
-export unconstrained_state
-export vars
+export names
+export to_model_domain
+export to_unconstrained_domain
+export transform
+export types
+export variables
+
+# Distributions
+export AbstractKernelDistribution
+export measure_theory, kernel_distribution
+export KernelBinaryMixture
+export KernelCircularUniform
+export KernelExponential
+export KernelNormal
+export KernelUniform
+
+export ProductBroadcastedDistribution
+export BroadcastedDistribution
+export DiscreteBroadcastedDistribution
 
 # Proposals
-export AnalyticProposal
-export GibbsProposal
-export IndependentProposal
-export Proposal
-export SymmetricProposal
+export additive_proposal
+export independent_proposal
+export quaternion_additive
+export quaternion_symmetric
+export symmetric_proposal
 
 export propose
 export transition_probability
 
+# Quaternions
+export QuaternionDistribution
+export QuaternionPerturbation
+export QuaternionProposal
+
 # Parameters
-export DepthImageParameters
-export PriorParameters
-export RandomWalkParameters
+export Parameters
+
+export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
+
+# RenderContext
+export RenderContext
+export render
+
+# PosteriorModel
+export PosteriorModel
+
+# Tempering
+export ConstantSchedule
+export ExponentialSchedule
+export LinearSchedule
+
+export increment_temperature
+
+# Samplers
+export ComposedSampler
+export Gibbs
+export MetropolisHastings
+export MultipleTry
+
+export BootstrapKernel
+export ForwardProposalKernel
+export MhKernel
+export SequentialMonteCarlo
+export smc_step
 
 # Models
-export DepthExponential
-export DepthExponentialUniform
-export DepthImageMeasure
-export DepthNormal
-export DepthNormalExponential
-export DepthNormalExponentialUniform
-export DepthNormalUniform
-export DepthUniform
-export WrappedModel
+export ImageLikelihoodNormalizer
+export ValidPixel
 
+export expected_pixel_count
 export image_association
+export nonzero_pixels
 export pixel_association
-export pose_depth_model
-export preprocess
-export prior_depth_model
-export random_walk_proposal
-
-# MetropolisHastings
-export MetropolisHastings
-
-# Gibbs
-export AnalyticGibbs
-export Gibbs
+export pixel_explicit
+export pixel_mixture
+export pixel_normal
+export pixel_tail
+export render_fn
+export valid_pixel_explicit
+export valid_pixel_mixture
+export valid_pixel_normal
+export valid_pixel_tail
 
 # Visualization
-export colorize_depth
-export colorize_probability
 export density_variable
+export histogram_variable
 export mean_image
-export plot_variable
+export plot_depth_img, plot_prob_img
 export polar_density_variable
+export plot_logprob
+export plot_variable
 export polar_histogram_variable
 export scatter_position
+export sphere_density
+export sphere_scatter
 
-# Extensions
-export as○, as_circular
-export BinaryMixture
-export CircularUniform
-export MixtureMeasure
-export UniformInterval
-export VectorizedMeasure
+# Extensions and Reexports
+using Reexport
+@reexport import Quaternions: Quaternion
+@reexport import Rotations: QuatRotation, RotXYZ
+@reexport import CoordinateTransformations: Translation
+@reexport import SciGL: Scale, Scene
 
-export AbstractGpuMeasure
-export cpu_measure, gpu_measure
-export GpuBinaryMixture
-export GpuCircularUniform
-export GpuExponential
-export GpuNormal
-export GpuUniformInterval
-export GpuProductMeasure
-export GpuVectorizedMeasure
+@reexport import DensityInterface: logdensityof
+@reexport import Random: rand!
+@reexport import StatsBase: Weights
 
-# Main script
-export destroy_render_context
-export init_render_context
-export main
-export render_to_cpu
-export render_pose
-export render_pose!
+# Bijectors
+@reexport import Bijectors: bijector, inverse, link, invlink, with_logabsdet_jacobian, transformed
+export BroadcastedBijector
+export Circular
+export ZeroIdentity
+export is_identity
+
+# Distributions
+@reexport import Distributions: truncated
 
 end # module

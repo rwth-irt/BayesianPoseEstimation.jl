@@ -2,206 +2,128 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using MeasureTheory, Soss
-using Random
+"""
+    Proposals.jl
+Implement common proposal models with the convention of always proposing in the unconstrained domain ℝⁿ.
+"""
 
 """
-    AbstractProposal
-Has a `model` which supports rand() and logdensity
+    evaluation_nodes(proposal, posterior)
+Extract a SequentializedGraph of the nodes that need to be re-evaluated after proposing the new sample.
+It contains all parents of the `proposal` nodes in the prior of the `posterior` node.
 """
-abstract type AbstractProposal end
+function evaluation_nodes(proposal::SequentializedGraph, posterior::AbstractNode{name}) where {name}
+    p = parents(posterior, values(proposal)...)
+    Base.structdiff(p, (; name => ()))
+end
+evaluation_nodes(proposal_model::AbstractNode, posterior_model::AbstractNode) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
 
-# TODO probably no use? Might even cause undefined behaviour
-# """
-#     Proposal
-# Propose samples from the previous one by using a general proposal distribution.
-# """
-# struct Proposal{T<:AbstractMeasure} <: AbstractProposal
-#     model::T
-
-#     function Proposal(m::T) where {T<:Soss.AbstractModel}
-#         # Generally only unconstrained proposal models are supported
-#         # E.g. an exponential proposal would result in s - c_cond < 0 and thus an invalid logdensity
-#         if !is_identity(xform(m | (;)))
-#             throw(DomainError(m, "Model is not unconstrained, i.e. requires maps to a domain which is not ℝ"))
-#         end
-#         new{T}(m)
-#     end
-# end
-
-"""
-    model(q)
-Get the internal probabilistic model from which the proposals are generated.
-"""
-model(q::AbstractProposal) = q.model
-
-"""
-    rand(rng, q)
-Generate a new raw state `θ` using the `model` of the proposal `q`.
-Whether the sample is Constrained or not is determined 
-"""
-Base.rand(rng::AbstractRNG, q::AbstractProposal) = rand(rng, model(q))
-
-"""
-    rand(q)
-Generate a new raw state `θ` using the `model` of the proposal `q`.
-"""
-Base.rand(q::AbstractProposal) = rand(Random.GLOBAL_RNG, q)
-
-"""
-    propose(rng, q, s)
-For the general case of dependent samples.
-Support for Gibbs: applies the current state to the args of the model.
-"""
-propose(rng::AbstractRNG, q::AbstractProposal, s::Sample) = s + rand(rng, model(q)(state(s)))
-
-"""
-    propose(q, s)
-For the general case of dependent samples.
-"""
-propose(q::AbstractProposal, s::Sample) = propose(Random.GLOBAL_RNG, q, s)
-
-"""
-    propose(q, s)
-For an initial sample, not supported by every Proposal type.
-Mainly for dispatch of a missing random number generator.
-"""
-propose(q::AbstractProposal) = propose(Random.GLOBAL_RNG, q)
-
-"""
-    transition_probability(q, s, s_cond)
-For the general case of dependent samples.
-Support for Gibbs: applies the previous state to the args of the model.
-"""
-# The proposal model had s_cond applied to args
-# Dependent samples are sampled in the unconstrained domain -> raw state for conditional
-transition_probability(q::AbstractProposal, s::Sample, s_cond::Sample) = logdensity(model(q)(state(s_cond)), raw_state(s - s_cond))
-
-
-"""
-    SymmetricProposal
-Propose samples from the previous one by using a symmetric proposal distribution.
-"""
-struct SymmetricProposal{T<:AbstractMeasure} <: AbstractProposal
-    model::T
-
-    function SymmetricProposal(m::T) where {T<:AbstractMeasure}
-        if !is_identity(as(m))
-            throw(DomainError(m, "Model is not unconstrained, i.e. requires maps to a domain which is not ℝ"))
-        end
-        new{T}(m)
-    end
-
-    function SymmetricProposal(m::T) where {T<:Soss.AbstractModel}
-        # TODO workaround for Gibbs which moves variables to the arguments
-        if isempty(arguments(m)) && !is_identity(xform(m | (;)))
-            throw(DomainError(m, "Model is not unconstrained, i.e. requires maps to a domain which is not ℝ"))
-        end
-        new{T}(m)
-    end
+struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B<:NamedTuple{names},C}
+    propose_fn::F
+    transition_probability_fn::G
+    model::M
+    evaluation::E
+    proposal_bijectors::B
+    posterior_bijectors::C
 end
 
-"""
-    transition_probability(q, s, s_cond)
-For symmetric proposals, the forward and backward transition probability cancels out
-"""
-transition_probability(q::SymmetricProposal, ::Sample, ::Sample) = 0.0
-
+Proposal(proposal_model, posterior_model, propose_fn, transition_probability_fn) = Proposal(propose_fn, transition_probability_fn, sequentialize(proposal_model), evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(proposal_model)), map_materialize(bijector(posterior_model)))
 
 """
-    IndependentProposal
+    updated_variables(proposal)
+Returns a Val{(names...,)} with all updated variables including the proposed and evaluated ones.
+"""
+updated_variables(::Proposal{names,<:Any,<:Any,<:Any,<:SequentializedGraph{evaluated}}) where {names,evaluated} = Val((names..., evaluated...))
+
+# Convenience constructors
+
+"""
+    additive_proposal(proposal_model, posterior_model)
+Propose a new sample from the previous by adding random values from the proposal distribution.
+Does not use any simplifications so the support of the proposal distribution must be (-∞,∞). 
+"""
+additive_proposal(proposal_model, posterior_model) = Proposal(proposal_model, posterior_model, propose_additive, transition_probability_additive)
+
+"""
+    independent_proposal(proposal_model, posterior_model)
 Propose samples independent from the previous one.
 """
-struct IndependentProposal{T<:AbstractMeasure} <: AbstractProposal
-    model::T
+independent_proposal(proposal_model, posterior_model) = Proposal(proposal_model, posterior_model, propose_independent, transition_probability_independent)
+
+"""
+    symmetric_proposal(proposal_model, posterior_model)
+Propose a new sample from the previous one by using a symmetric proposal distribution.
+Always returns 0 for the transition probability, as it cancels out in MH.
+"""
+symmetric_proposal(proposal_model, posterior_model) = Proposal(proposal_model, posterior_model, propose_additive, transition_probability_symmetric)
+
+# Interface methods
+
+"""
+    propose(proposal, previous_sample, [dims...])
+Generate a new sample using the `proposal` and maybe conditioning on the old `sample`.
+Use dims to sample propose the variables multiple times (vectorization support).
+"""
+propose(proposal::Proposal, previous_sample, dims...) = proposal.propose_fn(proposal, previous_sample, dims...)
+
+"""
+    transition_probability(proposal, new_sample, prev_sample)
+The probability of transitioning from the `prev_sample` to the `new_sample` given the `proposal` model.
+"""
+transition_probability(proposal::Proposal, new_sample, previous_sample) = proposal.transition_probability_fn(proposal, new_sample, previous_sample)
+
+# propose_fn implementations
+
+"""
+    propose(proposal, previous_sample, [dims...])
+Propose a new sample by adding a random perturbation from the proposal model.
+"""
+function propose_additive(proposal::Proposal, previous_sample, dims...)
+    # Propose in unconstrained domain
+    proposed = previous_sample + rand(proposal.model, dims...)
+    # Evaluate in model domain
+    model_sample, _ = to_model_domain(proposed, proposal.posterior_bijectors)
+    evaluated = evaluate(proposal.evaluation, variables(model_sample))
+    # Sampling in unconstrained domain
+    to_unconstrained_domain(Sample(evaluated), proposal.posterior_bijectors)
 end
 
 """
-    propose(rng, q)
-Independent samples are just random values from the model.
+    propose(proposal, previous_sample, [dims...])
+Independent samples are simply random values from the model.
 """
-propose(rng::AbstractRNG, q::IndependentProposal) = Sample(rng, model(q))
+function propose_independent(proposal::Proposal, previous_sample, dims...)
+    # Propose in the model domain
+    model_sample, _ = to_model_domain(previous_sample, proposal.posterior_bijectors)
+    proposed = merge(model_sample, rand(proposal.model, dims...))
+    evaluated = evaluate(proposal.evaluation, variables(proposed))
+    # Sampling in unconstrained domain, proposals might have other bijectors than the posterior (prior) model
+    merged_bijectors = merge(proposal.posterior_bijectors, proposal.proposal_bijectors)
+    to_unconstrained_domain(Sample(evaluated), merged_bijectors)
+end
+
+# transition_probability_fn implementations
 
 """
-    propose(rng, q, s)
-Independent samples are just random values from the model.
-Support for Gibbs: applies the current state to the args of the model.
+    transition_probability_additive(proposal, new_sample, prev_sample)
+For the general case of additive proposals, where the forward and backward transition probabilities do not cancel out.
 """
-propose(rng::AbstractRNG, q::IndependentProposal, s::Sample) = Sample(rng, model(q)(state(s)))
+transition_probability_additive(proposal::Proposal{names}, new_sample, previous_sample) where {names} = logdensityof(proposal.model, variables(new_sample[Val(names)] - previous_sample))
 
 """
-    transition_probability(q, s, s_cond)
+    transition_probability_independent(proposal, new_sample, prev_sample)
 For independent proposals, the transition probability does not depend on the previous sample.
-Support for Gibbs: applies the current state to the args of the model.
+Since the proposal model might be defined in a constrained domain, the sample is transformed and the logjac adjustment added to the logdensity.
 """
-# IndependentProposal: logdensity in constrained domain -> transformation via state
-transition_probability(q::IndependentProposal, s::Sample, s_cond::Sample) = logdensity(model(q)(state(s_cond)), state(s))
-
-
-"""
-    GibbsProposal
-Propose only a subset of the variables.
-Thus, GibbsProposal is only an overlay over another AbstractProposal type `Q` which uses a conditional `model` for its proposal.
-"""
-struct GibbsProposal{Q<:AbstractProposal} <: AbstractProposal
-    internal_proposal::Q
+function transition_probability_independent(proposal::Proposal{names}, new_sample, previous_sample) where {names}
+    # Evaluate only the bijector of the proposed variables to avoid adding the logjac correction for variables which are not evaluated in logdensityof
+    model_sample, logjac = to_model_domain(new_sample[Val(names)], proposal.proposal_bijectors)
+    logdensityof(proposal.model, variables(model_sample)) + logjac
 end
 
 """
-    GibbsProposal(model, var)
-Convenience constructor which automatically transforms the `model`` so only the variables `var` will be proposed.
-Since Gibbs assumes all other variables to be known, the required dependencies are moved to the `args` of the model.
+    transition_probability_symmetric(proposal, new_sample, prev_sample)
+For symmetric proposals, the forward and backward transition probability cancels out in MH - return 0.
 """
-function GibbsProposal{Q}(model::AbstractMeasure, var::Symbol...) where {Q<:AbstractProposal}
-    # Sanity check is only executed without arguments
-    SymmetricProposal(model)
-    # Move var to arguments & create GibbsProposal
-    Soss.likelihood(Model(model), var...)(argvals(model)) |> Q |> GibbsProposal
-end
+transition_probability_symmetric(proposal::Proposal, new_sample, previous_sample) = 0
 
-"""
-    model(q)
-Get the probabilistic model of the internal proposal model from which the proposals are generated.
-"""
-model(q::GibbsProposal) = model(q.internal_proposal)
-
-"""
-    propose(rng, q, s)
-Gibbs proposals are conditioned on the other variables of the previous sample.
-A subset of the variables is proposed by the internal proposal model and merged with the previous sample.
-"""
-function propose(rng::AbstractRNG, q::GibbsProposal, s::Sample)
-    s2 = propose(rng, q.internal_proposal, s)
-    merge(s, s2)
-end
-
-"""
-    transition_probability(q, s, s_cond)
-Forwards it to the transition probability model of the intern proposal distribution.
-"""
-transition_probability(q::GibbsProposal, s::Sample, s_cond::Sample) = transition_probability(q.internal_proposal, s, s_cond)
-
-
-"""
-    AnalyticProposal
-Has a callable `f(s)` which returns a new Sample for a subset of the model variables given a previous sample `s`.
-"""
-struct AnalyticProposal{T} <: AbstractProposal
-    f::T
-end
-
-"""
-    propose(rng, q, s)
-Analytic proposals are conditioned on the other variables of the previous sample.
-A subset of the variables is proposed by the internal proposal model and merged with the previous sample.
-"""
-function propose(::AbstractRNG, q::AnalyticProposal{Q}, s::Sample) where {Q}
-    s2 = q.f(s)
-    merge(s, s2)
-end
-
-"""
-    transition_probability(q, s, s_cond)
-Analytic proposals are always accepted
-"""
-transition_probability(::AnalyticProposal, s::Sample, s_cond::Sample) = Inf

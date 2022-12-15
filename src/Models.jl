@@ -1,175 +1,176 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
-# All rights reserved. 
+# All rights reserved.
 
-using AbstractMCMC
-using MeasureTheory, Soss
 using Random
-
-
-# Adapter from MeasureTheory.jl to AbstractMCMC.jl
+using SciGL
 
 """
-    WrappedModel
-Wrapper around an `AbstractMeasure`` for compatibility with AbstractMCMC's sample method.
+# ObservationModel
+Model to compare rendered and observed depth images.
+
+# Pixel Distribution
+Each pixel is assumed to be independent and the measurement can be described by a distribution `pixel_dist(μ, o)`.
+`μ` is the expected depth and `o` is the object association probability.
+Therefore, the image logdensity for the measurement `z` is calculated by summing the pixel logdensities.
+Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
+
+# Normalization
+If a normalization_constant is provided, `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
+This effectively changes the number of data points evaluated in the sum of the image loglikelihood for different views.
+Thus, the algorithm might prefer (incorrect) poses further or closer to the object, which depends if the pixel loglikelihood is positive or negative.
+
+To remove the sensitivity to the number of valid expected pixels, the images is normalized by diving the sum of the pixel loglikelihood by the number of valid pixels.
+The `normalization_constant` is multiplied afterwards, a reasonable constant is the expected number of visible pixels for the views from the prior.
+
+# Alternatives to Normalization
+* proper preprocessing by cropping or segmenting the image
+* a pixel_dist which handles the tail distribution by providing a reasonable likelihood for invalid expected values
 """
-struct WrappedModel{T<:AbstractMeasure} <: AbstractMCMC.AbstractModel
-    model::T
+
+"""
+    ValidPixel
+Takes care of missing values in the expected depth `μ == 0` by setting the logdensity to zero, effectively ignoring these pixels in the sum.
+Consequently, the sum of the image likelihood must be normalized by dividing through the number of valid pixels, since the likelihood is very sensitive to the number of evaluated data points.
+"""
+struct ValidPixel{T<:Real,D} <: AbstractKernelDistribution{T,Continuous}
+    # Should not cause memory overhead if used in lazily broadcasted context
+    μ::T
+    # Do not constrain M<:AbstractKernelDistribution{T} because it might be transformed / truncated
+    model::D
 end
 
-"""
-    logdensity(pm, s)
-Evaluates the logdensity of the internal model
-"""
-MeasureTheory.logdensity(pm::WrappedModel, s::Sample) = logdensity(pm.model, s)
-
-"""
-    rand(rng, pm)
-Calls rand on the internal model
-"""
-Base.rand(rng::AbstractRNG, pm::WrappedModel) = rand(rng, pm.model)
-
-# Adapter
-
-# Models for the depth pixels
-
-"""
-    DepthNormal(μ, p)
-Normal distribution intended for observing the expected object.
-Given the expected depth `μ`.
-"""
-DepthNormal(μ, p::DepthImageParameters) = Normal(μ, p.pix_σ)
-
-"""
-    DepthExponential(p)
-Exponential distribution intended for observing an occlusion.
-"""
-DepthExponential(p::DepthImageParameters) = Exponential(p.pix_θ)
-
-"""
-    DepthUniform(p)
-Uniform distribution intended for observing random outliers.
-"""
-DepthUniform(p::DepthImageParameters) = UniformInterval(p.min_depth, p.max_depth)
-
-"""
-    DepthExponentialUniform(p)
-Mixture of exponential and uniform distribution intended for observing an occlusion or random outlier.
-"""
-DepthExponentialUniform(p::DepthImageParameters) = BinaryMixture(DepthExponential(p), DepthUniform(p), p.mix_exponential, 1 - p.mix_exponential)
-
-"""
-    DepthNormalExponential(μ, o, p)
-Assumes a normal distribution for the object and an uniform distribution for random outliers.
-Given the expected depth `μ` and object association probability `o`.
-"""
-DepthNormalExponential(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthExponential(p), o, 1.0 - o)
-
-"""
-    DepthNormalUniform(μ, o, p)
-Assumes a normal distribution for the object and an exponential distribution for occlusions.
-Given the expected depth `μ` and object association probability `o`.
-"""
-DepthNormalUniform(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthUniform(p), o, 1.0 - o)
-
-"""
-    DepthNormalExponentialUniform(μ, o, p)
-Assumes a normal distribution for the object and a mixture of an exponential and uniform distribution for occlusions and outliers.
-Given the expected depth `μ` and object association probability `o`.
-"""
-DepthNormalExponentialUniform(μ, o, p::DepthImageParameters) = BinaryMixture(DepthNormal(μ, p), DepthExponentialUniform(p), o, 1.0 - o)
-
-"""
-    prior_depth_model(model)
-Model containing all the variables required to sample z.
-"""
-prior_depth_model(model) = prior(Model(model), :z)(argvals(model))
-
-"""
-    DepthImageMeasure(μ, o, m_pix, filter_fn, prep_fn)
-Optimized measure for handling observation of depth images.
-
-During inference it takes care of missing values in the expected depth `μ` and only evaluates the logdensity for pixels with depth 0 < z < max_depth.
-Invalid values of z are set to zero by convention.
-
-Each pixel is assumed to be independent and the measurement can be described by the measure `p.pixel_measure(μ, o)`.
-`o` is the object association probability.
-
-For the generative model, the whole image is generated.
-"""
-struct DepthImageMeasure <: AbstractMeasure
-    μ::Matrix{Float64}
-    o::Matrix{Float64}
-    params::DepthImageParameters
-end
-MeasureTheory.basemeasure(::DepthImageMeasure) = Lebesgue{ℝ}
-TransformVariables.as(d::DepthImageMeasure) = as(Array, asℝ, (d.params.width, d.params.height))
-
-Base.show(io::IO, d::DepthImageMeasure) = print(io, "DepthImageMeasure\n  Parameters: $(d.params)")
-
-# Generate independent random numbers from m_pix(μ, o)
-function Base.rand(rng::AbstractRNG, T::Type, d::DepthImageMeasure)
-    map(zip(d.μ, d.o)) do (μ, o)
-        random_depth = rand(rng, T, d.params.pixel_measure(μ, o, d.params))
-        d.params.min_depth < random_depth < d.params.max_depth ? random_depth : zero(random_depth)
-    end
-end
-
-function MeasureTheory.logdensity(d::DepthImageMeasure, z)
-    # Only sum the logdensity for values for which filter_fn is true
-    ind = findall(x -> d.params.min_depth < x < d.params.max_depth, d.μ)
-    sum = 0.0
-    for i in ind
-        # Preprocess the measurement
-        z_i = d.params.min_depth < z[i] < d.params.max_depth ? z[i] : zero(z[i])
-        sum = sum + logdensity(d.params.pixel_measure(d.μ[i], d.o[i], d.params), z_i)
-    end
-    sum
-end
-
-"""
-    pixel_association(μ, z, q, params)
-Probability of the pixel being associated to the object.
-Given an expected depth of `μ` and observation of `z` the posterior is calculated using Bayes Law with the prior `q`.
-The distribution of observing the object is constructed via `d_is(μ)` and other observations are explained by `d_not(μ)`
-"""
-function pixel_association(μ::Real, z::Real, q::Real, params::DepthImageParameters)::Float64
-    # If the rendered value is invalid, we do not know more than before => prior
-    if μ <= 0.0
-        return q
-    end
-    prior_likelihood = pdf(params.association_is(μ, params), z) * q
-    # Marginalize Bernoulli distributed by summing out o
-    marginal = prior_likelihood + pdf(params.association_not(params), z) * (1 - q)
-    # Normalized posterior
-    posterior = prior_likelihood / marginal
-    # robust for transformation as𝕀 ∈ (0,1), might get numerically 0.0 or 1.0
-    if posterior < eps()
-        return eps()
-    elseif posterior > 1 - eps()
-        return 1 - eps()
+function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
+    # TODO Does the insupport dist(dist, x) help or not?
+    if !insupport(dist, dist.μ)
+        # If the expected value is invalid, it does not provide any information
+        zero(T)
     else
-        return posterior
+        # clamp to avoid NaNs
+        logdensityof(dist.model, clamp(x, minimum(dist), maximum(dist)))
     end
 end
 
+function Base.rand(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
+    if !insupport(dist, dist.μ)
+        zero(T)
+    else
+        depth = rand(rng, dist.model)
+        # maximum is inf
+        clamp(depth, minimum(dist), maximum(dist))
+    end
+end
+
+# Depth pixels can have any positive value not like radar
+Base.maximum(dist::ValidPixel{T}) where {T} = maximum(dist.model)
+# Negative measurements do not make any sense, all others might, depending on the underlying model.
+Base.minimum(dist::ValidPixel{T}) where {T} = max(zero(T), minimum(dist.model))
+# logpdf explicitly handles outliers, so no transformation is desired
+Bijectors.bijector(dist::ValidPixel) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
+Distributions
+# Depth pixels can have any positive value, zero and negative are invalid
+Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
+
+
 """
-    image_association(s, z, prior_o, image_params, render_fn)
-Uses the render image state of the sample `s.μ` and then calls `pixel_association` with each rendered pixel for the observed depth `z`.
+    ImageLikelihoodNormalizer
+Use it in a modifier node to normalize the loglikelihood of the image to make it independent from the number of visible pixels in μ. 
 """
-function image_association(s::Sample, z::AbstractMatrix{<:Real}, prior_o::AbstractMatrix{<:Real}, image_params::DepthImageParameters, render_fn::Base.Callable)
-    st = state(s)
-    μ = render_fn(st.t, st.r)
-    # Also broadcast over the prior, protect params from broadcasting
-    # TODO use previous sample as prior for o instead of prior_o?
-    o = pixel_association.(μ, z, prior_o, (image_params,))
-    tr = as((; o = as(Array, as𝕀, size(o))))
-    Sample((; o = o), -Inf, tr)
+struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
+    normalization_constant::T
+    μ::M
+end
+
+ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
+
+Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
+using DensityInterface
+function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
+    # Images are always 2D
+    n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
+    ℓ .* model.normalization_constant ./ n_pixel
 end
 
 """
-    nonzero_indices(img)
-Returns a list of indices for the nonzero pixels in the image.
+    expected_pixel_count(rng, prior_model, render_context, scene, parameters)
+Calculates the expected number of valid rendered pixels for the poses of the prior model.
+This number can for example be used as the normalization constant in the observation model.
 """
-nonzero_indices(img) = findall(!iszero, img)
+function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::RenderContext, scene::Scene, parameters::Parameters)
+    n_pixel = Vector{parameters.precision}(undef, 0)
+    for _ in 1:cld(parameters.n_normalization_samples, parameters.depth)
+        prior_sample = rand(rng, prior_model, parameters.depth)
+        img = render(render_context, scene, parameters.object_id, to_pose(variables(prior_sample).t, variables(prior_sample).r))
+        append!(n_pixel, nonzero_pixels(img, (1, 2)))
+    end
+    mean(n_pixel)
+end
 
+"""
+    nonzero_pixels(images, dims)
+Calculates the number of nonzero pixels for each image with the given dims.
+"""
+nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
+
+"""
+    pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
+Mixture distribution for a depth pixel: normal / tail.
+The mixture is weighted by the association o for the normal and 1-o for the tail.
+
+* Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
+* Tail distribution: occlusions (exponential) and random outliers (uniform)
+"""
+function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
+    normal = KernelNormal(μ, σ)
+    tail = pixel_tail(min_depth, max_depth, θ, μ)
+    KernelBinaryMixture(normal, tail, o, one(o) - o)
+end
+
+valid_pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
+
+function pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real}
+    # TODO Does truncated make a difference? Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
+    # exponential = KernelExponential
+    # truncated must satisfy: lower <= upper → max(min_depth, μ)
+    # TODO what about the μ in the association model?
+    exponential = truncated(KernelExponential(θ), min_depth, max(min_depth, μ))
+    uniform = KernelUniform(zero(T), max_depth)
+    # TODO custom weights for exponential and uniform?
+    KernelBinaryMixture(exponential, uniform, one(T), one(T))
+end
+
+valid_pixel_tail(min_depth::T, max_depth::T, θ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, μ))
+
+pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
+valid_pixel_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
+
+
+"""
+    pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
+Mixture distribution for a depth pixel which explicitly handles invalid μ.
+In case the expected depth is invalid, only the tail distribution for outliers is evaluated.
+Otherwise, if the measured depth and expected depth are zero, a unreasonably high likelihood would be returned.
+The mixture is weighted by the association o for the normal and 1-o for the tail.
+
+* Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
+* Tail distribution: occlusions (exponential) and random outliers (uniform)
+"""
+function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
+    if μ > 0
+        pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
+    else
+        # Distribution must be of same type for CUDA support so set o to zero to evaluate the tail only
+        pixel_mixture(min_depth, max_depth, θ, σ, μ, zero(T))
+    end
+end
+
+valid_pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
+
+"""
+    render_fn(render_context, scene, object_id, t, r)
+Function can be conditioned on the render_context, scene & object_id to be used in a model node to render different poses for t & r.
+"""
+function render_fn(render_context, scene, object_id, t, r)
+    p = to_pose(t, r)
+    render(render_context, scene, object_id, p)
+end
