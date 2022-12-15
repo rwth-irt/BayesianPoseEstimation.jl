@@ -88,7 +88,12 @@ using DensityInterface
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     # Images are always 2D
     n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
-    ℓ .* model.normalization_constant ./ n_pixel
+    if iszero(n_pixel)
+        # Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely
+        typemin(ℓ)
+    else
+        ℓ .* model.normalization_constant ./ n_pixel
+    end
 end
 
 """
