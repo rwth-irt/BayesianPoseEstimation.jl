@@ -8,10 +8,9 @@ using Random
 
 """
     SequentialMonteCarlo
-Sequential Monte Carlo with systematic resampling and 
+Sequential Monte Carlo with systematic resampling and likelihood tempering via p(θ|z) ∝ p(z|θ)ᶲ p(θ).
 """
-struct SequentialMonteCarlo{K,S}
-    # TODO In this case the symmetric simplification does not hold anymore, use AdditiveProposal
+struct SequentialMonteCarlo{K,S} <: AbstractMCMC.AbstractSampler
     kernel::K
     temp_scheduler::S
     n_particles::Int64
@@ -27,14 +26,23 @@ struct SmcState{S<:Sample,W<:AbstractVector,L<:AbstractVector}
     temperature::Float64
 end
 
+function tempered_logdensity(log_prior, log_likelihood, temp=1)
+    if temp == 0
+        return log_prior
+    end
+    if temp == 1
+        return add_logdensity(log_prior, log_likelihood)
+    end
+    add_logdensity(log_prior, temp .* log_likelihood)
+end
 
-function smc_step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
     # NOTE This is an IS step
     # rand on PosteriorModel samples from prior in unconstrained domain
     s = rand(model, sampler.n_particles)
     # tempering starts with ϕ₀=0
-    log_prior, log_likelihood = prior_and_likelihood(model, s, 0)
-    log_full = add_logdensity(log_prior, log_likelihood)
+    log_prior, log_likelihood = prior_and_likelihood(model, s)
+    log_full = tempered_logdensity(log_prior, log_likelihood, 0)
     s = set_logp(s, log_full)
 
     # ϕ₀=0 → importance distribution = target density → wᵢ=1, normalized:
@@ -49,20 +57,19 @@ end
     step(rng, model, sampler, state)
 Generic SMC sampler according to 3.1.1. (Sequential Monte Carol Samplers, Del Moral 2006)
 """
-function smc_step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo, old_state::SmcState)
-    # TODO Does a mutable SmcState make sense?
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo, old_state::SmcState)
     # Schedule the likelihood tempering
     new_temp = increment_temperature(sampler.temp_scheduler, old_state.temperature)
 
     # Draw new particles using the forward kernel
     proposed_sample = propose(sampler.kernel, old_state.sample, sampler.n_particles)
-    log_prior, log_likelihood = prior_and_likelihood(model, proposed_sample, new_temp)
-    log_full = add_logdensity(log_prior, log_likelihood)
+    log_prior, log_likelihood = prior_and_likelihood(model, proposed_sample)
+    log_full = tempered_logdensity(log_prior, log_likelihood, new_temp)
     proposed_sample = set_logp(proposed_sample, log_full)
     new_sample = forward(sampler.kernel, proposed_sample, old_state.sample)
 
     # Update weights using backward kernel
-    incr_weights = incremental_weights(sampler.kernel, new_sample, new_temp, old_state)
+    incr_weights = incremental_weights(sampler.kernel, new_sample, log_likelihood, new_temp, old_state)
     new_weights = add_logdensity(old_state.log_weights, incr_weights)
     new_evidence = old_state.log_evidence + logsumexp(new_weights)
     normalized_weights = normalize_log_weights(new_weights)
@@ -74,8 +81,8 @@ end
 
 # SmcKernels, implement:
 # proposal(kernel): Getter for the proposal
-# forward(kernel, new_sample, old_sample, new_temp, old_temp): forward kernel for the proposed sample
-# incremental_weights(kernel, new_sample, old_state): calculate the unnormalized incremental weights
+# forward(kernel, new_sample, old_state): forward kernel for the proposed sample
+# incremental_weights(kernel, new_sample, new_likelihood, new_temp, old_state): calculate the unnormalized incremental weights
 
 propose(kernel, previous_sample, n_particles) = propose(proposal(kernel), previous_sample, n_particles)
 
@@ -93,11 +100,11 @@ proposal(kernel::ForwardProposalKernel) = kernel.proposal
 forward(kernel::ForwardProposalKernel, new_sample, old_sample) = new_sample
 
 """
-    increment_weights(kernel, new_sample, new_temp, old_state)
+    increment_weights(kernel, new_sample, new_likelihood, new_temp, old_state)
 Calculate the unnormalized incremental log using a "forward proposal L-kernel" (Increasing the Efficiency of Sequential Monte Carlo Samplers..., Green 2022).
 The weights are updated similarly to a Metropolis-Hastings acceptance ratio.
 """
-function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, new_temp, old_state::SmcState)
+function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState)
     forward = transition_probability(kernel.proposal, new_sample, old_state.sample)
     backward = transition_probability(kernel.proposal, old_state.sample, new_sample)
     logprob(new_sample) .+ backward - logprob(old_state.sample) .- forward
@@ -112,9 +119,15 @@ proposal(kernel::MhKernel) = kernel.proposal
 forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel(kernel.rng, proposal(kernel), new_sample, old_sample)
 
 """
-    increment_weights(kernel, new_sample, new_temp, old_state)
+    increment_weights(kernel, new_sample, new_likelihood, new_temp, old_state)
 Calculate the unnormalized incremental log using an MCMC Kernel (Sequential Monte Carlo Samplers, Del Moral 2006).
-For a likelihood tempered target γᵢ = p(z|θ)ᵠp(θ) the formula simplifies to γ₂/γ₁ = p(z|θ₁)^(ϕ₂ - ϕ₁) (Efficient Sequential Monte-Carlo Samplers for Bayesian Inference, Nguyen 2016)
+For a likelihood tempered target γᵢ = p(z|θ)ᵠp(θ) the incremental weight formula simplifies to γ₂/γ₁ = p(z|θ₁)^(ϕ₂ - ϕ₁) (Efficient Sequential Monte-Carlo Samplers for Bayesian Inference, Nguyen 2016)
+"""
+# TODO revert to log_likelihood and do not temper in PosteriorModel since there is almost no expected performance gain since only ϕ₀=0
+incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* old_state.log_likelihood
+# TODO why is ith so much better?
+# incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* new_likelihood
+
 """
 incremental_weights(::MhKernel, new_sample::Sample, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* old_state.log_likelihood
 

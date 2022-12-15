@@ -55,23 +55,13 @@ DensityInterface.logdensityof(posterior::PosteriorModel, sample, ϕ=1) = add_log
 """
     logdensityof(posterior, sample, [ϕ=1])
 Takes care of transforming the sample according to the bijectors of the prior and adding the logjac correction.
-Allows tempering of the likelihood via ϕ:  p(θ|z) ∝ p(z|θ)ᵠ p(θ)
 Returns ℓ_prior, ℓ_likelihood
 """
-function prior_and_likelihood(posterior::PosteriorModel, sample, ϕ=1)
+function prior_and_likelihood(posterior::PosteriorModel, sample)
     model_sample, logjac = to_model_domain(sample, posterior.bijectors)
     ℓ_prior = logdensityof(posterior.prior, variables(model_sample))
     ℓ_prior_logjac = add_logdensity(ℓ_prior, logjac)
-    # Early stopping if only the prior needs to be evaluated
-    if iszero(ϕ)
-        return ℓ_prior_logjac, one.(ℓ_prior_logjac)
-    end
-
     conditioned_sample = merge(model_sample, posterior.data)
     ℓ_likelihood = logdensityof(posterior.likelihood, variables(conditioned_sample))
-    if ϕ != 1
-        # Often p(θ|z) ∝ p(z|θ)¹p(θ) is wanted -> save matrix multiplications
-        ℓ_likelihood .*= ϕ
-    end
     ℓ_prior_logjac, ℓ_likelihood
 end
