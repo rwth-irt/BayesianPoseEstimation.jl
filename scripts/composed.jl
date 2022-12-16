@@ -40,22 +40,8 @@ end
 
 observation = fake_observation(parameters, render_context, 0.4)
 
-function plot_pose_chain(model_chain, step=200)
-    plt_t_chain = plot_variable(model_chain, :t, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Position [m]", legend=false)
-    plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=false, left_margin=5mm)
-
-    plt_r_chain = plot_variable(model_chain, :r, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Orientierung [rad]", legend=false, top_margin=5mm)
-    plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientierung [rad]", ylabel="Wahrscheinlichkeit", legend=false)
-
-    plot(
-        plt_t_chain, plt_r_chain,
-        plt_t_dens, plt_r_dens,
-        layout=(2, 2)
-    )
-end
-
-function plot_o_chain(model_chain, step=200)
-    plt_o_chain = plot_variable(model_chain, :o, step; label="o", xlabel="Iteration [÷ $(step)]", ylabel="Zugehörigkeit", legend=false)
+function plot_o_chain(model_chain, len=50)
+    plt_o_chain = plot_variable(model_chain, :o, len; label="o", xlabel="Iteration [÷ $(len)]", ylabel="Zugehörigkeit", legend=false)
     plt_o_dens = density_variable(model_chain, :o; label="o", xlabel="Zugehörigkeit [0,1]", ylabel="Wahrscheinlichkeit", legend=false)
     plot(plt_o_chain, plt_o_dens)
 end
@@ -139,16 +125,16 @@ parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
 parameters = @set parameters.normalization_constant = 10
 model_chain = run_inference(parameters, render_context, observation, 1_000, 50; thinning=1);
-plot_pose_chain(model_chain, length(model_chain) ÷ 50)
+plot_pose_chain(model_chain, 50)
 
-plot_logprob(model_chain, length(model_chain) ÷ 50)
+plot_logprob(model_chain, 50)
 # NOTE I would have expected it to converge around 0.8
-plot_o_chain(model_chain, length(model_chain) ÷ 50)
+plot_o_chain(model_chain, 50)
 
 # gr()
 # anim = @animate for i ∈ 0:2:360
-#     scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-# end
+#     scatter_position(model_chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+# end;
 # gif(anim, "anim_fps15.gif", fps=20)
 # pyplot()
 

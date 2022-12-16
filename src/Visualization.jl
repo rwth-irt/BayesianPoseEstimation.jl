@@ -103,7 +103,32 @@ plotable_matrix(chain::AbstractVector{<:Sample}, var_name, len=length(chain)) = 
 
 plotable_matrix(final_sample::Sample, var_name, len=last(size(variables(final_sample)[var_name]))) = plotable_matrix(step_data(variables(final_sample)[var_name], len))
 
-# Position plotting
+# Pose plotting
+
+function plot_pose_density(sample, len=50; kwargs...)
+    plt_t_dens = density_variable(sample, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Density", legend=false, kwargs...)
+
+    plt_r_dens = density_variable(sample, :r; label=["x" "y" "z"], xlabel="Orientation [rad]", ylabel="Density", legend=false, kwargs...)
+
+    plot(
+        plt_t_dens, plt_r_dens,
+        layout=(2, 1)
+    )
+end
+
+function plot_pose_chain(model_chain, len=50)
+    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Position [m]", legend=false)
+    plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Density", legend=false, left_margin=5mm)
+
+    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Orientation [rad]", legend=false, top_margin=5mm)
+    plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientation [rad]", ylabel="Density", legend=false)
+
+    plot(
+        plt_t_chain, plt_r_chain,
+        plt_t_dens, plt_r_dens,
+        layout=(2, 2)
+    )
+end
 
 """
     scatter_position(M; c_grad)
@@ -114,10 +139,14 @@ function scatter_position(M::AbstractMatrix; c_grad=:viridis, kwargs...)
     mz = [1:length(M[1, :])+1...]
     s = size(M)
     s = size(mz)
-    scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), markersize=3, xlabel="x", ylabel="y", zlabel="z", label="sample number [÷$(step)]", kwargs...)
+    scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), markersize=3, xlabel="x", ylabel="y", zlabel="z", kwargs...)
 end
 
-scatter_position(chain; var_name=:t, len=100, c_grad=:viridis, kwargs...) = scatter_position(plotable_matrix(chain, var_name, len); c_grad=c_grad, kwargs...)
+function scatter_position(chain, len=100; var_name=:t, c_grad=:viridis, kwargs...)
+    M = plotable_matrix(chain, var_name, len)
+    step = round(last(size(M)) / len; digits=1)
+    scatter_position(M; c_grad=c_grad, label="sample number [÷$(step)]", kwargs...)
+end
 
 """
     density_variable(chain, var_name; kwargs...)

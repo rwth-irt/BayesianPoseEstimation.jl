@@ -42,20 +42,6 @@ end
 
 observation = fake_observation(parameters, render_context, 0.4)
 
-function plot_pose_chain(model_chain, step=200)
-    plt_t_chain = plot_variable(model_chain, :t, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Position [m]", legend=false)
-    plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=false, left_margin=5mm)
-
-    plt_r_chain = plot_variable(model_chain, :r, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Orientierung [rad]", legend=false, top_margin=5mm)
-    plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientierung [rad]", ylabel="Wahrscheinlichkeit", legend=false)
-
-    plot(
-        plt_t_chain, plt_r_chain,
-        plt_t_dens, plt_r_dens,
-        layout=(2, 2)
-    )
-end
-
 function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_particles=500; kwargs...)
     # Device
     if parameters.device === :CUDA
@@ -116,6 +102,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)
 
     # sampler = composed_sampler
+    # sampler = sym_smc_mh
+    sampler = sym_smc_fp
     # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
     # sampler = sym_smc_boot
 
@@ -136,15 +124,13 @@ parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples while MCMC kernels tend to perform better with more steps
 final_sample, final_state = run_inference(parameters, render_context, observation, 1_000, 50);
 
-# TODO generalize plots
 println("Final log-evidence: $(final_state.log_evidence)")
-density(transpose(variables(final_sample).t); fill=true, fillalpha=0.4, trim=true)
-M = map(variables(final_sample).r) do q
-    r_q = QuatRotation(q)
-    r_xyz = RotXYZ(r_q)
-    [r_xyz.theta1, r_xyz.theta2, r_xyz.theta3]
-end;
-M = hcat(M...);
-density(M'; fill=true, fillalpha=0.4, trim=true)
+plot_pose_density(final_sample, 50; trim=true)
 
+gr()
+anim = @animate for i ∈ 0:2:360
+    scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+end;
+gif(anim, "anim_fps15.gif", fps=20)
+pyplot()
 # TODO diagnostics: Accepted steps, resampling steps

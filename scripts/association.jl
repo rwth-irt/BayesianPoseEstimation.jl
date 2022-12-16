@@ -40,20 +40,6 @@ end
 
 observation = fake_observation(parameters, render_context, 0.4)
 
-function plot_pose_chain(model_chain, step=200)
-    plt_t_chain = plot_variable(model_chain, :t, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Position [m]", legend=false)
-    plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Wahrscheinlichkeit", legend=false, left_margin=5mm)
-
-    plt_r_chain = plot_variable(model_chain, :r, step; label=["x" "y" "z"], xlabel="Iteration [÷ $(step)]", ylabel="Orientierung [rad]", legend=false, top_margin=5mm)
-    plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientierung [rad]", ylabel="Wahrscheinlichkeit", legend=false)
-
-    plot(
-        plt_t_chain, plt_r_chain,
-        plt_t_dens, plt_r_dens,
-        layout=(2, 2)
-    )
-end
-
 function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_tries=250; kwargs...)
     # Device
     if parameters.device === :CUDA
@@ -135,8 +121,8 @@ parameters = @set parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
 model_chain = run_inference(parameters, render_context, observation, 10_000, 50; thinning=1);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
-plot_pose_chain(model_chain, length(model_chain) ÷ 50)
-plot_logprob(model_chain, length(model_chain) ÷ 50)
+plot_pose_chain(model_chain, 50)
+plot_logprob(model_chain, 50)
 
 # NOTE This does not look too bad. The most likely issue is the logjac correction which is calculated over all the pixels instead of the valid
 plot_prob_img(mean_image(model_chain, :o) |> Array)
@@ -144,7 +130,7 @@ plot_prob_img(model_chain[end].variables.o |> Array)
 
 gr()
 anim = @animate for i ∈ 0:2:360
-    scatter_position(model_chain, 100, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-end
+    scatter_position(model_chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+end;
 gif(anim, "anim_fps15.gif", fps=20)
 pyplot()
