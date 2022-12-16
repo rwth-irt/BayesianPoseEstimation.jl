@@ -242,6 +242,23 @@ Base.minimum(::KernelCircularUniform{T}) where {T} = zero(T)
 Bijectors.bijector(::KernelCircularUniform) = Circular{0}()
 Distributions.insupport(dist::KernelCircularUniform, x::Real) = minimum(dist) <= x <= maximum(dist)
 
+# KernelDirac
+
+struct KernelDirac{T<:Real} <: AbstractKernelDistribution{T,Discrete}
+    value::T
+end
+
+Base.show(io::IO, dist::KernelDirac{T}) where {T} = print(io, "KernelDirac{$(T)}, value: $(dist.value)")
+
+Distributions.logpdf(dist::KernelDirac{T}, x) where {T<:Real} = insupport(dist, x) ? zero(T) : typemin(T)
+
+Base.rand(::AbstractRNG, dist::KernelDirac) = dist.value
+
+Base.maximum(dist::KernelDirac) = dist.value
+Base.minimum(dist::KernelDirac) = dist.value
+Bijectors.bijector(::KernelDirac) = ZeroIdentity()
+Distributions.insupport(dist::KernelDirac, x::Real) = x == dist.value
+
 # KernelBinaryMixture
 
 # Value support makes only sense to be either Discrete or Continuous

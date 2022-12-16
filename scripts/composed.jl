@@ -74,7 +74,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
     # NOTE takes longer to converge than Dirac and does not work well if actual occlusion is present. Occlusion should lead to low o which leads to low confidence in the data
-    o = BroadcastedNode(:o, dev_rng, Dirac, parameters.prior_o)
+    o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
     # TODO o = BroadcastedNode(:o, dev_rng, KernelUniform, parameters.precision)
 
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)

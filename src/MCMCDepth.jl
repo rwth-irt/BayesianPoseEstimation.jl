@@ -78,6 +78,7 @@ export AbstractKernelDistribution
 export measure_theory, kernel_distribution
 export KernelBinaryMixture
 export KernelCircularUniform
+export KernelDirac
 export KernelExponential
 export KernelNormal
 export KernelUniform

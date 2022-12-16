@@ -76,6 +76,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
     association_fn = pixel_association | (dist_is, dist_not, parameters.prior_o)
     o = DeterministicNode(:o, (expectation) -> association_fn.(expectation, observation.z), (; μ=μ))
+    # NOTE almost no performance gain over DeterministicNode
+    # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
 
     # NOTE valid_pixel diverges without normalization
     pixel_model = valid_pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
@@ -114,8 +116,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)
 
     # sampler = composed_sampler
-    sampler = sym_smc_mh
-    # sampler = sym_smc_fp
+    # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
     # sampler = sym_smc_boot
 
     sample, state = step(rng, posterior, sampler)
