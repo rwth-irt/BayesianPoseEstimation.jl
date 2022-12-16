@@ -4,6 +4,7 @@
 
 using ColorSchemes
 using CoordinateTransformations: SphericalFromCartesian
+using EllipsisNotation
 using IterTools: partition
 using Plots
 using Plots.PlotMeasures
@@ -25,6 +26,8 @@ correct_fontsize(::Plots.AbstractBackend, font_size) = font_size |> round
 correct_size(size) = correct_size(Plots.backend(), size)
 # 4//3 plotly magic number??
 correct_size(::Plots.AbstractBackend, size) = size .* (mm / px) .|> round
+
+# Image plotting
 
 """
     value_or_typemax(x, [value=zero(x)])
@@ -61,63 +64,64 @@ Plot a probability image with a given `color_scheme` and use black for values of
 """
 plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]", kwargs...) = plot_depth_img(img; value_to_typemax=nothing, color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title, clims=(0, 1), kwargs...)
 
+# Position and Orientation conversion
+
 """
-  convert(Matrix, chain, var_name::Symbol, step = 1)
-Converts the chain to a column matrix of the variable `var_name`.
+    step_data(A, len)
+Returns a view of the sub data where the last dimensions has length `len`.
 """
-function Base.convert(::Type{Matrix}, chain::AbstractVector{<:Sample}, var_name::Symbol, step=1)
-    M = hcat([variables(chain[i])[var_name] for i in 1:step:length(chain)]...)
-    # TODO should this be hidden in here?
-    if M isa AbstractArray{<:Quaternion}
-        M = map(M) do q
-            r_q = QuatRotation(q)
-            r_xyz = RotXYZ(r_q)
-            [r_xyz.theta1, r_xyz.theta2, r_xyz.theta3]
-        end
-        M = hcat(M...)
-    end
-    M
+step_data(A, len) = @view A[.., round.(Int, LinRange(1, last(size(A)), len))]
+
+plotable_matrix(vec::AbstractVector) = hcat(vec...)
+plotable_matrix(M::AbstractMatrix) = M
+
+plotable_matrix(vec::AbstractVector{<:Quaternion}) = plotable_matrix(rotxyz_vector.(vec))
+
+function rotxyz_vector(q::Quaternion)
+    r_q = QuatRotation(q)
+    r_xyz = RotXYZ(r_q)
+    [r_xyz.theta1, r_xyz.theta2, r_xyz.theta3]
 end
 
 """
-  convert(Matrix, chain, var_name::Symbol, step = 1)
-Converts the chains to a column matrix of the variable `var_name`.
+    position_matrix(chain, var_name, [len=n_samples])
+Generate a Matrix with [x,y,z;len] for each position in the chain.
 """
-Base.convert(::Type{Matrix}, chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name::Symbol, step=1) = hcat([Base.convert(Matrix, c, var_name, step) for c in chains]...)
+plotable_matrix(chain::AbstractVector{<:Sample}, var_name, len=length(chain)) = plotable_matrix(getindex.(variables.(step_data(chain, len)), [var_name]))
+
+plotable_matrix(final_sample::Sample, var_name, len=last(size(variables(final_sample)[var_name]))) = plotable_matrix(step_data(variables(final_sample)[var_name], len))
+
+# Position plotting
 
 """
-  scatter_position(M; c_grad)
-Creates a 3D scatter plot of the column matrix.
+    scatter_position(M; c_grad)
+Creates a 3D scatter plot of the matrix.
 """
 function scatter_position(M::AbstractMatrix; c_grad=:viridis, kwargs...)
     # z value for color in order of the samples
     mz = [1:length(M[1, :])+1...]
     s = size(M)
     s = size(mz)
-    scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), markersize=3, xlabel="x", ylabel="y", zlabel="z", kwargs...)
+    scatter(M[1, :], M[2, :], M[3, :]; marker_z=mz, color=cgrad(c_grad), markersize=3, xlabel="x", ylabel="y", zlabel="z", label="sample number [÷$(step)]", kwargs...)
 end
 
-"""
-    scatter_position(chains, [step]; c_grad, kwargs...)
-Creates a 3D scatter plot of the chain for the given variable.
-"""
-scatter_position(chains::AbstractVector, step=1; c_grad=:viridis, kwargs...) = scatter_position(Base.convert(Matrix, chains, :t, step); c_grad=c_grad, label="sample number [÷$(step)]", kwargs...)
+scatter_position(chain; var_name=:t, len=100, c_grad=:viridis, kwargs...) = scatter_position(plotable_matrix(chain, var_name, len); c_grad=c_grad, kwargs...)
 
 """
-    density_variable(chains, var_name, [step]; kwargs...)
+    density_variable(chain, var_name; kwargs...)
 Creates a density plot for the given variable.
 """
-function histogram_variable(chains, var_name, step=1; kwargs...)
-    M = convert(Matrix, chains, var_name, step)
+function histogram_variable(chain, var_name; kwargs...)
+    M = plotable_matrix(chain, var_name)
     histogram(transpose(M); fill=true, fillalpha=0.4, kwargs...)
 end
 
 """
-    density_variable(chains, var_name, [step]; kwargs...)
+    density_variable(chain, var_name; kwargs...)
 Creates a density plot for the given variable.
 """
-function density_variable(chains, var_name, step=1; kwargs...)
-    M = convert(Matrix, chains, var_name, step)
+function density_variable(chain, var_name; kwargs...)
+    M = plotable_matrix(chain, var_name)
     density(transpose(M); fill=true, fillalpha=0.4, palette=distinguishable_rwth(first(size(M))), trim=true, kwargs...)
 end
 
