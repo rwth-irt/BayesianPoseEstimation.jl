@@ -64,6 +64,18 @@ Plot a probability image with a given `color_scheme` and use black for values of
 """
 plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]", kwargs...) = plot_depth_img(img; value_to_typemax=nothing, color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title, clims=(0, 1), kwargs...)
 
+"""
+    mean_image(chain, var_name)
+Creates an image of the mean of the given variable.
+"""
+mean_image(chain::AbstractVector{<:Sample}, var_name) = mean(x -> variables(x)[var_name], chain)
+
+"""
+    mean_image(chain, var_name)
+Creates an image of the mean of the given variable.
+"""
+mean_image(chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name) = mean(x -> mean_image(x, var_name), chains)
+
 # Position and Orientation conversion
 
 """
@@ -126,20 +138,20 @@ function density_variable(chain, var_name; kwargs...)
 end
 
 """
-    polar_density_variable(chains, var_name, [step]; palette, kwargs...)
+    polar_density_variable(chain, var_name; kwargs...)
 Creates a density plot in polar coordinates for the given variable.
 """
-function polar_density_variable(chains, var_name, step=1; kwargs...)
-    M = convert(Matrix, chains, var_name, step)
+function polar_density_variable(chain, var_name; kwargs...)
+    M = plotable_matrix(chain, var_name)
     stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=distinguishable_rwth(first(size(M))), trim=true, kwargs...)
 end
 
 """
-    polar_histogram_variable(chains, var_name, [step], [nbins], palette)
+    polar_histogram_variable(chain, var_name, [nbins], palette)
 Creates a histogram plot in polar coordinates for the given variable.
 """
-function polar_histogram_variable(chains, var_name; step=1, nbins=90, kwargs...)
-    M = convert(Matrix, chains, var_name, step)
+function polar_histogram_variable(chain, var_name; nbins=90, kwargs...)
+    M = plotable_matrix(chain, var_name)
     bins = range(0, 2π, length=nbins)
     pl = plot(palette=distinguishable_rwth(first(size(M))))
     for i in 1:size(M, 1)
@@ -150,40 +162,28 @@ function polar_histogram_variable(chains, var_name; step=1, nbins=90, kwargs...)
 end
 
 """
-    polar_variable(chains, var_name, [step]; kwargs....)
+    plot_variable(chain, var_name, [len=100]; kwargs....)
 Line plot of the variable.
 """
-function plot_variable(chains, var_name, step=1; kwargs...)
-    M = convert(Matrix, chains, var_name, step)
+function plot_variable(chain, var_name, len=100; kwargs...)
+    M = plotable_matrix(chain, var_name, len)
     scatter(transpose(M); palette=distinguishable_rwth(first(size(M))), kwargs...)
 end
 
+plot_logprob(logprobs::AbstractVector{<:Number}; kwargs...) = scatter(logprobs; palette=distinguishable_rwth(first(size(logprobs))), label="logprob", kwargs...)
+
 """
-    plot_logprob(chains, [step]; kwargs...)
+    plot_logprob(chains, [len=100]; kwargs...)
 Plot of the logdensity over the samples.
 """
-function plot_logprob(chains, step=1; kwargs...)
-    logprobs = hcat([logprob(chains[i]) for i in 1:step:length(chains)]...)
-    scatter(transpose(logprobs); palette=distinguishable_rwth(first(size(logprobs))), label="logprob", kwargs...)
-end
+plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprob.(chain), len))
+plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprob(final_sample), len))
 
 """
-    mean_prob_image(chain, var_name)
-Creates an image of the mean of the given variable.
-"""
-mean_image(chain::AbstractVector{<:Sample}, var_name) = mean(x -> variables(x)[var_name], chain)
-
-"""
-    mean_prob_image(chain, var_name)
-Creates an image of the mean of the given variable.
-"""
-mean_image(chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name) = mean(x -> mean_image(x, var_name), chains)
-
-"""
-    discrete_palette(cscheme, length)
+    discrete_palette(cscheme, [len=3])
 Returns a discretized version of the color palette.
 """
-discrete_palette(cscheme=:viridis, length::Int64=3) = get(colorschemes[cscheme], range(0.0, 1.0, length=length))
+discrete_palette(cscheme=:viridis, len::Int64=3) = get(colorschemes[cscheme], range(0.0, 1.0, length=len))
 
 """
     sphere_density(rotations, [point]; [n_θ, n_ϕ, color], kwargs...)
@@ -219,6 +219,16 @@ function sphere_density(rotations, point=[0, 0, 1]; n_θ=50, n_ϕ=25, color=:vir
 
     # override fill_z to use the weights for the surface color
     surface(x_surf, y_surf, z_surf; fill_z=weights, color=color, kwargs...)
+end
+
+function sphere_density(chain::AbstractVector{<:Sample}, var_name=:r, point=[0, 0, 1]; kwargs...)
+    rotations = QuatRotation.(getindex.(variables.(step_data(chain, length(chain))), var_name))
+    sphere_density(rotations, point; kwargs...)
+end
+
+function sphere_density(final_sample::Sample, var_name=:r, point=[0, 0, 1]; kwargs...)
+    rotations = QuatRotation.(variables(final_sample)[var_name])
+    sphere_density(rotations, point; kwargs...)
 end
 
 """
