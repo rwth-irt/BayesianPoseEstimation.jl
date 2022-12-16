@@ -46,14 +46,13 @@ end
 # DensityInterface
 @inline DensityKind(::PosteriorModel) = HasDensity()
 """
-    logdensityof(posterior, sample, [ϕ=1])
+    logdensityof(posterior, sample)
 Takes care of transforming the sample according to the bijectors of the prior and adding the logjac correction.
-Allows tempering of the likelihood via ϕ:  p(θ|z) ∝ p(z|θ)ᵠ p(θ)
 """
-DensityInterface.logdensityof(posterior::PosteriorModel, sample, ϕ=1) = add_logdensity(prior_and_likelihood(posterior, sample, ϕ)...)
+DensityInterface.logdensityof(posterior::PosteriorModel, sample) = add_logdensity(prior_and_likelihood(posterior, sample)...)
 
 """
-    logdensityof(posterior, sample, [ϕ=1])
+    logdensityof(posterior, sample)
 Takes care of transforming the sample according to the bijectors of the prior and adding the logjac correction.
 Returns ℓ_prior, ℓ_likelihood
 """
