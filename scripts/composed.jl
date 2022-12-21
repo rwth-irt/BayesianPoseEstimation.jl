@@ -15,8 +15,8 @@ using Random
 using Plots
 using Plots.PlotMeasures
 
-pyplot()
-MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
+gr()
+MCMCDepth.diss_defaults()
 
 parameters = Parameters()
 parameters = @set parameters.device = :CUDA
@@ -131,12 +131,10 @@ plot_logprob(model_chain, 50)
 # NOTE I would have expected it to converge around 0.8
 plot_o_chain(model_chain, 50)
 
-# gr()
 # anim = @animate for i ∈ 0:2:360
 #     scatter_position(model_chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 # end;
 # gif(anim, "anim_fps15.gif", fps=20)
-# pyplot()
 
 # plot(
 #     plot_depth_img(obs.z |> Array),

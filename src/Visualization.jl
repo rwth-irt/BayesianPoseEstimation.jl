@@ -16,9 +16,19 @@ distinguishable_rwth(n) = distinguishable_colors(n, RWTH_blue, lchoices=0:75)
 
 """
     diss_default(;kwargs...)
-
+Install fonts for matplotlib
+    - Arial = Helvetica
+    - Times New Romans
+    - Carlito (google) = Calibri
+    - Caladea (google) = Cambria
+```bash
+apt install ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
+fc-cache
+rm -rf ~/.cache/matplotlib
+julia> fonts = PyPlot.matplotlib.font_manager.FontManager().get_font_names()
+```
 """
-diss_defaults(; size=(148.4789, 83.5193), fontsize=11, fontfamily="helvetica", kwargs...) = Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(0.8 * fontsize), colorbar_tickfontsize=correct_fontsize(0.8 * fontsize), annotationfontsize=correct_fontsize(fontsize), size=correct_size(size), fontfamily=fontfamily, colorbar_tickfontfamily=fontfamily, markersize=2, markerstrokewidth=0.5, kwargs...)
+diss_defaults(; size=(148.4789, 83.5193), fontsize=11, fontfamily="Helvetica", kwargs...) = Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(0.8 * fontsize), colorbar_tickfontsize=correct_fontsize(0.8 * fontsize), annotationfontsize=correct_fontsize(fontsize), size=correct_size(size), fontfamily=fontfamily, colorbar_tickfontfamily=fontfamily, markersize=2, markerstrokewidth=0.5, kwargs...)
 
 correct_fontsize(font_size) = correct_fontsize(Plots.backend(), font_size)
 correct_fontsize(::Plots.AbstractBackend, font_size) = font_size |> round

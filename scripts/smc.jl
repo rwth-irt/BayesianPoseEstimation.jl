@@ -16,8 +16,8 @@ using Plots
 using Plots.PlotMeasures
 using ProgressLogging
 
-pyplot()
-MCMCDepth.diss_defaults(; fontfamily="Carlito", fontsize=11, markersize=2.5, size=(160, 90))
+gr()
+MCMCDepth.diss_defaults()
 
 parameters = Parameters()
 # NOTE takes 3min instead of 3sec
@@ -127,10 +127,8 @@ final_sample, final_state = run_inference(parameters, render_context, observatio
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample, 50; trim=true)
 
-gr()
 anim = @animate for i ∈ 0:2:360
     scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
 gif(anim, "anim_fps15.gif", fps=20)
-pyplot()
 # TODO diagnostics: Accepted steps, resampling steps
