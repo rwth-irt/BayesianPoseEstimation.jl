@@ -24,6 +24,7 @@ include("PosteriorModel.jl")
 include("BijectorsExtensions.jl")
 # Distributions
 include("KernelDistributions.jl")
+include("SmoothExponential.jl")
 include("BroadcastedDistribution.jl")
 include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
