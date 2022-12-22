@@ -50,10 +50,9 @@ plot!(r, [full_pdf(θ, σ, mini, maxi, z) for z in r], linewidth=2.5)
 
 # Check whether the logdensity is correct
 plot(r, [full_logpdf(θ, σ, mini, maxi, z) for z in r]);
-plot!(r, [log(full_pdf(θ, σ, mini, maxi, z)) for z in r])
+plot!(r, [log(full_pdf(θ, σ, mini, maxi, z)) for z in r]);
 plot!(r, [logdensityof(dist, z) for z in r])
 
 @benchmark logdensityof(dist, 0.9f0)
 @benchmark full_logpdf(θ, σ, mini, maxi, 0.9f0)
 @benchmark full_pdf(θ, σ, mini, maxi, 0.9f0)
-
