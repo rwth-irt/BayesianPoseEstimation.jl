@@ -83,6 +83,7 @@ export KernelDirac
 export KernelExponential
 export KernelNormal
 export KernelUniform
+export SmoothExponential
 
 export ProductBroadcastedDistribution
 export BroadcastedDistribution

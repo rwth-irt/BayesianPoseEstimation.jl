@@ -21,21 +21,25 @@ end
 Base.show(io::IO, dist::SmoothExponential{T}) where {T} = print(io, "SmoothExponential{$(T)}, θ: $(dist.θ),  σ: $(dist.σ), min: $(dist.min), max: $(dist.max)")
 
 # Accurate uses lower and upper bound
-acc_logerf(d::SmoothExponential{T}, x) where {T} = loghalf + logerf(
-    (d.min + d.σ^2 / d.θ - x) / (sqrt2 * d.σ),
-    (d.max + d.σ^2 / d.θ - x) / (sqrt2 * d.σ))
+function accurate_logerf(d::SmoothExponential{T}, x) where {T}
+    invsqrt2σ = inv(sqrt2 * d.σ)
+    common = d.σ / (sqrt2 * d.θ) - x * invsqrt2σ
+    lower = d.min * invsqrt2σ
+    upper = d.max * invsqrt2σ
+    loghalf + logerf(common + lower, common + upper)
+end
 # NOTE for upper bound only, when σ ≪ min_depth, StatsFuns.jl has some extra numerical stability implementations. On CPU, it can be 5x faster, on GPU almost no difference
-perf_logerf(d::SmoothExponential, x) = normlogccdf(d.max + d.σ^2 / d.θ, d.σ, x)
+performant_logerf(d::SmoothExponential, x) = normlogccdf(d.max + d.σ^2 / d.θ, d.σ, x)
 
-acc_normalization(d::SmoothExponential) = -log(exp(-d.min / d.θ) - exp(-d.max / d.θ))
-perf_normalization(d::SmoothExponential) = -log1p(-exp(-d.max / d.θ))
+accurate_normalization(d::SmoothExponential) = -logsubexp(-d.min / d.θ, -d.max / d.θ)
+performant_normalization(d::SmoothExponential) = -log1p(-exp(-d.max / d.θ))
 
-acc_factor(d::SmoothExponential, x) = (-x / d.θ + (d.σ / d.θ)^2 / 2) - log(d.θ) + acc_normalization(d)
-perf_factor(d::SmoothExponential, x) = (-x / d.θ + (d.σ / d.θ)^2 / 2) - log(d.θ) + perf_normalization(d)
+accurate_factor(d::SmoothExponential, x) = (-x / d.θ + (d.σ / d.θ)^2 / 2) - log(d.θ) + accurate_normalization(d)
+performant_factor(d::SmoothExponential, x) = (-x / d.θ + (d.σ / d.θ)^2 / 2) - log(d.θ) + performant_normalization(d)
 
 # Distributions.logpdf(dist::SmoothExponential{T}, x) where {T} = insupport(dist, x) ? perf_factor(dist, x) + perf_logerf(dist, x) : typemin(T)
 
-Distributions.logpdf(dist::SmoothExponential{T}, x) where {T} = insupport(dist, x) ? acc_factor(dist, x) + acc_logerf(dist, x) : typemin(T)
+Distributions.logpdf(dist::SmoothExponential{T}, x) where {T} = insupport(dist, x) ? accurate_factor(dist, x) + accurate_logerf(dist, x) : typemin(T)
 
 # Exponential convoluted with normal: Sample from exponential and then add noise of normal
 # TODO test if the plots match
