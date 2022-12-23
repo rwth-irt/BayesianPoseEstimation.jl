@@ -80,6 +80,7 @@ export KernelCircularUniform
 export KernelDirac
 export KernelExponential
 export KernelNormal
+export KernelTailUniform
 export KernelUniform
 export SmoothExponential
 
@@ -149,7 +150,7 @@ export render_fn
 export smooth_mixture
 export smooth_tail
 export smooth_valid_mixture
-export smooth_valid_mixture
+export smooth_valid_tail
 export valid_pixel_explicit
 export valid_pixel_mixture
 export valid_pixel_normal

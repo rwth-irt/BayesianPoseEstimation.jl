@@ -88,6 +88,7 @@ using DensityInterface
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     # Images are always 2D
     n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
+    # TODO checks if the whole array is zero and neglects rows
     if iszero(n_pixel)
         # Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely
         typemin(ℓ)
@@ -134,12 +135,9 @@ end
 valid_pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
-    # TODO Does truncated make a difference? Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
-    # exponential = KernelExponential
-    # truncated must satisfy: lower <= upper → max(min_depth, μ)
-    # TODO what about the μ in the association model?
-    exponential = truncated(KernelExponential(θ), min_depth, max(min_depth, μ))
-    uniform = KernelUniform(zero(T), max_depth)
+    # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
+    exponential = KernelExponential()
+    uniform = KernelTailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
     KernelBinaryMixture(exponential, uniform, one(T), one(T))
 end
@@ -156,11 +154,13 @@ smooth_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) wher
 
 function smooth_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
     exponential = SmoothExponential(min_depth, μ, θ, σ)
-    # TODO uniform not smooth
-    uniform = KernelUniform(min_depth, max_depth)
+    uniform = KernelTailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
     KernelBinaryMixture(exponential, uniform, one(T), one(T))
 end
+
+smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, smooth_tail(min_depth, max_depth, θ, σ, μ))
+
 
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
 valid_pixel_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))

@@ -225,6 +225,30 @@ Base.minimum(dist::KernelUniform) = dist.min
 Bijectors.bijector(dist::KernelUniform) = Bijectors.TruncatedBijector{0}(minimum(dist), maximum(dist))
 Distributions.insupport(dist::KernelUniform, x::Real) = minimum(dist) <= x <= maximum(dist)
 
+# KernelTailUniform
+
+"""
+    KernelTailUniform(min, max)
+Acts like a uniform distribution of [min,max] but ignores outliers and always returns 1/(max-min) as probability.
+"""
+struct KernelTailUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous}
+    min::T
+    max::T
+end
+KernelTailUniform(min::Real, max::Real) = KernelTailUniform(promote(min, max)...)
+KernelTailUniform(::Type{T}=Float32) where {T} = KernelTailUniform{T}(0.0, 1.0)
+
+Base.show(io::IO, dist::KernelTailUniform{T}) where {T} = print(io, "KernelTailUniform{$(T)}, a: $(dist.min), b: $(dist.max)")
+
+Distributions.logpdf(dist::KernelTailUniform{T}, x) where {T<:Real} = -log(dist.max - dist.min)
+
+Base.rand(rng::AbstractRNG, dist::KernelTailUniform{T}) where {T} = (dist.max - dist.min) * rand(rng, T) + dist.min
+
+Base.maximum(::KernelTailUniform{T}) where {T} = typemax(T)
+Base.minimum(::KernelTailUniform{T}) where {T} = typemin(T)
+Bijectors.bijector(::KernelTailUniform) = ZeroIdentity()
+Distributions.insupport(dist::KernelTailUniform, x::Real) = true
+
 # KernelCircularUniform
 
 struct KernelCircularUniform{T<:Real} <: AbstractKernelDistribution{T,Continuous} end

@@ -57,13 +57,14 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
     dist_is = valid_pixel_normal | parameters.association_σ
-    dist_not = smooth_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+    dist_not = smooth_valid_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.association_σ)
     association_fn = pixel_association | (dist_is, dist_not, parameters.prior_o)
     o = DeterministicNode(:o, (expectation) -> association_fn.(expectation, observation.z), (; μ=μ))
     # NOTE almost no performance gain over DeterministicNode
     # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
 
     # NOTE valid_pixel diverges without normalization
+    # TODO check if parametrization is correct
     pixel_model = smooth_valid_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
@@ -113,14 +114,14 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 end
 
 # NOTE SMC: tempering is essential? 
-# NOTE MCMC Kernel: Use higher normalization_constant since it will be tempered, resampling not that often... maybe set ESS threshold higher?
-# NOTE FP & Bootstrap: Lower normalization seems beneficial
+# NOTE MCMC Kernel: Use higher normalization_constant e.g. 30 since it will be tempered, resampling not that often... maybe set ESS threshold higher?
+# NOTE FP & Bootstrap: Lower normalization seems beneficial, e.g. 15
 parameters = @set parameters.normalization_constant = 15;
 parameters = @set parameters.proposal_σ_r_quat = 0.1;
 parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01];
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples while MCMC kernels tend to perform better with more steps
-final_sample, final_state = run_inference(parameters, render_context, observation, 1_000, 50);
+final_sample, final_state = run_inference(parameters, render_context, observation, 2_000, 50);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample, 50; trim=true)
