@@ -72,7 +72,6 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     posterior = PosteriorModel(z_norm, observation)
 
     # Assemble samplers
-    # temp_schedule = ConstantSchedule()
     # temp_schedule = ExponentialSchedule(n_steps, 0.9999)
     # NOTE LinearSchedule seems reasonable
     temp_schedule = LinearSchedule(n_steps)
@@ -96,8 +95,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     sym_boot_kernel = BootstrapKernel(sym_proposal)
     sym_smc_boot = SequentialMonteCarlo(sym_boot_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
 
-    # TODO ComposedSampler for individual components will not result in a proper distribution since other components might get resampled away
-    # TODO ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
+    # NOTE ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
     composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)
 
     # sampler = composed_sampler
@@ -113,18 +111,16 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     sample, state
 end
 
-# NOTE SMC: tempering is essential? 
-# NOTE MCMC Kernel: Use higher normalization_constant e.g. 30 since it will be tempered, resampling not that often... maybe set ESS threshold higher?
-# NOTE FP & Bootstrap: Lower normalization seems beneficial, e.g. 15
-parameters = @set parameters.normalization_constant = 15;
+# NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant, 15-30 seems to be a good range.
+parameters = @set parameters.normalization_constant = 25;
 parameters = @set parameters.proposal_σ_r_quat = 0.1;
 parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01];
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
-# NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples while MCMC kernels tend to perform better with more steps
-final_sample, final_state = run_inference(parameters, render_context, observation, 2_000, 50);
+# NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
+final_sample, final_state = run_inference(parameters, render_context, observation, 1_000, 100);
 
 println("Final log-evidence: $(final_state.log_evidence)")
-plot_pose_density(final_sample, 50; trim=true)
+plot_pose_density(final_sample; trim=false)
 
 anim = @animate for i ∈ 0:2:360
     scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)

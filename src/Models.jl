@@ -91,7 +91,7 @@ function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
-logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ .* norm_const ./ n_pixel
+logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
 
 """
     expected_pixel_count(rng, prior_model, render_context, scene, parameters)

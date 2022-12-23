@@ -115,7 +115,7 @@ plotable_matrix(final_sample::Sample, var_name, len=last(size(variables(final_sa
 
 # Pose plotting
 
-function plot_pose_density(sample, len=50; kwargs...)
+function plot_pose_density(sample; kwargs...)
     plt_t_dens = density_variable(sample, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Density", legend=false, kwargs...)
 
     plt_r_dens = density_variable(sample, :r; label=["x" "y" "z"], xlabel="Orientation [rad]", ylabel="Density", legend=false, kwargs...)
