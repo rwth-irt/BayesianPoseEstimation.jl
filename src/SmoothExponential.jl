@@ -45,10 +45,3 @@ Base.maximum(::SmoothExponential{T}) where {T} = typemax(T)
 Base.minimum(::SmoothExponential{T}) where {T} = typemin(T)
 Bijectors.bijector(::SmoothExponential) = ZeroIdentity()
 Distributions.insupport(dist::SmoothExponential, x::Real) = true
-
-# Might be more performant depending on the CPU being used, on GPU almost no difference. Uses upper bound only, might make sense if σ ≪ min_depth
-# performant_factor(d::SmoothExponential, x) = (-x / d.θ + (d.σ / d.θ)^2 / 2) - log(d.θ) + performant_normalization(d)
-# performant_normalization(d::SmoothExponential) = -log1p(-exp(-d.max / d.θ))
-# # StatsFuns.jl has some extra numerical stability implementations.
-# performant_logerf(d::SmoothExponential, x) = normlogccdf(d.max + d.σ^2 / d.θ, d.σ, x)
-# Distributions.logpdf(dist::SmoothExponential{T}, x) where {T} = insupport(dist, x) ? performant_factor(dist, x) + performant_logerf(dist, x) : typemin(T)
