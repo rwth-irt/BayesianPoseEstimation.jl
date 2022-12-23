@@ -11,13 +11,11 @@ Smooth truncated exponential distribution by convolving the exponential with a n
 This results in smooth min and max limits and a definition on ℝ instead of ℝ⁺
 """
 struct SmoothExponential{T<:Real} <: AbstractKernelDistribution{T,Continuous}
-    # TODO revisit min_depth and ValidPixel. With the normal in the mixture, min_depth will be ignored
     min::T
     max::T
     θ::T
     σ::T
 end
-# TODO SmoothExponential(::Type{T}=Float32) where {T} = SmoothExponential{T}(1.0)
 
 Base.show(io::IO, dist::SmoothExponential{T}) where {T} = print(io, "SmoothExponential{$(T)}, min: $(dist.min), max: $(dist.max), θ: $(dist.θ), σ: $(dist.σ)")
 
@@ -37,7 +35,6 @@ Distributions.logpdf(dist::SmoothExponential{T}, x) where {T} = insupport(dist, 
 
 
 # Exponential convoluted with normal: Sample from exponential and then add noise of normal
-# TODO test if the plots match
 function Base.rand(rng::AbstractRNG, dist::SmoothExponential{T}) where {T}
     μ = rand(rng, truncated(KernelExponential(dist.θ), dist.min, dist.max))
     rand(rng, KernelNormal(μ, dist.σ))
@@ -48,7 +45,6 @@ Base.maximum(::SmoothExponential{T}) where {T} = typemax(T)
 Base.minimum(::SmoothExponential{T}) where {T} = typemin(T)
 Bijectors.bijector(::SmoothExponential) = ZeroIdentity()
 Distributions.insupport(dist::SmoothExponential, x::Real) = true
-# TODO do I want support truncated via normlogcdf and invlogcdf ?
 
 # Might be more performant depending on the CPU being used, on GPU almost no difference. Uses upper bound only, might make sense if σ ≪ min_depth
 # performant_factor(d::SmoothExponential, x) = (-x / d.θ + (d.σ / d.θ)^2 / 2) - log(d.θ) + performant_normalization(d)

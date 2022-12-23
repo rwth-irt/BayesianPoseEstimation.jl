@@ -87,7 +87,6 @@ sum_and_dropdims(A::Number, ::Dims{N}) where {N} = A
 Convert and broadcast positions and orientations to a vector of `Pose`.
 """
 to_pose(t, r) = to_pose(to_translation(t), to_rotation(r))
-# TODO test & remove
 to_pose(t::Translation, r::Rotation) = Pose(t, r)
 to_pose(t::AbstractArray{<:Translation}, r::AbstractArray{<:Rotation}) = Pose.(t, r)
 to_pose(t::AbstractArray{<:Translation}, r::Rotation) = Pose.(t, (r,))

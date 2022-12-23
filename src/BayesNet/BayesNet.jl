@@ -117,7 +117,6 @@ end
 Calculate the logdensity of the model given the variables by traversing the child nodes.
 Each node is evaluated only once.
 """
-# TODO promote before reduce
 DensityInterface.logdensityof(node::AbstractNode, variables::NamedTuple) = reduce(add_logdensity,
     traverse(node, (;)) do current, _
         logdensityof_barrier(current, variables)

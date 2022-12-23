@@ -140,9 +140,7 @@ function AbstractMCMC.bundle_samples(
     ::Any,
     ::Type{TupleVector};
     start=1,
-    step=1
-)
-    # TODO make sure only to use relevant variables, for example only the ones specified by the variable names of the NamedTuple of the prior.
+    step=1)
     variables = variables.(samples)
     TupleVector(variables[start:step:end])
 end

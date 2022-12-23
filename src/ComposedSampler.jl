@@ -59,7 +59,6 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::ComposedSampler, state)
     index = sample(rng, sampler.weights)
-    # TODO Different states like multiple weighted samples not supported yet
     new_sample, new_state = AbstractMCMC.step(rng, model, sampler.samplers[index], state)
     # sample, state
     new_sample, new_state

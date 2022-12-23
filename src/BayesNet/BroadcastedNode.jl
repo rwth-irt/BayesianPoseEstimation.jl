@@ -38,7 +38,6 @@ function BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution::Base.Call
 end
 
 # Construct as leaf
-# TODO Do I like the parameter order, i.e. rng between params and distribution? Should model / distribution be moved to the end?
 """
     BroadcastedNode(name, rng, distribution, params...)
 Construct the node as leaf (no children) by broadcasting the `distribution` over the `params`.

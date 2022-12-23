@@ -18,7 +18,6 @@ struct RenderContext{T,F<:GLAbstraction.FrameBuffer,C<:AbstractArray{T},P<:GLAbs
     window::GLFW.Window
     # Preallocate a CPU Array or GPU CuArray, this also avoids having to pass a device flag
     framebuffer::F
-    # TODO benchmark whether inference or copy time dominates -> is double buffering worth it?
     gl_buffer::PersistentBuffer{T}
     render_data::C
     shader_program::P
@@ -94,7 +93,6 @@ function render(render_context::RenderContext, scene::Scene, object_id::Integer,
     width, height = size(render_context.gl_buffer)
     depth = length(poses)
     # WARN According to Stackoverflow CUDA and OpenGL do run concurrently
-    # TODO any CPU computations or double buffered rendering?
     # Copy only the rendered poses for performance and return a matching view, so broadcasting ignores the other (old) render_data
     unsafe_copyto!(render_context.gl_buffer, render_context.framebuffer, width, height, depth)
     @view render_context.render_data[:, :, 1:depth]

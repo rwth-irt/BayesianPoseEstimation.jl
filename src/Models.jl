@@ -41,7 +41,6 @@ struct ValidPixel{T<:Real,D} <: AbstractKernelDistribution{T,Continuous}
 end
 
 function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
-    # TODO Does the insupport dist(dist, x) help or not?
     if !insupport(dist, dist.μ)
         # If the expected value is invalid, it does not provide any information
         zero(T)

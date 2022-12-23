@@ -9,17 +9,19 @@ using Random
 
 """
     MultipleTry
-# TODO
+Multiple Try Metropolis sampler (MTM).
+Proposes multiple samples and selects one according to its probability → acceptance rate increases with the number of tries `n_tries`.
+However, the standard implementation requires to propose `2*n_tries` to calculate auxiliary weights for the acceptance ratio.
 """
 struct MultipleTry{Q} <: AbstractMCMC.AbstractSampler
-    # TODO In this case the symmetric simplification does not hold anymore, use AdditiveProposal
     proposal::Q
     n_tries::Int64
 end
 
 """
     IndependentMultipleTry
-# TODO
+Proposes multiple samples and selects one according to its probability → acceptance rate increases with the number of tries `n_tries`.
+If the proposal is independent from the previous sample, no auxiliary weights are requires and only `n_tries` are proposed.
 """
 const IndependentMultipleTry = MultipleTry{<:Proposal{<:Any,typeof(propose_independent)}}
 
