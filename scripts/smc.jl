@@ -9,11 +9,9 @@ using .MCMCDepth
 using AbstractMCMC: step
 using Accessors
 using CUDA
-using Distributions
 using MCMCDepth
 using Random
 using Plots
-using Plots.PlotMeasures
 using ProgressLogging
 
 gr()
@@ -59,14 +57,14 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
     dist_is = valid_pixel_normal | parameters.association_σ
-    dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
+    dist_not = smooth_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     association_fn = pixel_association | (dist_is, dist_not, parameters.prior_o)
     o = DeterministicNode(:o, (expectation) -> association_fn.(expectation, observation.z), (; μ=μ))
     # NOTE almost no performance gain over DeterministicNode
     # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
 
     # NOTE valid_pixel diverges without normalization
-    pixel_model = valid_pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
+    pixel_model = smooth_valid_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
 

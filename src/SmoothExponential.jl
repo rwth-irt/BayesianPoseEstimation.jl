@@ -11,15 +11,15 @@ Smooth truncated exponential distribution by convolving the exponential with a n
 This results in smooth min and max limits and a definition on ℝ instead of ℝ⁺
 """
 struct SmoothExponential{T<:Real} <: AbstractKernelDistribution{T,Continuous}
-    θ::T
-    σ::T
     # TODO revisit min_depth and ValidPixel. With the normal in the mixture, min_depth will be ignored
     min::T
     max::T
+    θ::T
+    σ::T
 end
 # TODO SmoothExponential(::Type{T}=Float32) where {T} = SmoothExponential{T}(1.0)
 
-Base.show(io::IO, dist::SmoothExponential{T}) where {T} = print(io, "SmoothExponential{$(T)}, θ: $(dist.θ), σ: $(dist.σ), min: $(dist.min), max: $(dist.max)")
+Base.show(io::IO, dist::SmoothExponential{T}) where {T} = print(io, "SmoothExponential{$(T)}, min: $(dist.min), max: $(dist.max), θ: $(dist.θ), σ: $(dist.σ)")
 
 # Accurate version uses lower and upper bound
 accurate_normalization(d::SmoothExponential) = -logsubexp(-d.min / d.θ, -d.max / d.θ)

@@ -2,8 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-__precompile__()
-
 module MCMCDepth
 
 # Common functions on Base & CUDA types
@@ -148,6 +146,10 @@ export pixel_mixture
 export pixel_normal
 export pixel_tail
 export render_fn
+export smooth_mixture
+export smooth_tail
+export smooth_valid_mixture
+export smooth_valid_mixture
 export valid_pixel_explicit
 export valid_pixel_mixture
 export valid_pixel_normal

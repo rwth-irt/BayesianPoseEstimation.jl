@@ -9,11 +9,9 @@ using .MCMCDepth
 using AbstractMCMC
 using Accessors
 using CUDA
-using Distributions
 using MCMCDepth
 using Random
 using Plots
-using Plots.PlotMeasures
 
 gr()
 MCMCDepth.diss_defaults()

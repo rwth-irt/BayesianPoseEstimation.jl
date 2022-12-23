@@ -41,7 +41,7 @@ full_logpdf(θ, σ, min, max, z) = accurate_logexp(θ, σ, min, max, z) + accura
 mini = 0.0f0
 maxi = 1.1f0
 
-dist = SmoothExponential(θ, σ, mini, maxi)
+dist = SmoothExponential(mini, maxi, θ, σ)
 
 # Check whether the generative model matches the likelihood
 N = 10_000
