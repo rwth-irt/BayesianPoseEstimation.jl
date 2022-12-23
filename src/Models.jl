@@ -146,8 +146,6 @@ end
 
 valid_pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, σ, μ))
 
-smooth_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, smooth_mixture(min_depth, max_depth, θ, σ, μ, o))
-
 function smooth_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
     tail = smooth_tail(min_depth, max_depth, θ, σ, μ)

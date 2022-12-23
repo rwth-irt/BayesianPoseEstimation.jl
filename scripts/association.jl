@@ -58,7 +58,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
     # NOTE the σ of the association must be larger than the one for the pose estimation
     dist_is = valid_pixel_normal | parameters.association_σ
-    dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ)
+    dist_not = valid_pixel_tail | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     association_fn = pixel_association | (dist_is, dist_not, parameters.prior_o)
     o = DeterministicNode(:o, (expectation) -> association_fn.(expectation, observation.z), (; μ=μ))
 
