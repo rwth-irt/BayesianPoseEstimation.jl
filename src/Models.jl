@@ -114,6 +114,7 @@ Calculates the number of nonzero pixels for each image with the given dims.
 """
 nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
 
+
 """
     pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
 Mixture distribution for a depth pixel: normal / tail.
@@ -128,7 +129,7 @@ function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) wh
     KernelBinaryMixture(normal, tail, o, one(o) - o)
 end
 
-valid_pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
+pixel_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
     # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
@@ -138,8 +139,16 @@ function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:R
     KernelBinaryMixture(exponential, uniform, one(T), one(T))
 end
 
-valid_pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, σ, μ))
+pixel_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, σ, μ))
 
+"""
+    smooth_mixture(min_depth, max_depth, θ, σ, μ, o)
+Mixture distribution for a depth pixel: normal / tail.
+The mixture is weighted by the association o for the normal and 1-o for the tail.
+
+* Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
+* Tail distribution: occlusions are modeled by a SmoothExponential distribution and random outliers via a KernelTailUniform
+"""
 function smooth_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
     tail = smooth_tail(min_depth, max_depth, θ, σ, μ)

@@ -75,7 +75,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # t & r change expected depth, o not
     t_ind = independent_proposal(t, z)
     t_ind_mh = MetropolisHastings(t_ind)
-    # TODO twice the compute budget
+    # NOTE twice the compute budget
     t_ind_mtm = MultipleTry(t_ind, n_tries * 2)
 
     t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t), z)
@@ -86,7 +86,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 
     r_ind = independent_proposal(r, z)
     r_ind_mh = MetropolisHastings(r_ind)
-    # TODO twice the compute budget
+    # NOTE twice the compute budget
     r_ind_mtm = MultipleTry(r_ind, n_tries * 2)
 
     r_sym = symmetric_proposal(BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat), z)

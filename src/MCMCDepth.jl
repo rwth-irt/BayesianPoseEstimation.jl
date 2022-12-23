@@ -152,9 +152,9 @@ export smooth_tail
 export smooth_valid_mixture
 export smooth_valid_tail
 export valid_pixel_explicit
-export valid_pixel_mixture
+export pixel_valid_mixture
 export valid_pixel_normal
-export valid_pixel_tail
+export pixel_valid_tail
 
 # Visualization
 export density_variable

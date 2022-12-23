@@ -64,7 +64,6 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
 
     # NOTE valid_pixel diverges without normalization
-    # TODO check if parametrization is correct
     pixel_model = smooth_valid_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | parameters.normalization_constant)
@@ -78,22 +77,20 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 
     ind_proposal = independent_proposal((; t=t, r=r), z)
     ind_fp_kernel = ForwardProposalKernel(ind_proposal)
-    # TODO parameter for ESS
-    ind_smc_mh = SequentialMonteCarlo(ind_fp_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
+    ind_smc_mh = SequentialMonteCarlo(ind_fp_kernel, temp_schedule, n_particles, log(parameters.relative_ess * n_particles))
 
     t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t)
     r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat)
     sym_proposal = symmetric_proposal((; t=t_sym, r=r_sym), z)
 
     sym_fp_kernel = ForwardProposalKernel(sym_proposal)
-    # TODO parameter for ESS
-    sym_smc_fp = SequentialMonteCarlo(sym_fp_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
+    sym_smc_fp = SequentialMonteCarlo(sym_fp_kernel, temp_schedule, n_particles, log(parameters.relative_ess * n_particles))
 
     sym_mh_kernel = MhKernel(rng, sym_proposal)
-    sym_smc_mh = SequentialMonteCarlo(sym_mh_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
+    sym_smc_mh = SequentialMonteCarlo(sym_mh_kernel, temp_schedule, n_particles, log(parameters.relative_ess * n_particles))
 
     sym_boot_kernel = BootstrapKernel(sym_proposal)
-    sym_smc_boot = SequentialMonteCarlo(sym_boot_kernel, temp_schedule, n_particles, log(0.5 * n_particles))
+    sym_smc_boot = SequentialMonteCarlo(sym_boot_kernel, temp_schedule, n_particles, log(parameters.relative_ess * n_particles))
 
     # NOTE ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
     composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)

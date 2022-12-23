@@ -58,6 +58,8 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * `n_samples` Number of samples in the chain
 * `n_burn_in` Number of samples before recording the chain
 * `n_thinning` Record only every n_thinning sample to the chain
+* `n_particles` For particle / multiple try algorithms
+* `relative_ess` Relative effective sample size threshold ∈ (0,1)
 """
 Base.@kwdef struct Parameters
     # Meshes
@@ -97,9 +99,11 @@ Base.@kwdef struct Parameters
     precision = Float32
     device = :CUDA
     seed = 8418387917544508114
-    n_samples = 5000
-    n_burn_in = 1000
+    n_steps = 5_000
+    n_burn_in = 1_000
     n_thinning = 2
+    n_particles = 100
+    relative_ess = 0.5
 end
 
 
