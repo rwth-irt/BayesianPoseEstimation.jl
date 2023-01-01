@@ -2,13 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using CoordinateTransformations
-using CUDA
-using Quaternions
-using Random
-using Rotations
-using StaticArrays
-
 """
     flatten(x)
 Flattens x to return a 1D array.
@@ -64,25 +57,6 @@ map_materialize(b) = Broadcast.materialize(b)
 map_materialize(b::Union{NamedTuple,Tuple,AbstractArray}) = map(Broadcast.materialize, b)
 
 """
-    sum_and_dropdims(A,[;] dims)
-Sum the matrix A over the given dimensions and drop the very same dimensions afterwards.
-In case of a matching number of dimensions, a scalar is returned
-"""
-sum_and_dropdims(A; dims) = sum_and_dropdims(A, dims)
-# Cannot dispatch on named parameter so implement helper methods below
-sum_and_dropdims(A, dims::Dims) = dropdims(sum(A; dims=dims), dims=dims)
-# Case of matching dimensions → return scalar
-sum_and_dropdims(A::AbstractArray{<:Any,N}, ::Dims{N}) where {N} = sum(A)
-# Scalar case
-sum_and_dropdims(A::Number, ::Dims{N}) where {N} = A
-
-# WARN Do not try to implement reduction of Broadcasted via Base.mapreducedim!
-# LinearIndices(::Broadcasted{<:Any,<:Tuple{Any}}) only works for 1D case: https://github.com/JuliaLang/julia/blob/v1.8.0/base/broadcast.jl#L245
-# Type hijacking does not work, since Broadcasted handles indexing differently which results to different results
-# Base.LinearIndices(bc::Broadcast.Broadcasted{<:Any,<:Tuple}) = LinearIndices(axes(bc))
-# Base.has_fast_linear_indexing(bc::Broadcast.Broadcasted{<:Broadcast.BroadcastStyle,<:Tuple}) = false
-
-"""
     pose_vector(t, r)
 Convert and broadcast positions and orientations to a vector of `Pose`.
 """
@@ -121,15 +95,6 @@ Convert an array of Quaternions to a `Vector{Rotation}` column wise, optionally 
 to_rotation(Q::Array{<:Quaternion}) = QuatRotation.(Q)
 to_rotation(q::Quaternion) = QuatRotation(q)
 
-
-"""
-    array_for_rng(rng, T, dims...)
-Generate the correct array to be used in rand! based on the random number generator provided.
-CuArray for CUDA.RNG and Array for all other RNGs.
-"""
-array_for_rng(rng::AbstractRNG, ::Type{T}, dims::Integer...) where {T} = array_for_rng(rng){T}(undef, dims...)
-array_for_rng(::AbstractRNG) = Array
-array_for_rng(::CUDA.RNG) = CuArray
 
 """
     norm_dims(A, [p=2; dims=(1,)])

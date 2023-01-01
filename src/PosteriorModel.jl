@@ -2,11 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO move usings
-using Bijectors
-using DensityInterface
-using Random
-
 """
     PosteriorModel(bijectors, data, prior, likelihood)
 Consists of the `prior` and `likelihood` model.

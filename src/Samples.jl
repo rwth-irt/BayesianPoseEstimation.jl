@@ -2,11 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# bundle_samples for the Sample type
-using AbstractMCMC, TupleVectors
-using Accessors
-using Bijectors
-
 """
     Sample{T,V}(variables, logp)
 Consists of the state `variables` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
@@ -125,22 +120,3 @@ Only same type is supported to prevent surprises in the return type.
 """
 Base.:-(a::Sample, b::NamedTuple) = map_merge(.-, a, b)
 Base.:-(a::Sample, b::Sample) = a - variables(b)
-
-"""
-    bundle_samples(samples, model, sampler, state, chain_type[; kwargs...])
-Bundle all `samples` that were sampled from the `model` with the given `sampler` in a chain.
-The final `state` of the `sampler` can be included in the chain. The type of the chain can
-be specified with the `chain_type` argument.
-By default, this method returns `samples`.
-"""
-function AbstractMCMC.bundle_samples(
-    samples::Vector{<:Sample},
-    ::AbstractMCMC.AbstractModel,
-    ::AbstractMCMC.AbstractSampler,
-    ::Any,
-    ::Type{TupleVector};
-    start=1,
-    step=1)
-    variables = variables.(samples)
-    TupleVector(variables[start:step:end])
-end

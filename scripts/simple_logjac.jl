@@ -18,7 +18,7 @@ Minimal example to sample from a known distribution in a constrained domain usin
 
 # Prepare RNG & result plots
 rng = Random.default_rng()
-pyplot()
+gr()
 function plot_result_z((xmin, xmax), chain, bijectors, target)
     z_values = map(chain) do sample
         s, _ = to_model_domain(sample, bijectors)

@@ -62,16 +62,16 @@ broadcasted_sum = logdensityof.(KernelUniform(), a_val) .+ logdensityof.(KernelE
 # Test bijectors
 bij = bijector(d)
 @test bij isa NamedTuple{(:a, :b, :c, :d)}
-a_bij = bijector(ProductBroadcastedDistribution(KernelUniform, 0, fill(1.0f0, 3)))
+a_bij = bijector(BroadcastedDistribution(KernelUniform, 0, fill(1.0f0, 3)))
 @test bij.a.dims == a_bij.dims
 @test materialize(bij.a.bijectors) == materialize(a_bij.bijectors)
-b_bij = bijector(ProductBroadcastedDistribution(KernelExponential, fill(1.0f0, 3, 4)))
+b_bij = bijector(BroadcastedDistribution(KernelExponential, fill(1.0f0, 3, 4)))
 @test bij.b.dims == b_bij.dims
 @test materialize(bij.b.bijectors) == materialize(b_bij.bijectors)
-c_bij = bijector(ProductBroadcastedDistribution(KernelNormal, 0, fill(1.0f0, 3, 4)))
+c_bij = bijector(BroadcastedDistribution(KernelNormal, 0, fill(1.0f0, 3, 4)))
 @test bij.c.dims == c_bij.dims
 @test materialize(bij.c.bijectors) == materialize(c_bij.bijectors)
-d_bij = bijector(ProductBroadcastedDistribution(KernelNormal, 0, fill(1.0f0, 3, 4)))
+d_bij = bijector(BroadcastedDistribution(KernelNormal, 0, fill(1.0f0, 3, 4)))
 @test bij.d.dims == d_bij.dims
 @test materialize(bij.d.bijectors) == materialize(d_bij.bijectors)
 

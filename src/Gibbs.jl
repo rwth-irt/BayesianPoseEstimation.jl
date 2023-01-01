@@ -2,10 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using AbstractMCMC
-using DensityInterface
-using Random
-
 """
     Gibbs
 Analytically samples groups of variables conditioned on the other variables.

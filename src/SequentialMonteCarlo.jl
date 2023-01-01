@@ -2,10 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using AbstractMCMC
-using LogExpFunctions
-using Random
-
 """
     SequentialMonteCarlo
 Sequential Monte Carlo with systematic resampling and likelihood tempering via p(θ|z) ∝ p(z|θ)ᶲ p(θ).

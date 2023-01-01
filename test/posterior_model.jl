@@ -41,12 +41,12 @@ CUDA.allowscalar(false)
 # PriorModel
 # Pose only makes sense on CPU since CUDA cannot start render calls to OpenGL
 parameters = @set parameters.mean_t = [0, 0, 1.5]
-t_model = ProductBroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
+t_model = BroadcastedDistribution(KernelNormal, parameters.mean_t, parameters.σ_t) |> cpu_model
 circular_uniform(::Any) = KernelCircularUniform()
-r_model = ProductBroadcastedDistribution(circular_uniform, Array{parameters.precision}(undef, 3)) |> cpu_model
+r_model = BroadcastedDistribution(circular_uniform, Array{parameters.precision}(undef, 3)) |> cpu_model
 uniform(::Any) = KernelUniform()
 # Use the rng from params
-o_model = ProductBroadcastedDistribution(uniform, device_array(parameters, parameters.width, parameters.height))
+o_model = BroadcastedDistribution(uniform, device_array(parameters, parameters.width, parameters.height))
 prior_model = PriorModel(t_model, r_model, o_model)
 prior_sample = @inferred rand(dev_rng, prior_model)
 @test keys(variables(prior_sample)) == (:t, :r, :o)
@@ -80,7 +80,7 @@ function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:R
     ValidPixel(μ, dist)
 end
 my_pixel_dist = mix_normal_truncated_exponential | (0.5f0, 0.5f0)
-obs_model_fn = ObservationModel | (10f0, my_pixel_dist)
+obs_model_fn = ObservationModel | (10.0f0, my_pixel_dist)
 
 posterior_model = PosteriorModel(prior_model, obs_model_fn, render_context, scene, parameters.object_id)
 posterior_sample = @inferred rand(dev_rng, posterior_model)

@@ -2,11 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using AbstractMCMC
-using EllipsisNotation
-using LogExpFunctions
-using Random
-
 """
     MultipleTry
 Multiple Try Metropolis sampler (MTM).

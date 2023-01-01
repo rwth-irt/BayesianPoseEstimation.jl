@@ -4,11 +4,9 @@
 
 using ColorSchemes
 using CoordinateTransformations: SphericalFromCartesian
-using EllipsisNotation
 using IterTools: partition
 using Plots
 using Plots.PlotMeasures
-using StatsBase
 import StatsPlots: density as stats_density
 
 const RWTH_blue = colorant"#00549f"
@@ -182,7 +180,7 @@ Creates a density plot in polar coordinates for the given variable.
 """
 function polar_density_variable(chain, var_name; kwargs...)
     M = plotable_matrix(chain, var_name)
-    stats_density(M', proj=:polar, fill=true, fillalpha=0.4, palette=distinguishable_rwth(first(size(M))), trim=true, kwargs...)
+    density(M', proj=:polar, fill=true, fillalpha=0.4, palette=distinguishable_rwth(first(size(M))), trim=true, kwargs...)
 end
 
 """

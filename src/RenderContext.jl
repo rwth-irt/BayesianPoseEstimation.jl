@@ -2,10 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using CUDA
-using ModernGL
-using SciGL
-
 """
     RenderContext
 Stores all the static information required for rendering the object in the scene (everything except the latent variables like pose and occlusion).

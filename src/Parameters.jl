@@ -2,10 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using CUDA
-using Logging
-using Random
-
 # TODO Use https://juliadynamics.github.io/DrWatson.jl/dev/save/ for reproducible experiments, make a new experiments project and dev src/MCMCDepth as described in their documentation
 # TODO might want to convert this to a dict for DrWatson
 

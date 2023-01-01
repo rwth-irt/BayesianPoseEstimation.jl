@@ -2,9 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using DensityInterface
-using Distributions
-
 """
     pixel_association(dist_is, dist_not, prior, μ, z)
 Consists of a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.

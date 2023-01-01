@@ -7,7 +7,7 @@
 Broadcasts the parameters of the children using a BroadcastedDistribution.
 Also takes care of matching the dimensions for broadcasting multiple samples.
 """
-struct BroadcastedNode{name,child_names,C<:NamedTuple{child_names},R<:AbstractRNG,M<:Union{Distribution,Function},N,D<:Tuple{Vararg{Dims}}} <: AbstractNode{name,child_names}
+struct BroadcastedNode{name,child_names,C<:NamedTuple{child_names},R<:AbstractRNG,M,N,D<:Tuple{Vararg{Dims}}} <: AbstractNode{name,child_names}
     children::C
     rng::R
     # Must be function to avoid UnionAll type instabilities
@@ -17,7 +17,7 @@ struct BroadcastedNode{name,child_names,C<:NamedTuple{child_names},R<:AbstractRN
 end
 
 # Convenience constructor for moving name to the parametric type.
-BroadcastedNode(name::Symbol, rng::R, model::M, model_dims::Dims{N}, children::C, child_sizes::D) where {child_names,C<:NamedTuple{child_names},R<:AbstractRNG,M<:Union{Distribution,Function},N,D<:Tuple{Vararg{Dims}}} = BroadcastedNode{name,child_names,C,R,M,N,D}(children, rng, model, model_dims, child_sizes)
+BroadcastedNode(name::Symbol, rng::R, model::M, model_dims::Dims{N}, children::C, child_sizes::D) where {child_names,C<:NamedTuple{child_names},R<:AbstractRNG,M,N,D<:Tuple{Vararg{Dims}}} = BroadcastedNode{name,child_names,C,R,M,N,D}(children, rng, model, model_dims, child_sizes)
 
 """
     BroadcastedNode(name, rng, distribution, children)
@@ -43,7 +43,7 @@ end
 Construct the node as leaf (no children) by broadcasting the `distribution` over the `params`.
 The resulting `BroadcastedDistribution` acts like a product distribution, reducing the ndims of the `params`.
 """
-BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution, params...) = BroadcastedNode(name, rng, ProductBroadcastedDistribution(distribution, params...), param_dims(params...), (;), ())
+BroadcastedNode(name::Symbol, rng::AbstractRNG, distribution, params...) = BroadcastedNode(name, rng, BroadcastedDistribution(distribution, params...), param_dims(params...), (;), ())
 
 
 # WARN Manipulated function not type stable for Type as arg

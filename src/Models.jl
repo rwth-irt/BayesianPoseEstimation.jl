@@ -2,9 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-using Random
-using SciGL
-
 """
 # ObservationModel
 Model to compare rendered and observed depth images.
@@ -50,7 +47,7 @@ function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
     end
 end
 
-function Base.rand(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
+function KernelDistributions.rand_kernel(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
     if !insupport(dist, dist.μ)
         zero(T)
     else
@@ -125,7 +122,7 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
     tail = pixel_tail(min_depth, max_depth, θ, σ, μ)
-    KernelBinaryMixture(normal, tail, o, one(o) - o)
+    BinaryMixture(normal, tail, o, one(o) - o)
 end
 
 pixel_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
@@ -133,9 +130,9 @@ pixel_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where
 function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
     # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
     exponential = KernelExponential()
-    uniform = KernelTailUniform(min_depth, max_depth)
+    uniform = TailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
-    KernelBinaryMixture(exponential, uniform, one(T), one(T))
+    BinaryMixture(exponential, uniform, one(T), one(T))
 end
 
 pixel_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, σ, μ))
@@ -146,21 +143,21 @@ Mixture distribution for a depth pixel: normal / tail.
 The mixture is weighted by the association o for the normal and 1-o for the tail.
 
 * Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
-* Tail distribution: occlusions are modeled by a SmoothExponential distribution and random outliers via a KernelTailUniform
+* Tail distribution: occlusions are modeled by a SmoothExponential distribution and random outliers via a TailUniform
 """
 function smooth_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
     tail = smooth_tail(min_depth, max_depth, θ, σ, μ)
-    KernelBinaryMixture(normal, tail, o, one(o) - o)
+    BinaryMixture(normal, tail, o, one(o) - o)
 end
 
 smooth_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, smooth_mixture(min_depth, max_depth, θ, σ, μ, o))
 
 function smooth_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
     exponential = SmoothExponential(min_depth, μ, θ, σ)
-    uniform = KernelTailUniform(min_depth, max_depth)
+    uniform = TailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
-    KernelBinaryMixture(exponential, uniform, one(T), one(T))
+    BinaryMixture(exponential, uniform, one(T), one(T))
 end
 
 smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, smooth_tail(min_depth, max_depth, θ, σ, μ))

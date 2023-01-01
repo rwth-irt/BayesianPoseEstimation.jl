@@ -51,7 +51,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 
     # Model specification
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
-    r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
+    r = BroadcastedNode(:r, rng, QuaternionUniform, parameters.precision)
 
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))

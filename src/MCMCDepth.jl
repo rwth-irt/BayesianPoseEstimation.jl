@@ -4,6 +4,24 @@
 
 module MCMCDepth
 
+using Accessors
+using CoordinateTransformations
+using CUDA
+using DensityInterface
+using EllipsisNotation
+using LogExpFunctions
+using Logging
+using Quaternions
+using Random
+using Reexport
+using Rotations
+using SciGL
+using StaticArrays
+using StatsBase
+
+@reexport using AbstractMCMC
+@reexport using KernelDistributions
+
 # Common functions on Base & CUDA types
 include("Common.jl")
 # BayesNet
@@ -18,13 +36,6 @@ include("Samples.jl")
 include("FunctionManipulation.jl")
 include("Proposals.jl")
 include("PosteriorModel.jl")
-# Extensions
-include("BijectorsExtensions.jl")
-# Distributions
-include("KernelDistributions.jl")
-include("SmoothExponential.jl")
-include("BroadcastedDistribution.jl")
-include("QuaternionDistribution.jl")
 # Inference / Sampling algorithms
 include("Tempering.jl")
 
@@ -73,18 +84,7 @@ export types
 export variables
 
 # Distributions
-export AbstractKernelDistribution
-export measure_theory, kernel_distribution
-export KernelBinaryMixture
-export KernelCircularUniform
-export KernelDirac
-export KernelExponential
-export KernelNormal
-export KernelTailUniform
-export KernelUniform
-export SmoothExponential
-
-export ProductBroadcastedDistribution
+export BroadcastedDistribution
 export BroadcastedDistribution
 export DiscreteBroadcastedDistribution
 
@@ -97,11 +97,6 @@ export symmetric_proposal
 
 export propose
 export transition_probability
-
-# Quaternions
-export QuaternionDistribution
-export QuaternionPerturbation
-export QuaternionProposal
 
 # Parameters
 export Parameters
@@ -172,24 +167,13 @@ export sphere_density
 export sphere_scatter
 
 # Extensions and Reexports
-using Reexport
 @reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
 @reexport import SciGL: Scale, Scene
-
-@reexport import DensityInterface: logdensityof
-@reexport import Random: rand!
 @reexport import StatsBase: Weights
 
-# Bijectors
-@reexport import Bijectors: bijector, inverse, link, invlink, with_logabsdet_jacobian, transformed
-export BroadcastedBijector
-export Circular
-export ZeroIdentity
-export is_identity
+
 
 # Distributions
-@reexport import Distributions: truncated
-
 end # module

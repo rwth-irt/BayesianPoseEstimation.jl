@@ -2,12 +2,6 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using AbstractMCMC
-using Accessors
-using DensityInterface
-using Logging
-using StatsBase
-
 """
     ComposedSampler
 Provide a different sampler for each group (just like in Turing.jl).

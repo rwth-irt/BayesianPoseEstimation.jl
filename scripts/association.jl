@@ -6,7 +6,6 @@
 include("../src/MCMCDepth.jl")
 using .MCMCDepth
 
-using AbstractMCMC
 using Accessors
 using CUDA
 using MCMCDepth
@@ -50,7 +49,7 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # Model specification
     # Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
-    r = BroadcastedNode(:r, rng, QuaternionDistribution, parameters.precision)
+    r = BroadcastedNode(:r, rng, QuaternionUniform, parameters.precision)
 
     μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
