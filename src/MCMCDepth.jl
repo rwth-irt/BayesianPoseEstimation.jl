@@ -5,6 +5,7 @@
 module MCMCDepth
 
 using Accessors
+using Bijectors
 using CoordinateTransformations
 using CUDA
 using DensityInterface
@@ -16,21 +17,14 @@ using Random
 using Reexport
 using Rotations
 using SciGL
-using StaticArrays
 using StatsBase
 
 @reexport using AbstractMCMC
+@reexport using BayesNet
 @reexport using KernelDistributions
 
 # Common functions on Base & CUDA types
 include("Common.jl")
-# BayesNet
-include("BayesNet/BayesNet.jl")
-include("BayesNet/BroadcastedNode.jl")
-include("BayesNet/DeterministicNode.jl")
-include("BayesNet/ModifierNode.jl")
-include("BayesNet/Sequentialized.jl")
-include("BayesNet/SimpleNode.jl")
 # Model primitives
 include("Samples.jl")
 include("FunctionManipulation.jl")
@@ -59,17 +53,6 @@ export map_intersect
 export norm_dims, normalize_dims!, normalize_dims
 export sum_and_dropdims
 export to_rotation, to_translation, to_pose
-
-# BayesNet
-export BroadcastedNode
-export DeterministicNode
-export ModifierNode
-export SimpleNode
-
-export evaluate
-export parents
-export prior
-export sequentialize
 
 # Samples
 export Sample
