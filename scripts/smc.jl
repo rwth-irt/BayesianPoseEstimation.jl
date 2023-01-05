@@ -76,8 +76,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     temp_schedule = LinearSchedule(n_steps)
 
     ind_proposal = independent_proposal((; t=t, r=r), z)
-    ind_fp_kernel = ForwardProposalKernel(ind_proposal)
-    ind_smc_mh = SequentialMonteCarlo(ind_fp_kernel, temp_schedule, n_particles, log(parameters.relative_ess * n_particles))
+    ind_mh_kernel = MhKernel(rng, ind_proposal)
+    ind_smc_mh = SequentialMonteCarlo(ind_mh_kernel, temp_schedule, n_particles, log(parameters.relative_ess * n_particles))
 
     t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, parameters.proposal_σ_t)
     r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, parameters.proposal_σ_r_quat)
@@ -95,9 +95,9 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     # NOTE ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
     composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)
 
-    # sampler = composed_sampler
+    sampler = composed_sampler
     # sampler = sym_smc_mh
-    sampler = sym_smc_fp
+    # sampler = sym_smc_fp
     # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
     # sampler = sym_smc_boot
 
@@ -108,13 +108,15 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     sample, state
 end
 
-# NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant, 15-30 seems to be a good range.
-parameters = @set parameters.normalization_constant = 25;
+# NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
+parameters = @set parameters.normalization_constant = 20;
 parameters = @set parameters.proposal_σ_r_quat = 0.1;
 parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01];
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
+# Normalization and tempering leads to less resampling
+parameters = @set parameters.relative_ess = 0.8;
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-final_sample, final_state = run_inference(parameters, render_context, observation, 1_000, 100);
+final_sample, final_state = run_inference(parameters, render_context, observation, 2_000, 50);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
