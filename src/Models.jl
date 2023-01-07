@@ -94,7 +94,7 @@ logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ *
 Calculates the expected number of valid rendered pixels for the poses of the prior model.
 This number can for example be used as the normalization constant in the observation model.
 """
-function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::RenderContext, scene::Scene, parameters::Parameters)
+function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::OffscreenContext, scene::Scene, parameters::Parameters)
     n_pixel = Vector{parameters.precision}(undef, 0)
     for _ in 1:cld(parameters.n_normalization_samples, parameters.depth)
         prior_sample = rand(rng, prior_model, parameters.depth)

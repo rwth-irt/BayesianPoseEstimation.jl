@@ -14,7 +14,7 @@ Random.seed!(rng, 42)
 # Setup render context & scene
 params = MCMCDepth.Parameters()
 params = @set params.mesh_files = ["meshes/BM067R.obj"]
-render_context = RenderContext(params.width, params.height, params.depth, Array)
+render_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
 
 # Setup probability Distributions
 function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}

@@ -20,25 +20,25 @@ MCMCDepth.diss_defaults()
 parameters = Parameters()
 # NOTE takes 3min instead of 3sec
 # parameters = @set parameters.device = :CPU
-render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
+gl_context = render_context(parameters)
 
-function fake_observation(parameters::Parameters, render_context::RenderContext, occlusion::Real)
+function fake_observation(parameters::Parameters, gl_context::OffscreenContext, occlusion::Real)
     # Nominal scene
     obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj", "meshes/cube.obj"]
-    obs_scene = Scene(obs_params, render_context)
+    obs_scene = Scene(obs_params, gl_context)
     # Background
     obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0, 0, 3)
     obs_scene = @set obs_scene.meshes[2].scale = Scale(3, 3, 1)
     # Occlusion
     obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion, 0, 1.6)
     obs_scene = @set obs_scene.meshes[3].scale = Scale(0.7, 0.7, 0.7)
-    obs_μ = render(render_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
+    obs_μ = render(gl_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
     # add noise
     pixel_model = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     (; z=rand(device_rng(parameters), BroadcastedDistribution(pixel_model, (), obs_μ, 0.8f0)))
 end
 
-observation = fake_observation(parameters, render_context, 0.4)
+observation = fake_observation(parameters, gl_context, 0.4)
 
 function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_particles=500; kwargs...)
     # Device
@@ -116,7 +116,7 @@ parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
 # Normalization and tempering leads to less resampling
 parameters = @set parameters.relative_ess = 0.8;
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-final_sample, final_state = run_inference(parameters, render_context, observation, 2_000, 50);
+final_sample, final_state = run_inference(parameters, gl_context, observation, 1_000, 100);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)

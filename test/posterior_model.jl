@@ -33,7 +33,7 @@ Random.seed!(dev_rng, 42)
 
 # Parameters
 parameters = MCMCDepth.Parameters()
-render_context = RenderContext(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
+render_context = depth_offscreen_context(parameters.width, parameters.height, parameters.depth, device_array_type(parameters))
 scene = Scene(parameters, render_context)
 Random.seed!(dev_rng, parameters.seed)
 CUDA.allowscalar(false)

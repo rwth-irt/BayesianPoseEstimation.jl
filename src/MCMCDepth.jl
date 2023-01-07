@@ -87,7 +87,7 @@ export Parameters
 export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
 
 # RenderContext
-export RenderContext
+export render_context
 export render
 
 # PosteriorModel
@@ -153,7 +153,7 @@ export sphere_scatter
 @reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
-@reexport import SciGL: Scale, Scene
+@reexport import SciGL: OffscreenContext, Scale, Scene
 @reexport import StatsBase: Weights
 
 

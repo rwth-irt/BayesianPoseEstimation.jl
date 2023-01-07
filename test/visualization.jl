@@ -18,7 +18,7 @@ using Test
 pyplot()
 params = MCMCDepth.Parameters()
 params = @set params.mesh_files = ["meshes/BM067R.obj"]
-render_context = RenderContext(params.width, params.height, params.depth, Array)
+render_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
 
 # CvCamera like ROS looks down positive z
 scene = Scene(params, render_context)

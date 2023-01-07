@@ -27,7 +27,7 @@ Random.seed!(dev_rng, 42)
 CUDA.allowscalar(false)
 
 # Parameters
-render_context = RenderContext(100, 100, 50, CuArray)
+render_context = depth_offscreen_context(100, 100, 50, CuArray)
 scene = Scene(Parameters(), render_context)
 t = [0, 0, 1.5]
 r = Quaternion(1, 0, 0, 0) |> normalize
