@@ -116,7 +116,7 @@ parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
 # Normalization and tempering leads to less resampling
 parameters = @set parameters.relative_ess = 0.8;
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-final_sample, final_state = run_inference(parameters, gl_context, observation, 1_000, 100);
+final_sample, final_state = run_inference(parameters, gl_context, observation, 2_000, 50);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)

@@ -116,7 +116,7 @@ parameters = @set parameters.normalization_constant = 20
 parameters = @set parameters.proposal_σ_r_quat = 0.3
 parameters = @set parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32)
-model_chain = run_inference(parameters, gl_context, observation, 2_000, 25; thinning=1);
+model_chain = run_inference(parameters, gl_context, observation, 2_000, 50; thinning=1);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain, 50)
 plot_logprob(model_chain, 50)
