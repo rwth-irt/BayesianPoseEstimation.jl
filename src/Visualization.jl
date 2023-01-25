@@ -50,7 +50,7 @@ Plot a depth image with a given `color_scheme` and use black for values of 0.
 `value_to_typemax` specifies the value which is converted to typemax.
 `reverse` determines whether the color scheme is reversed.
 """
-function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth [m]", clims=nothing, kwargs...)
+function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, kwargs...)
     # Copy because of the inplace operations
     # color_grad = cgrad(color_scheme; rev=reverse)
     color_grad = cgrad(color_scheme; rev=reverse)
@@ -114,9 +114,9 @@ plotable_matrix(final_sample::Sample, var_name, len=last(size(variables(final_sa
 # Pose plotting
 
 function plot_pose_density(sample; kwargs...)
-    plt_t_dens = density_variable(sample, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Density", legend=false, kwargs...)
+    plt_t_dens = density_variable(sample, :t; label=["x" "y" "z"], xlabel="Position / m", ylabel="Density", legend=false, kwargs...)
 
-    plt_r_dens = density_variable(sample, :r; label=["x" "y" "z"], xlabel="Orientation [rad]", ylabel="Density", legend=false, kwargs...)
+    plt_r_dens = density_variable(sample, :r; label=["x" "y" "z"], xlabel="Orientation / rad", ylabel="Density", legend=false, kwargs...)
 
     plot(
         plt_t_dens, plt_r_dens,
@@ -125,11 +125,11 @@ function plot_pose_density(sample; kwargs...)
 end
 
 function plot_pose_chain(model_chain, len=50)
-    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Position [m]", legend=false)
-    plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position [m]", ylabel="Density", legend=false, left_margin=5mm)
+    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Position / m", legend=false)
+    plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position / m", ylabel="Density", legend=false, left_margin=5mm)
 
-    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Orientation [rad]", legend=false, top_margin=5mm)
-    plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientation [rad]", ylabel="Density", legend=false)
+    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Orientation / rad", legend=false, top_margin=5mm)
+    plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientation / rad", ylabel="Density", legend=false)
 
     plot(
         plt_t_chain, plt_r_chain,
