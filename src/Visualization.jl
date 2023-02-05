@@ -61,9 +61,8 @@ function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=
         max = maximum(img)
         clims = (min, max)
     end
-    width, height = size(img)
     img = value_or_typemax.(img, value_to_typemax)
-    plot = heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+    heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
 end
 
 """

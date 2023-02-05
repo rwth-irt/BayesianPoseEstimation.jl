@@ -89,8 +89,8 @@ to_rotation(v::AbstractVector{T}) where {T<:Number,} = RotXYZ(v...)
 to_rotation(A::AbstractArray{<:Rotation}) = A
 
 """
-    to_rotation(A, [T=RotXYZ])
-Convert an array of Quaternions to a `Vector{Rotation}` column wise, optionally specifying the orientation representation `T`.
+    to_rotation(Q)
+Convert an array of Quaternions to an array of Rotations.
 """
 to_rotation(Q::Array{<:Quaternion}) = QuatRotation.(Q)
 to_rotation(q::Quaternion) = QuatRotation(q)

@@ -32,7 +32,11 @@ function fake_observation(parameters::Parameters, gl_context::OffscreenContext, 
     # Occlusion
     obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion, 0, 1.6)
     obs_scene = @set obs_scene.meshes[3].scale = Scale(0.7, 0.7, 0.7)
-    obs_μ = render(gl_context, obs_scene, parameters.object_id, to_pose(parameters.mean_t + [0.05, -0.05, -0.1], [0, 0, 0]))
+    # Ground truth
+    gt_position = parameters.mean_t + [0.05, -0.05, -0.1]
+    gt_rotation = rand(QuaternionUniform())
+    println("GT position & rotation: $gt_position, $gt_rotation")
+    obs_μ = render(gl_context, obs_scene, parameters.object_id, to_pose(gt_position, gt_rotation))
     # add noise
     pixel_model = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
     (; z=rand(device_rng(parameters), BroadcastedDistribution(pixel_model, (), obs_μ, 0.8f0)))
@@ -109,14 +113,14 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 end
 
 # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
-parameters = @set parameters.normalization_constant = 20;
+parameters = @set parameters.normalization_constant = 30;
 parameters = @set parameters.proposal_σ_r_quat = 0.1;
 parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01];
 parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
-# Normalization and tempering leads to less resampling
+# Normalization and tempering leads to less resampling, especially in MCMC sampler
 parameters = @set parameters.relative_ess = 0.8;
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-final_sample, final_state = run_inference(parameters, gl_context, observation, 2_000, 50);
+final_sample, final_state = run_inference(parameters, gl_context, observation, 2_000, 100);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
