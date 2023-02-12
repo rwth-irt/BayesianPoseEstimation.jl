@@ -12,6 +12,7 @@ using DensityInterface
 using EllipsisNotation
 using LogExpFunctions
 using Logging
+using PoseErrors
 using Quaternions
 using Random
 using Reexport
@@ -40,6 +41,7 @@ include("MultipleTry.jl")
 include("SequentialMonteCarlo.jl")
 
 # Plumbing together the depth image based pose estimator
+include("Crop.jl")
 include("Visualization.jl")
 include("Parameters.jl")
 include("RenderContext.jl")
@@ -148,6 +150,11 @@ export polar_histogram_variable
 export scatter_position
 export sphere_density
 export sphere_scatter
+
+# Data loading an preprocessing
+export crop_boundingbox
+export crop_image
+export depth_resize
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion
