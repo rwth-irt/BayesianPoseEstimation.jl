@@ -5,7 +5,7 @@
 # TODO remove
 using CoordinateTransformations
 using ImageTransformations: imresize
-using Interpolations: Constant
+using Interpolations: Linear
 using Rotations
 
 # Compared to SciGL no conversion between OpenGL and OpenCV conventions required
@@ -27,8 +27,7 @@ end
 
 # TODO mind julia convention, shift it one pixel right and down
 function crop_center(camera::CvCamera, center3d::AbstractVector, camera_pose::Pose=one(Pose))
-    transformed = cv_project(camera, center3d, camera_pose)
-    center2d = round.(Int, transformed[1:2])
+    center2d = cv_project(camera, center3d, camera_pose)
     # OpenCV assumes (0,0) as the origin, while Julia arrays start at (1,1)
     center2d .+ 1
 end
@@ -46,16 +45,24 @@ function clamp_boundingbox(left, right, top, bottom, width, height)
 end
 
 """
+    crop_boundingbox(center2d, width, height)
+Returns the parameters (left, right, top, bottom) of the bounding box to crop the image to.
+"""
+function crop_boundingbox(center2d, crop_size, image_size)
+    left, top = @. round(Int, center2d - crop_size / 2)
+    right, bottom = @. round(Int, center2d + crop_size / 2)
+    clamp_boundingbox(left, right, top, bottom, image_size...)
+end
+
+"""
     crop_boundingbox(camera, center3d, model_diameter, [camera_pose=one(Pose)])
 Returns the parameters (left, right, top, bottom) of the bounding box to crop the image to.
 """
 function crop_boundingbox(camera::CvCamera, center3d::AbstractVector, model_diameter, camera_pose::Pose=one(Pose))
     center2d = crop_center(camera, center3d, camera_pose)
     diameter3d = 1.5 * model_diameter
-    width, height = @. ceil(Int, (camera.f_x, camera.f_y) * diameter3d / center3d[3])
-    left, top = @. floor(Int, center2d - (width, height) / 2)
-    right, bottom = left + width, top + height
-    clamp_boundingbox(left, right, top, bottom, camera.width, camera.height)
+    crop_size = @. (camera.f_x, camera.f_y) * diameter3d / center3d[3]
+    crop_boundingbox(center2d, crop_size, (camera.width, camera.height))
 end
 
 """
@@ -67,8 +74,24 @@ crop_image(img, left, right, top, bottom) = @view img[left:right, top:bottom]
 
 """
     depth_resize(img, args...; kwargs...)
-Avoids interpolations when resizing depth images.
-What might look nice on color images causes wrong values on depth images, since no interpolated values in between two discontinuous surfaces would be captured by a real camera.
-Calls ImageTransformations.jl `imresize(img, args...; kwargs..., method=Constant())`
+Even though nearest neighbor `Constant()` interpolation might be the correct one on paper, a linear interpolation results in less deviations from the rendered ground truth.
+However, discontinuities along edges are wrong, since real cameras do not interpolate.
+Calls ImageTransformations.jl `imresize(img, args...; kwargs..., method=Linear())`
 """
-depth_resize(img, args...; kwargs...) = imresize(img, args...; kwargs..., method=Constant())
+depth_resize(img, args...; kwargs...) = imresize(img, args...; kwargs..., method=Linear())
+
+"""
+    depth_resize_custom(img, crop_size)
+Template to experiment with different resize methods.
+However neither the stack-overflow suggestion of using the mode nor using a one-to-one mapping perform as good as the depth_resize.
+"""
+function depth_resize_custom(img, crop_size)
+    bin_size = size(img) ./ crop_size
+    res = similar(img, crop_size)
+    for i in CartesianIndices(res)
+        xy = Tuple(i)
+        img_i = xy .* bin_size
+        res[i] = img[round.(Int, img_i)...]
+    end
+    res
+end

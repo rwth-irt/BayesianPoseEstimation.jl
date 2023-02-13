@@ -57,7 +57,7 @@ full_img = draw(gl_context, scene) |> copy
 @testset "Crop image" begin
     center2d = @inferred MCMCDepth.crop_center(cv_camera, cube.pose.translation.translation, camera.pose)
     # Visually verified via full_img[center2d...] = 1
-    @test center2d == [450, 350]
+    @test round.(center2d) == [450, 350]
 
     bounding_box = @inferred crop_boundingbox(cv_camera, cube.pose.translation.translation, cube_diameter)
     # Verified visually
@@ -79,18 +79,33 @@ cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = crop(cv_camera, bounding_box...)
 scene = Scene(camera, [cube])
 crop_render = draw(gl_context, scene) |> copy
+crop_img = crop_image(full_img, bounding_box...)
+resized = @inferred depth_resize(crop_img, RE_SIZE...)
 
 @testset "Resize image" begin
-    # Wrong method will interpolate values which a camera would not capture
-    resized = imresize(crop_img, RE_SIZE; method=Linear())
-    @test minimum(resized[resized.>0]) < 0.5
-    # Correct method will not interpolate
-    resized = @inferred depth_resize(crop_img, RE_SIZE...)
+    EPS = 3e-3
+
+    # "correct" implementation with bad results
+    resized = @inferred imresize(crop_img, RE_SIZE...; method=Constant())
     @test size(resized) == RE_SIZE
     @test minimum(resized[resized.>0]) ≈ 0.6
+    sum_const = sum(abs.(resized - crop_render) .> EPS)
+
+    # my attempt for an custom implementation without interpolations
+    resized = MCMCDepth.depth_resize_custom(crop_img, RE_SIZE)
+    @test size(resized) == RE_SIZE
+    @test minimum(resized[resized.>0]) ≈ 0.6
+    sum_custom = sum(abs.(resized - crop_render) .> EPS)
+
+    # "wrong" interpolation - horrible corners great surfaces
+    resized = @inferred depth_resize(crop_img, RE_SIZE...)
+    @test size(resized) == RE_SIZE
+    # Interpolates values which a camera would not capture
+    @test minimum(resized[resized.>0]) < 0.6
+    sum_linear = sum(abs.(resized - crop_render) .> EPS)
 
     sum_drawn = sum(resized .> 0)
-    sum_diff = sum(abs.(resized - crop_render) .> 0.001)
-    # TODO value is much better for Linear interpolation
-    @test sum_diff / sum_drawn < 0.2
+    @test sum_it / sum_drawn < 0.1
+    # TODO test if it holds for slim objects like the instruments
+    @test sum_linear < sum_const < sum_custom
 end
