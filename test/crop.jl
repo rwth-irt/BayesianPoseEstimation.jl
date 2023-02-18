@@ -71,8 +71,6 @@ end
 bounding_box = crop_boundingbox(cv_camera, cube.pose.translation.translation, cube_diameter)
 
 gl_context = depth_offscreen_context((RE_SIZE)..., 1, Array)
-cube_path = joinpath(dirname(pathof(SciGL)), "..", "examples", "meshes", "cube.obj")
-cube_mesh = load(cube_path)
 cube_diameter = CUBE_SCALE.scale * model_diameter(cube_mesh)
 cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
 cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
@@ -81,31 +79,79 @@ scene = Scene(camera, [cube])
 crop_render = draw(gl_context, scene) |> copy
 crop_img = crop_image(full_img, bounding_box...)
 resized = @inferred depth_resize(crop_img, RE_SIZE...)
+sum_drawn = sum(resized .> 0)
 
 @testset "Resize image" begin
     EPS = 3e-3
-
-    # "correct" implementation with bad results
-    resized = @inferred imresize(crop_img, RE_SIZE...; method=Constant())
+    # "correct" nearest neighbor implementation with bad results
+    resized = @inferred depth_resize(crop_img, RE_SIZE...)
     @test size(resized) == RE_SIZE
     @test minimum(resized[resized.>0]) ≈ 0.6
     sum_const = sum(abs.(resized - crop_render) .> EPS)
+    @test sum_const / sum_drawn < 0.1
 
-    # my attempt for an custom implementation without interpolations
+    # my (bad) attempt of a custom implementation without interpolations
     resized = MCMCDepth.depth_resize_custom(crop_img, RE_SIZE)
     @test size(resized) == RE_SIZE
     @test minimum(resized[resized.>0]) ≈ 0.6
     sum_custom = sum(abs.(resized - crop_render) .> EPS)
 
     # "wrong" interpolation - horrible corners great surfaces
-    resized = @inferred depth_resize(crop_img, RE_SIZE...)
+    resized = @inferred imresize(crop_img, RE_SIZE...; method=Linear())
     @test size(resized) == RE_SIZE
     # Interpolates values which a camera would not capture
     @test minimum(resized[resized.>0]) < 0.6
     sum_linear = sum(abs.(resized - crop_render) .> EPS)
+    @test sum_linear / sum_drawn < 0.05
 
-    sum_drawn = sum(resized .> 0)
-    @test sum_it / sum_drawn < 0.1
-    # TODO test if it holds for slim objects like the instruments
+    # Expectations from the comments above
     @test sum_linear < sum_const < sum_custom
+end
+
+# Slim objects
+CUBE_SCALE = Scale(0.01, 0.01, 0.2)
+cube_diameter = maximum(CUBE_SCALE.scale) * model_diameter(cube_mesh)
+
+# Draw an image to crop
+gl_context = depth_offscreen_context(WIDTH, HEIGHT, 1, Array)
+cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
+cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
+camera = Camera(cv_camera)
+scene = Scene(camera, [cube])
+full_img = draw(gl_context, scene) |> copy
+crop_img = crop_image(full_img, bounding_box...)
+resized = @inferred depth_resize(crop_img, RE_SIZE...)
+
+gl_context = depth_offscreen_context((RE_SIZE)..., 1, Array)
+cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
+cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
+camera = crop(cv_camera, bounding_box...)
+scene = Scene(camera, [cube])
+crop_render = draw(gl_context, scene) |> copy
+
+@testset "Resize slim objects" begin
+    EPS = 3e-3
+    # "correct" nearest neighbor implementation with bad results
+    resized = @inferred depth_resize(crop_img, RE_SIZE...)
+    @test size(resized) == RE_SIZE
+    @test minimum(resized[resized.>0]) ≈ 0.6
+    sum_const = sum(abs.(resized - crop_render) .> EPS)
+    @test sum_const / sum_drawn < 0.1
+
+    # my attempt of a custom implementation without interpolations
+    resized = MCMCDepth.depth_resize_custom(crop_img, RE_SIZE)
+    @test size(resized) == RE_SIZE
+    @test minimum(resized[resized.>0]) ≈ 0.6
+    sum_custom = sum(abs.(resized - crop_render) .> EPS)
+
+    # "wrong" interpolation - horrible corners great surfaces
+    resized = @inferred imresize(crop_img, RE_SIZE...; method=Linear())
+    @test size(resized) == RE_SIZE
+    # Interpolates values which a camera would not capture
+    @test minimum(resized[resized.>0]) < 0.6
+    sum_linear = sum(abs.(resized - crop_render) .> EPS)
+    @test sum_linear / sum_drawn < 0.05
+
+    # Slim objects / objects with self occlusions are dominated by edges
+    @test sum_const < sum_linear < sum_custom
 end

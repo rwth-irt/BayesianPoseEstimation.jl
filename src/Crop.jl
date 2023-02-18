@@ -5,7 +5,7 @@
 # TODO remove
 using CoordinateTransformations
 using ImageTransformations: imresize
-using Interpolations: Linear
+using Interpolations: Constant
 using Rotations
 
 # Compared to SciGL no conversion between OpenGL and OpenCV conventions required
@@ -74,11 +74,11 @@ crop_image(img, left, right, top, bottom) = @view img[left:right, top:bottom]
 
 """
     depth_resize(img, args...; kwargs...)
-Even though nearest neighbor `Constant()` interpolation might be the correct one on paper, a linear interpolation results in less deviations from the rendered ground truth.
-However, discontinuities along edges are wrong, since real cameras do not interpolate.
-Calls ImageTransformations.jl `imresize(img, args...; kwargs..., method=Linear())`
+Even though nearest neighbor `Constant()` interpolation might be the correct one on paper, a linear interpolation results in less deviations from the rendered ground truth for objects with large surfaces.
+However, for slim objects, the nearest neighbor interpolation performs better, since real cameras do not interpolate at discontinuous edges.
+Calls ImageTransformations.jl `imresize(img, args...; kwargs..., method=Constant())`
 """
-depth_resize(img, args...; kwargs...) = imresize(img, args...; kwargs..., method=Linear())
+depth_resize(img, args...; kwargs...) = imresize(img, args...; kwargs..., method=Constant())
 
 """
     depth_resize_custom(img, crop_size)
@@ -87,10 +87,13 @@ However neither the stack-overflow suggestion of using the mode nor using a one-
 """
 function depth_resize_custom(img, crop_size)
     bin_size = size(img) ./ crop_size
+    half_bin = bin_size ./ 2
     res = similar(img, crop_size)
     for i in CartesianIndices(res)
-        xy = Tuple(i)
-        img_i = xy .* bin_size
+        # origin in (0,0)
+        xy = Tuple(i) .- 1
+        # TODO not the center but the lower right corner?
+        img_i = xy .* bin_size .+ half_bin
         res[i] = img[round.(Int, img_i)...]
     end
     res
