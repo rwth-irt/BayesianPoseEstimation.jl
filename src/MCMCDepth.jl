@@ -48,6 +48,9 @@ include("RenderContext.jl")
 include("AssociationModel.jl")
 include("Models.jl")
 
+# Datasets
+include("BOP.jl")
+
 # Common
 export array_for_rng
 export flatten
