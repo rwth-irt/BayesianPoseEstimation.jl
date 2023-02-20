@@ -2,11 +2,8 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO remove
-using CoordinateTransformations
 using ImageTransformations: imresize
 using Interpolations: Constant
-using Rotations
 
 # Compared to SciGL no conversion between OpenGL and OpenCV conventions required
 
@@ -25,7 +22,6 @@ function cv_project(camera::CvCamera, point3d::AbstractVector, camera_pose::Pose
     uv[1:2] ./ uv[3]
 end
 
-# TODO mind julia convention, shift it one pixel right and down
 function crop_center(camera::CvCamera, center3d::AbstractVector, camera_pose::Pose=one(Pose))
     center2d = cv_project(camera, center3d, camera_pose)
     # OpenCV assumes (0,0) as the origin, while Julia arrays start at (1,1)
@@ -92,7 +88,6 @@ function depth_resize_custom(img, crop_size)
     for i in CartesianIndices(res)
         # origin in (0,0)
         xy = Tuple(i) .- 1
-        # TODO not the center but the lower right corner?
         img_i = xy .* bin_size .+ half_bin
         res[i] = img[round.(Int, img_i)...]
     end
