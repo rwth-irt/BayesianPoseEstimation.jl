@@ -51,7 +51,8 @@ Plot a depth image with a given `color_scheme` and use black for values of 0.
 `reverse` determines whether the color scheme is reversed.
 """
 function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, kwargs...)
-    # Copy because of the inplace operations
+    # Transfer to CPU
+    img = Array(img)
     # color_grad = cgrad(color_scheme; rev=reverse)
     color_grad = cgrad(color_scheme; rev=reverse)
     # pushfirst!(color_scheme, 0)
