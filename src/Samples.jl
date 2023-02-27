@@ -52,7 +52,7 @@ Transforms the sample to the model domain by using the inverse transform of the 
 The logjac correction is calculated in the same kernel.
 Returns (variables, logabsdetjac)
 """
-function to_model_domain(s::Sample, bijectors::NamedTuple{<:Any,<:Tuple{Vararg{Bijector}}})
+function to_model_domain(s::Sample, bijectors::NamedTuple)
     with_logjac = map_intersect((b, v) -> with_logabsdet_jacobian(inverse(b), v), bijectors, variables(s))
     tr_vars = map(first, with_logjac)
     model_sample = @set s.variables = merge(s.variables, tr_vars)
