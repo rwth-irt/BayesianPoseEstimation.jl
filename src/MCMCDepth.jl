@@ -53,7 +53,6 @@ include("BOP.jl")
 
 # Common
 export array_for_rng
-export flatten
 export map_intersect
 export norm_dims, normalize_dims!, normalize_dims
 export sum_and_dropdims

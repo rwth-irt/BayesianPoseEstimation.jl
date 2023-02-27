@@ -2,10 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-# WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
-using .MCMCDepth
-
 using AbstractMCMC: step
 using Accessors
 using CUDA
@@ -13,36 +9,18 @@ using MCMCDepth
 using Random
 using Plots
 using ProgressLogging
+using SciGL
 
 gr()
 MCMCDepth.diss_defaults()
-
 parameters = Parameters()
 # NOTE takes 3min instead of 3sec
-# parameters = @set parameters.device = :CPU
+# @reset parameters.device = :CPU
 gl_context = render_context(parameters)
 
-function fake_observation(parameters::Parameters, gl_context::OffscreenContext, occlusion::Real)
-    # Nominal scene
-    obs_params = @set parameters.mesh_files = ["meshes/monkey.obj", "meshes/cube.obj", "meshes/cube.obj"]
-    obs_scene = Scene(obs_params, gl_context)
-    # Background
-    obs_scene = @set obs_scene.meshes[2].pose.translation = Translation(0, 0, 3)
-    obs_scene = @set obs_scene.meshes[2].scale = Scale(3, 3, 1)
-    # Occlusion
-    obs_scene = @set obs_scene.meshes[3].pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion, 0, 1.6)
-    obs_scene = @set obs_scene.meshes[3].scale = Scale(0.7, 0.7, 0.7)
-    # Ground truth
-    gt_position = parameters.mean_t + [0.05, -0.05, -0.1]
-    gt_rotation = rand(QuaternionUniform())
-    println("GT position & rotation: $gt_position, $gt_rotation")
-    obs_μ = render(gl_context, obs_scene, parameters.object_id, to_pose(gt_position, gt_rotation))
-    # add noise
-    pixel_model = pixel_explicit | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
-    (; z=rand(device_rng(parameters), BroadcastedDistribution(pixel_model, (), obs_μ, 0.8f0)))
-end
-
-observation = fake_observation(parameters, gl_context, 0.4)
+include("fake_observation.jl")
+obs_scene = observation_scene(gl_context, parameters, 0.5)
+observation = fake_observation(gl_context, parameters, obs_scene)
 
 function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_particles=500; kwargs...)
     # Device
@@ -57,7 +35,8 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
     t = BroadcastedNode(:t, rng, KernelNormal, parameters.mean_t, parameters.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionUniform, parameters.precision)
 
-    μ_fn = render_fn | (render_context, Scene(parameters, render_context), parameters.object_id)
+    scene = Scene(gl_context, parameters)
+    μ_fn = render_fn | (render_context, scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
     dist_is = valid_pixel_normal | parameters.association_σ
@@ -113,12 +92,12 @@ function run_inference(parameters::Parameters, render_context, observation, n_st
 end
 
 # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
-parameters = @set parameters.normalization_constant = 30;
-parameters = @set parameters.proposal_σ_r_quat = 0.1;
-parameters = @set parameters.proposal_σ_t = [0.01, 0.01, 0.01];
-parameters = @set parameters.seed = rand(RandomDevice(), UInt32);
+@reset parameters.normalization_constant = 30;
+@reset parameters.proposal_σ_r_quat = 0.1;
+@reset parameters.proposal_σ_t = [0.01, 0.01, 0.01];
+@reset parameters.seed = rand(RandomDevice(), UInt32);
 # Normalization and tempering leads to less resampling, especially in MCMC sampler
-parameters = @set parameters.relative_ess = 0.8;
+@reset parameters.relative_ess = 0.8;
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
 final_sample, final_state = run_inference(parameters, gl_context, observation, 2_000, 100);
 

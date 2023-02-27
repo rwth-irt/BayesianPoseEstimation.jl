@@ -3,12 +3,6 @@
 # All rights reserved. 
 
 """
-    flatten(x)
-Flattens x to return a 1D array.
-"""
-flatten(x) = collect(Iterators.flatten(x))
-
-"""
     map_intersect(f, a, b, default)
 Maps the function `f` over the intersection of the keys of `a` and `b`.
 Uses the value of `default`, which may be a function of `value(a[i])`, if no matching key is found in `b`.

@@ -10,16 +10,15 @@
 Monolith for storing the parameters.
 Deliberately not strongly typed because the strongly typed struct are constructed in the Main script from this.
 
-# Scene Objects
-* `mesh_files` Meshes in the scene
-* `object_id` Index of the object to estimate the pose of in the scene
-
-# Camera
-* `width, height` Dimensions of the image.
-* `depth` z-dimension resembles the number of parallel renderings
-* `f_x, f_y` Focal length of the OpenCV camera calibration
-* `c_x, c_y` Optical center of the OpenCV camera calibration
+# Render context
+* `width, height` Dimensions of the images.
 * `min_depth, max_depth` Range limit of the sensor / region of interest
+* `depth` z-dimension resembles the number of parallel renderings
+
+# Scene
+* `mesh_file` Mesh of the object of interest
+* `scale` Scaling of the object (e.g. Scale(1e-3) for mm to m)
+* `cv_camera` Camera parametrized by OpenCV convention
 
 # Observation Model
 ## Sensor Model
@@ -58,19 +57,18 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * `relative_ess` Relative effective sample size threshold ∈ (0,1)
 """
 Base.@kwdef struct Parameters
-    # Meshes
-    mesh_files = ["meshes/monkey.obj"]
-    object_id = 1
-    # Camera
+    # Render context
     width = 100
     height = 100
     depth = 1_000
-    f_x = 120
-    f_y = 120
-    c_x = 50
-    c_y = 50
     min_depth = 0.1
     max_depth = 3
+
+    # Scene
+    mesh_file = "meshes/monkey.obj"
+    scale = Scale(1)
+    cv_camera = CvCamera(width, height, 1.2 * width, 1.2 * height, width / 2, height / 2; near=min_depth, far=max_depth)
+
     # Depth pixel model
     pixel_σ = 0.01
     pixel_θ = 1.0
@@ -101,7 +99,6 @@ Base.@kwdef struct Parameters
     n_particles = 100
     relative_ess = 0.5
 end
-
 
 # Automatically convert to correct precision
 Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
@@ -157,6 +154,17 @@ function device_array_type(p::Parameters)
     end
 end
 device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, dims...)
+
+"""
+    Scene(gl_context, parameters)
+Create a scene for inference given the parameters.
+"""
+function SciGL.Scene(gl_context, p::Parameters)
+    scaled_mesh = p.scale(load(p.mesh_file))
+    object = load_mesh(gl_context, scaled_mesh)
+    camera = Camera(p.cv_camera)
+    Scene(camera, [object])
+end
 
 Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
 Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))
