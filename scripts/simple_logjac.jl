@@ -2,12 +2,8 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-# WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
-using .MCMCDepth
-
 using AbstractMCMC
-using Distributions
+using KernelDistributions
 using MCMCDepth
 using Plots
 using Random
@@ -29,30 +25,30 @@ function plot_result_z((xmin, xmax), chain, bijectors, target)
 end
 
 # Probabilistic model: domain [0,∞) for bijector test
-target = Gamma(3.0, 1.0)
-model = SimpleNode(:z, rng, Gamma, 3.0, 1.0)
+target = KernelExponential(3.0f0)
+model = SimpleNode(:z, rng, KernelExponential, 3.0f0)
 posterior = PosteriorModel(model, (;))
 
 # Requires adjustment of prior
-sym_proposal = symmetric_proposal(SimpleNode(:z, rng, Normal, 0, 0.1), model)
+sym_proposal = symmetric_proposal(SimpleNode(:z, rng, KernelNormal, 0, 0.1), model)
 sym_mh = MetropolisHastings(sym_proposal)
 sym_chain = sample(rng, posterior, sym_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), sym_chain, bijector(posterior), target)
 
 # Requires adjustment of prior
-ind_proposal = independent_proposal(SimpleNode(:z, rng, Normal), model)
+ind_proposal = independent_proposal(SimpleNode(:z, rng, KernelNormal), model)
 ind_mh = MetropolisHastings(ind_proposal)
 ind_chain = sample(rng, posterior, ind_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), ind_chain, bijector(posterior), target)
 
 # Requires adjustment of prior & proposal
-ind_proposal = independent_proposal(SimpleNode(:z, rng, Uniform), model)
+ind_proposal = independent_proposal(SimpleNode(:z, rng, KernelUniform), model)
 ind_mh = MetropolisHastings(ind_proposal)
 ind_chain = sample(rng, posterior, ind_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), ind_chain, bijector(posterior), target)
 
 # Requires adjustment of prior & proposal
-ind_proposal = independent_proposal(SimpleNode(:z, rng, Exponential), model)
+ind_proposal = independent_proposal(SimpleNode(:z, rng, KernelExponential), model)
 ind_mh = MetropolisHastings(ind_proposal)
 ind_chain = sample(rng, posterior, ind_mh, 10_000; discard_initial=0, thinning=5);
 plot_result_z((0, 15), ind_chain, bijector(posterior), target)
