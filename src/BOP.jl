@@ -69,7 +69,6 @@ Load the ground truth information for each object and image as a DataFrame with 
 """
 function gt_dataframe(scene_path)
     gt_json = JSON.parsefile(joinpath(scene_path, "scene_gt.json"))
-    # Create an Array of NamedTuples
     df = DataFrame(img_id=Int[], obj_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Translation[])
     for (img_id, value) in gt_json
         img_id = parse(Int, img_id)
@@ -77,7 +76,7 @@ function gt_dataframe(scene_path)
             obj_id = gt["obj_id"]
             # Saved row-wise, Julia is column major
             cam_R_m2c = reshape(gt["cam_R_m2c"], 3, 3)' |> RotMatrix3 |> QuatRotation
-            cam_t_m2c = 1e-3 * gt["cam_t_m2c"] |> Translation
+            cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"]) |> Translation
             push!(df, (img_id, obj_id, cam_R_m2c, cam_t_m2c))
         end
     end
@@ -114,3 +113,27 @@ gt_df = gt_dataframe(first_scene_path)
 df = leftjoin(gt_df, img_cam_df, on=:img_id)
 
 # TODO Goal: load an element from scene_gt.json and render the gt pose on top of the image.
+
+# TODO init context with mesh model and camera for each config in the df
+"""
+    object_dataframe(dataset_name)
+# TODO
+"""
+function object_dataframe(dataset_name)
+    path = dataset_path(dataset_name)
+    json = JSON.parsefile(joinpath(path, "models_eval", "models_info.json"))
+    df = DataFrame(obj_id=Int[], diameter=Float32[], mesh=Mesh[])
+    for (obj_id, data) in json
+        obj_id = parse(Int, obj_id)
+        diameter = Float32(1e-3 .* data["diameter"])
+        filename = "obj_" * lpad_bop(obj_id) * ".ply"
+        mesh_file = joinpath(path, "models_eval", filename)
+        mesh = Scale(Float32(1e-3))(load(mesh_file))
+        # TODO It makes more sense to keep the mesh in memory so replace mesh_file & scale in Parameters.jl
+        push!(df, (obj_id, diameter, mesh))
+    end
+    df
+end
+
+obj_df = object_dataframe("itodd")
+new_df = leftjoin(df, obj_df, on=:obj_id)
