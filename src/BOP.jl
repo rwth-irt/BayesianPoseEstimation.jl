@@ -9,6 +9,7 @@ using ImageCore
 using ImageIO
 using JSON
 using SciGL
+using StaticArrays
 
 dataset_path(dataset_name) = joinpath(pwd(), "datasets", dataset_name)
 datasubset_path(dataset_name, subset_name="test") = joinpath(dataset_path(dataset_name), subset_name)
@@ -17,7 +18,7 @@ datasubset_path(dataset_name, subset_name="test") = joinpath(dataset_path(datase
     scene_paths(dataset_name, [subset_name="test"])
 Returns a vector of the full paths to the scene directories of the datasets subset.
 """
-scene_paths(dataset_name="lm", subset_name="test") = readdir(datasubset_path(dataset_name, subset_name); join=true)
+scene_paths(dataset_name, subset_name="test") = readdir(datasubset_path(dataset_name, subset_name); join=true)
 
 """
     lpad_bop(number)
@@ -25,6 +26,12 @@ Pads the number with zeros from the left for a total length of six digits.
 `pad_bop(42) = 000042`
 """
 lpad_bop(number) = lpad(number, 6, "0")
+
+"""
+    scene_path(dataset_name, [subset_name="test", scene_number=1])
+Returns the path to the scene directory with the given number of the datasets subset.
+"""
+scene_path(dataset_name, subset_name="test", scene_number=1) = joinpath(datasubset_path(dataset_name, subset_name), lpad_bop(scene_number))
 
 """
     image_dataframe(scene_path, modality="depth")
@@ -76,7 +83,8 @@ function gt_dataframe(scene_path)
             obj_id = gt["obj_id"]
             # Saved row-wise, Julia is column major
             cam_R_m2c = reshape(gt["cam_R_m2c"], 3, 3)' |> RotMatrix3 |> QuatRotation
-            cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"]) |> Translation
+            cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"]) |> SVector{3} |> Translation
+            # TODO to pose?
             push!(df, (img_id, obj_id, cam_R_m2c, cam_t_m2c))
         end
     end
@@ -94,27 +102,6 @@ function load_depth_image(df::DataFrame, img_id::Integer)
     load_depth_image(df.img_path[row], df.depth_scale[row])
 end
 
-# Per scene
-first_scene_path = scene_paths("itodd", "val") |> first
-
-# Per image
-img_df = image_dataframe(first_scene_path, "depth")
-cam_df = camera_dataframe(first_scene_path, img_df)
-img_cam_df = innerjoin(img_df, cam_df; on=:img_id)
-
-# load the image
-depth_img = load_depth_image(img_cam_df, first(img_df.img_id))
-
-Gray.(depth_img)
-Gray.(depth_img ./ maximum(depth_img))
-
-# Per evaluation
-gt_df = gt_dataframe(first_scene_path)
-df = leftjoin(gt_df, img_cam_df, on=:img_id)
-
-# TODO Goal: load an element from scene_gt.json and render the gt pose on top of the image.
-
-# TODO init context with mesh model and camera for each config in the df
 """
     object_dataframe(dataset_name)
 # TODO
@@ -135,5 +122,17 @@ function object_dataframe(dataset_name)
     df
 end
 
-obj_df = object_dataframe("itodd")
-new_df = leftjoin(df, obj_df, on=:obj_id)
+# TODO support support multiple modalities, i.e. depth_img_path & color_img_path ?
+function scene_dataframe(dataset_name="lm", subset_name="test", scene_number=1)
+    path = scene_path(dataset_name, subset_name, scene_number)
+    # Per image
+    img_df = MCMCDepth.image_dataframe(path, "depth")
+    cam_df = MCMCDepth.camera_dataframe(path, img_df)
+    img_cam_df = innerjoin(img_df, cam_df; on=:img_id)
+    # Per evaluation
+    gt_df = gt_dataframe(path)
+    gt_img_df = leftjoin(gt_df, img_cam_df, on=:img_id)
+    # Per object
+    obj_df = object_dataframe(dataset_name)
+    leftjoin(gt_img_df, obj_df, on=:obj_id)
+end

@@ -48,7 +48,7 @@ cube_path = joinpath(dirname(pathof(SciGL)), "..", "examples", "meshes", "cube.o
 cube_mesh = load(cube_path)
 cube_diameter = CUBE_SCALE.scale * model_diameter(cube_mesh)
 
-cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
+cube = upload_mesh(gl_context, cube_mesh, CUBE_SCALE)
 cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = Camera(cv_camera)
 scene = Scene(camera, [cube])
@@ -72,7 +72,7 @@ bounding_box = crop_boundingbox(cv_camera, cube.pose.translation.translation, cu
 
 gl_context = depth_offscreen_context((RE_SIZE)..., 1, Array)
 cube_diameter = CUBE_SCALE.scale * model_diameter(cube_mesh)
-cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
+cube = upload_mesh(gl_context, cube_mesh, CUBE_SCALE)
 cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = crop(cv_camera, bounding_box...)
 scene = Scene(camera, [cube])
@@ -114,7 +114,7 @@ cube_diameter = maximum(CUBE_SCALE.scale) * model_diameter(cube_mesh)
 
 # Draw an image to crop
 gl_context = depth_offscreen_context(WIDTH, HEIGHT, 1, Array)
-cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
+cube = upload_mesh(gl_context, cube_mesh, CUBE_SCALE)
 cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = Camera(cv_camera)
 scene = Scene(camera, [cube])
@@ -123,7 +123,7 @@ crop_img = crop_image(full_img, bounding_box...)
 resized = @inferred depth_resize(crop_img, RE_SIZE...)
 
 gl_context = depth_offscreen_context((RE_SIZE)..., 1, Array)
-cube = load_mesh(gl_context, cube_mesh, CUBE_SCALE)
+cube = upload_mesh(gl_context, cube_mesh, CUBE_SCALE)
 cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = crop(cv_camera, bounding_box...)
 scene = Scene(camera, [cube])

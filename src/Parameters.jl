@@ -158,7 +158,7 @@ device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, 
 Create a scene for inference given the parameters.
 """
 function SciGL.Scene(gl_context, p::Parameters)
-    object = load_mesh(gl_context, p.mesh)
+    object = upload_mesh(gl_context, p.mesh)
     camera = Camera(p.cv_camera)
     Scene(camera, [object])
 end
