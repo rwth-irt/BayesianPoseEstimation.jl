@@ -66,7 +66,6 @@ export merge
 export names
 export to_model_domain
 export to_unconstrained_domain
-export transform
 export types
 export variables
 
@@ -162,7 +161,7 @@ export depth_resize
 @reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
-@reexport import SciGL: OffscreenContext, Scale, Scene
+@reexport import SciGL: OffscreenContext, Scale, Scene, destroy_context
 @reexport import StatsBase: Weights
 
 

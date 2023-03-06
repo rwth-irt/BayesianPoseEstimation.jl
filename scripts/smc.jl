@@ -99,7 +99,7 @@ end
 # Normalization and tempering leads to less resampling, especially in MCMC sampler
 @reset parameters.relative_ess = 0.8;
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-final_sample, final_state = run_inference(parameters, gl_context, observation, 2_000, 100);
+final_sample, final_state = run_inference(parameters, gl_context, observation, 2_500, 100);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)

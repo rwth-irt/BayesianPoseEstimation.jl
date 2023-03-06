@@ -16,8 +16,7 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * `depth` z-dimension resembles the number of parallel renderings
 
 # Scene
-* `mesh_file` Mesh of the object of interest
-* `scale` Scaling of the object (e.g. Scale(1e-3) for mm to m)
+* `mesh` Mesh of the object of interest
 * `cv_camera` Camera parametrized by OpenCV convention
 
 # Observation Model
@@ -60,13 +59,12 @@ Base.@kwdef struct Parameters
     # Render context
     width = 100
     height = 100
-    depth = 1_000
+    depth = 1000
     min_depth = 0.1
     max_depth = 3
 
     # Scene
-    mesh_file = "meshes/monkey.obj"
-    scale = Scale(1)
+    mesh = load("meshes/monkey.obj")
     cv_camera = CvCamera(width, height, 1.2 * width, 1.2 * height, width / 2, height / 2; near=min_depth, far=max_depth)
 
     # Depth pixel model
@@ -160,8 +158,7 @@ device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, 
 Create a scene for inference given the parameters.
 """
 function SciGL.Scene(gl_context, p::Parameters)
-    scaled_mesh = p.scale(load(p.mesh_file))
-    object = load_mesh(gl_context, scaled_mesh)
+    object = load_mesh(gl_context, p.mesh)
     camera = Camera(p.cv_camera)
     Scene(camera, [object])
 end

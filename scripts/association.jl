@@ -16,7 +16,7 @@ parameters = Parameters()
 gl_context = render_context(parameters)
 
 include("fake_observation.jl")
-obs_scene = observation_scene(gl_context, parameters, 0.8)
+obs_scene = observation_scene(gl_context, parameters, 0.5)
 observation = fake_observation(gl_context, parameters, obs_scene)
 
 function run_inference(parameters::Parameters, render_context, observation, n_steps=1_000, n_tries=250; kwargs...)
@@ -94,12 +94,12 @@ end
 
 # plot_depth_img(Array(obs.z))
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-@reset parameters.normalization_constant = 20
+@reset parameters.normalization_constant = 25
 # NOTE Should be able to increase σ in MTM
 @reset parameters.proposal_σ_r_quat = 0.3
 @reset parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 @reset parameters.seed = rand(RandomDevice(), UInt32)
-model_chain = run_inference(parameters, gl_context, observation, 2_000, 50; thinning=1);
+model_chain = run_inference(parameters, gl_context, observation, 1_000, 200; thinning=1)
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain, 50)
 plot_logprob(model_chain, 50)
