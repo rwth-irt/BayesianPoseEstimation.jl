@@ -116,8 +116,9 @@ For `variables` which contain multiple vectorized proposals.
 Selects the `index` of the last dim only for `variables` in the graph.
 """
 function select_variables_dim(variables::NamedTuple, ::Val{names}, index) where {names}
-    # Select index of last dim using EllipsisNotation.jl
-    selected_vars = map(x -> @view(x[.., index]), variables[names])
+    # `..` is from EllipsisNotation.jl
+    # WARN: Do not use view(x, .., index), since the GC can't collect the discarded dims which results in high GPU memory pressure → even more garbage collections or even out of memory exceptions.
+    selected_vars = map(x -> x[.., index], variables[names])
     # return sample where the proposed variables are replaced
     merge(variables, selected_vars)
 end
