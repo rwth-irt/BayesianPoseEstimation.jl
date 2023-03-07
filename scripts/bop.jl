@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using Accessors
+using FileIO
 using MCMCDepth
 using SciGL
 
@@ -25,7 +26,11 @@ scene = Scene(gl_context, parameters)
 # TODO convert all or nothing in BOP.jl? Mesh vs. Pose. Full scene probably not because of cropping
 @reset scene.meshes[1].pose = MCMCDepth.to_pose(row.cam_t_m2c, row.cam_R_m2c)
 
+# Draw result for visual validation
+MCMCDepth.diss_defaults()
+gr()
 rendered = draw(gl_context, scene)
-plot_depth_img(rendered)
+# TODO load into DataFrame
+img = load("/home/rd/code/mcmc-depth-images/datasets/tless/test_primesense/000001/rgb/000474.png")
+MCMCDepth.plot_depth_ontop(img, rendered)
 
-# TODO Goal: render the gt pose on top of the recorded (color) image.
