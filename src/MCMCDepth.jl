@@ -85,6 +85,7 @@ export propose
 export transition_probability
 
 # Parameters
+export Experiment
 export Parameters
 
 export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array

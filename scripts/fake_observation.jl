@@ -3,23 +3,26 @@
 # All rights reserved. 
 
 using Accessors
+using FileIO
 using SciGL
 
-function observation_scene(gl_context, params, occlusion_factor)
-    # Camera
-    f_x = 120
-    f_y = 120
-    c_x = 50
-    c_y = 50
-    camera = CvCamera(params.width, params.height, f_x, f_y, c_x, c_y; near=params.min_depth, far=params.max_depth) |> Camera
-    # Meshes
-    monkey = upload_mesh(gl_context, "meshes/monkey.obj")
+fake_gt_position = [0, 0, 2.0]
+fake_mesh = load("meshes/monkey.obj")
 
-    gt_position = params.mean_t + [0.05, -0.05, -0.1]
+function fake_camera(params)
+    f_x = 1.2 * params.width
+    f_y = f_x
+    c_x = 0.5 * params.width
+    c_y = 0.5 * params.height
+    CvCamera(params.width, params.height, f_x, f_y, c_x, c_y; near=params.min_depth, far=params.max_depth) |> Camera
+end
+
+function fake_observation(gl_context, params, occlusion_factor)
+    monkey = upload_mesh(gl_context, fake_mesh)
     gt_orientation = rand(QuaternionUniform())
     rxyz = RotXYZ(QuatRotation(gt_orientation))
-    println("GT position & rotation (XYZ): $gt_position, ($(rxyz.theta1), $(rxyz.theta2), $(rxyz.theta3) )")
-    @reset monkey.pose = to_pose(gt_position, gt_orientation)
+    println("GT position & rotation (XYZ): $fake_gt_position, ($(rxyz.theta1), $(rxyz.theta2), $(rxyz.theta3) )")
+    @reset monkey.pose = to_pose(fake_gt_position, gt_orientation)
 
     cube_mesh = load("meshes/cube.obj")
     background_mesh = Scale(3, 3, 1)(cube_mesh)
@@ -29,13 +32,10 @@ function observation_scene(gl_context, params, occlusion_factor)
     occlusion = upload_mesh(gl_context, occlusion_mesh)
     @reset occlusion.pose.translation = Translation(-0.85 + (0.05 + 0.85) * occlusion_factor, 0, 1.6)
 
-    Scene(camera, [monkey, background, occlusion])
-end
-
-function fake_observation(gl_context, params, scene)
+    scene = Scene(fake_camera(params), [monkey, background, occlusion])
     nominal = draw(gl_context, scene)
     # add noise
     association_probability = 0.8f0
     pixel_model = pixel_explicit | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    (; z=rand(device_rng(params), BroadcastedDistribution(pixel_model, (), nominal, association_probability)))
+    rand(device_rng(params), BroadcastedDistribution(pixel_model, (), nominal, association_probability))
 end

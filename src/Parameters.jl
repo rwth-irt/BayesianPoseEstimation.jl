@@ -6,18 +6,28 @@
 # TODO might want to convert this to a dict for DrWatson
 
 """
+    Experiment
+Data which might change from one experiment to another
+
+* `scene` camera parameters or object mesh might change
+* `prior_t` estimated position of the object center e.g. via RFID or bounding box
+* `depth_img` depth image of the observed scene
+"""
+struct Experiment
+    scene::Scene
+    prior_t::Vector{Float32}
+    depth_image::AbstractMatrix{Float32}
+end
+
+"""
     Parameters
 Monolith for storing the parameters.
-Deliberately not strongly typed because the strongly typed struct are constructed in the Main script from this.
+Deliberately not strongly typed because the strongly typed structs are constructed in the Main script from this.
 
 # Render context
 * `width, height` Dimensions of the images.
 * `min_depth, max_depth` Range limit of the sensor / region of interest
 * `depth` z-dimension resembles the number of parallel renderings
-
-# Scene
-* `mesh` Mesh of the object of interest
-* `cv_camera` Camera parametrized by OpenCV convention
 
 # Observation Model
 ## Sensor Model
@@ -63,10 +73,6 @@ Base.@kwdef struct Parameters
     min_depth = 0.1
     max_depth = 3
 
-    # Scene
-    mesh = load("meshes/monkey.obj")
-    cv_camera = CvCamera(width, height, 1.2 * width, 1.2 * height, width / 2, height / 2; near=min_depth, far=max_depth)
-
     # Depth pixel model
     pixel_σ = 0.01
     pixel_θ = 1.0
@@ -91,11 +97,11 @@ Base.@kwdef struct Parameters
     precision = Float32
     device = :CUDA
     seed = 8418387917544508114
-    n_steps = 5_000
+    n_steps = 3_000
     n_burn_in = 1_000
-    n_thinning = 2
+    n_thinning = 0
     n_particles = 100
-    relative_ess = 0.5
+    relative_ess = 0.8
 end
 
 # Automatically convert to correct precision
