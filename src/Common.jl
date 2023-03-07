@@ -88,6 +88,7 @@ Convert an array of Quaternions to an array of Rotations.
 """
 to_rotation(Q::Array{<:Quaternion}) = QuatRotation.(Q)
 to_rotation(q::Quaternion) = QuatRotation(q)
+to_rotation(r::Rotation) = QuatRotation(r)
 
 
 """
