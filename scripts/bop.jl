@@ -5,6 +5,7 @@
 using Accessors
 using FileIO
 using MCMCDepth
+using Plots
 using SciGL
 
 s_df = MCMCDepth.scene_dataframe("tless", "test_primesense", 1)
@@ -20,11 +21,11 @@ parameters = Parameters()
 gl_context = render_context(parameters)
 
 # Scene
-@reset parameters.cv_camera = row.camera
-@reset parameters.mesh = row.mesh
-scene = Scene(gl_context, parameters)
+camera = row.camera |> Camera
+mesh = upload_mesh(gl_context, row.mesh)
 # TODO convert all or nothing in BOP.jl? Mesh vs. Pose. Full scene probably not because of cropping
-@reset scene.meshes[1].pose = MCMCDepth.to_pose(row.cam_t_m2c, row.cam_R_m2c)
+@reset mesh.pose = MCMCDepth.to_pose(row.cam_t_m2c, row.cam_R_m2c)
+scene = Scene(camera, [mesh])
 
 # Draw result for visual validation
 MCMCDepth.diss_defaults()

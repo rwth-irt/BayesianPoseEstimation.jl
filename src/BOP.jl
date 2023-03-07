@@ -76,14 +76,14 @@ Load the ground truth information for each object and image as a DataFrame with 
 """
 function gt_dataframe(scene_path)
     gt_json = JSON.parsefile(joinpath(scene_path, "scene_gt.json"))
-    df = DataFrame(img_id=Int[], obj_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Translation[])
+    df = DataFrame(img_id=Int[], obj_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Vector{Float32}[])
     for (img_id, value) in gt_json
         img_id = parse(Int, img_id)
         for gt in value
             obj_id = gt["obj_id"]
             # Saved row-wise, Julia is column major
             cam_R_m2c = reshape(gt["cam_R_m2c"], 3, 3)' |> RotMatrix3 |> QuatRotation
-            cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"]) |> SVector{3} |> Translation
+            cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"])
             # TODO to pose?
             push!(df, (img_id, obj_id, cam_R_m2c, cam_t_m2c))
         end
