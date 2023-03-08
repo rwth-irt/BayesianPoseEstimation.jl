@@ -142,12 +142,14 @@ export pixel_valid_tail
 export density_variable
 export histogram_variable
 export mean_image
-export plot_depth_img, plot_prob_img
-export polar_density_variable
+export plot_depth_img
+export plot_depth_ontop
 export plot_logprob
 export plot_pose_chain
 export plot_pose_density
+export plot_prob_img
 export plot_variable
+export polar_density_variable
 export polar_histogram_variable
 export scatter_position
 export sphere_density
@@ -157,6 +159,7 @@ export sphere_scatter
 export crop_boundingbox
 export crop_image
 export depth_resize
+export scene_dataframe
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion

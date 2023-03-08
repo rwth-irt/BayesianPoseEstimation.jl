@@ -34,19 +34,24 @@ Returns the path to the scene directory with the given number of the datasets su
 scene_path(dataset_name, subset_name="test", scene_number=1) = joinpath(datasubset_path(dataset_name, subset_name), lpad_bop(scene_number))
 
 """
-    image_dataframe(scene_path, modality="depth")
-Load the image information as a DataFrame with the columns `img_id, img_path, img_size` with `img_size=(width, height)`
+    image_dataframe(scene_path)
+Load the image information as a DataFrame with the columns `img_id, depth_path, color_path, img_size` with `img_size=(width, height)`.
+`color_path` either contains rgb or grayscale images.
 """
-function image_dataframe(scene_path, modality="depth")
-    dir = joinpath(scene_path, modality)
-    img_paths = readdir(dir; join=true)
-    img_ids = @. parse(Int, img_paths |> splitext |> first |> splitpath |> last)
-    img_sizes = map(img_paths) do img_path
+function image_dataframe(scene_path)
+    depth_dir = joinpath(scene_path, "depth")
+    rgb_dir = joinpath(scene_path, "rgb")
+    gray_dir = joinpath(scene_path, "gray")
+    depth_paths = readdir(depth_dir; join=true)
+    # Depending on the dataset either gray or rgb is available
+    color_paths = isdir(rgb_dir) ? readdir(rgb_dir; join=true) : readdir(gray_dir; join=true)
+    img_ids = @. parse(Int, depth_paths |> splitext |> first |> splitpath |> last)
+    img_sizes = map(depth_paths) do img_path
         # ImageIO loads transposed
         img = img_path |> load |> transpose
         size(img)
     end
-    DataFrame(img_id=img_ids, img_path=img_paths, img_size=img_sizes)
+    DataFrame(img_id=img_ids, depth_path=depth_paths, color_path=color_paths, img_size=img_sizes)
 end
 
 """
@@ -76,16 +81,16 @@ Load the ground truth information for each object and image as a DataFrame with 
 """
 function gt_dataframe(scene_path)
     gt_json = JSON.parsefile(joinpath(scene_path, "scene_gt.json"))
-    df = DataFrame(img_id=Int[], obj_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Vector{Float32}[])
-    for (img_id, value) in gt_json
+    df = DataFrame(img_id=Int[], obj_id=Int[], gt_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Vector{Float32}[])
+    for (img_id, body) in gt_json
         img_id = parse(Int, img_id)
-        for gt in value
+        for (gt_id, gt) in enumerate(body)
             obj_id = gt["obj_id"]
             # Saved row-wise, Julia is column major
             cam_R_m2c = reshape(gt["cam_R_m2c"], 3, 3)' |> RotMatrix3 |> QuatRotation
             cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"])
             # TODO to pose?
-            push!(df, (img_id, obj_id, cam_R_m2c, cam_t_m2c))
+            push!(df, (img_id, obj_id, gt_id, cam_R_m2c, cam_t_m2c))
         end
     end
     df
@@ -126,7 +131,7 @@ end
 function scene_dataframe(dataset_name="lm", subset_name="test", scene_number=1)
     path = scene_path(dataset_name, subset_name, scene_number)
     # Per image
-    img_df = MCMCDepth.image_dataframe(path, "depth")
+    img_df = MCMCDepth.image_dataframe(path)
     cam_df = MCMCDepth.camera_dataframe(path, img_df)
     img_cam_df = innerjoin(img_df, cam_df; on=:img_id)
     # Per evaluation
