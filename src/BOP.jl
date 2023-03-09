@@ -77,11 +77,11 @@ end
 
 """
     gt_dataframe(scene_path)
-Load the ground truth information for each object and image as a DataFrame with the columns `img_id, obj_id, cam_R_m2c, cam_t_m2c`.
+Load the ground truth information for each object and image as a DataFrame with the columns `img_id, obj_id, cam_R_m2c, cam_t_m2c, mask_path, mask_visib_path`.
 """
 function gt_dataframe(scene_path)
     gt_json = JSON.parsefile(joinpath(scene_path, "scene_gt.json"))
-    df = DataFrame(img_id=Int[], obj_id=Int[], gt_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Vector{Float32}[])
+    df = DataFrame(img_id=Int[], obj_id=Int[], gt_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Vector{Float32}[], mask_path=String[], mask_visib_path=String[])
     for (img_id, body) in gt_json
         img_id = parse(Int, img_id)
         for (gt_id, gt) in enumerate(body)
@@ -90,7 +90,11 @@ function gt_dataframe(scene_path)
             cam_R_m2c = reshape(gt["cam_R_m2c"], 3, 3)' |> RotMatrix3 |> QuatRotation
             cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"])
             # TODO to pose?
-            push!(df, (img_id, obj_id, gt_id, cam_R_m2c, cam_t_m2c))
+            # masks paths (mind julia vs python indexing)
+            mask_filename = lpad_bop(img_id) * "_" * lpad_bop(gt_id - 1) * ".png"
+            mask_path = joinpath(scene_path, "mask", mask_filename)
+            mask_visib_path = joinpath(scene_path, "mask_visib", mask_filename)
+            push!(df, (img_id, obj_id, gt_id, cam_R_m2c, cam_t_m2c, mask_path, mask_visib_path))
         end
     end
     df
