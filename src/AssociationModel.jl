@@ -18,18 +18,3 @@ function pixel_association(dist_is, dist_not, prior, μ, z)
     # Normalized posterior
     nominator / marginal
 end
-
-"""
-    ImageAssociation(dist_is, dist_not, prior, observation, [association_name=:o, expectation_name=:μ])
-Creates a image_association for the given parameters which does not execute any reduction, so the logdensity returns the whole image.
-
-Internally, the `pixel_association` function is broadcasted in a DeterministicNode.
-Provide a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
-The `prior` is required for the association probability `o`.
-Finally, provide the `observation` on which the model can be conditioned.
-"""
-function image_association(dist_is, dist_not, prior, observation, association_name=:o, expectation_name=:μ)
-    expectation_node = DeterministicNode(expectation_name, () -> zero(observation), (;))
-    pix_ass = pixel_association | (dist_is, dist_not, prior)
-    DeterministicNode(association_name, (expectation) -> pix_ass.(expectation, observation), (; expectation_name => expectation_node))
-end

@@ -121,7 +121,6 @@ export ImageLikelihoodNormalizer
 export ValidPixel
 
 export expected_pixel_count
-export image_association
 export nonzero_pixels
 export pixel_association
 export pixel_explicit
@@ -133,9 +132,9 @@ export smooth_mixture
 export smooth_tail
 export smooth_valid_mixture
 export smooth_valid_tail
-export valid_pixel_explicit
+export pixel_valid_explicit
 export pixel_valid_mixture
-export valid_pixel_normal
+export pixel_valid_normal
 export pixel_valid_tail
 
 # Visualization

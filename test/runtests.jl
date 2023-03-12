@@ -2,6 +2,7 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+include("association_model.jl")
 include("common.jl")
 include("crop.jl")
 include("parameters.jl")

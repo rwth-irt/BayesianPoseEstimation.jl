@@ -42,10 +42,10 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
     μ_fn = render_fn | (render_context, experiment.scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
-    dist_is = valid_pixel_normal | params.association_σ
+    dist_is = pixel_valid_normal | params.association_σ
     dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
     association_fn = pixel_association | (dist_is, dist_not, params.prior_o)
-    o = DeterministicNode(:o, (expectation) -> association_fn.(expectation, experiment.depth_image), (; μ=μ))
+    o = DeterministicNode(:o, μ -> association_fn.(μ, experiment.depth_image), (; μ=μ))
     # NOTE almost no performance gain over DeterministicNode
     # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
 

@@ -164,7 +164,7 @@ smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Rea
 
 
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
-valid_pixel_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
+pixel_valid_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
 
 """
     pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
@@ -185,7 +185,7 @@ function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) w
     end
 end
 
-valid_pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
+pixel_valid_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
 
 """
     render_fn(render_context, scene, object_id, t, r)
