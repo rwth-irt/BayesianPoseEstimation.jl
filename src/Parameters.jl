@@ -94,7 +94,7 @@ Base.@kwdef struct Parameters
     proposal_σ_r = [0.1, 0.1, 0.1]
     proposal_σ_r_quat = 0.1
     # Inference
-    precision = Float32
+    float_type = Float32
     device = :CUDA
     seed = 8418387917544508114
     n_steps = 3_000
@@ -144,7 +144,7 @@ function device_rng(p::Parameters)
     end
 end
 
-cpu_array(p::Parameters, dims...) = Array{p.precision}(undef, dims...)
+cpu_array(p::Parameters, dims...) = Array{p.float_type}(undef, dims...)
 
 function device_array_type(p::Parameters)
     if p.device === :CUDA
@@ -157,7 +157,7 @@ function device_array_type(p::Parameters)
         Array
     end
 end
-device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, dims...)
+device_array(p::Parameters, dims...) = device_array_type(p){p.float_type}(undef, dims...)
 
 """
     Scene(gl_context, parameters)
@@ -169,19 +169,19 @@ function SciGL.Scene(gl_context, p::Parameters)
     Scene(camera, [object])
 end
 
-Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
-Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))
+Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.float_type.(getfield(p, :min_depth))
+Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.float_type.(getfield(p, :max_depth))
 
-Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.precision.(getfield(p, :prior_o))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.precision.(getfield(p, :proposal_σ_o))
-Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.precision.(getfield(p, :normalization_constant))
-Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.precision.(getfield(p, :pixel_σ))
-Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.precision.(getfield(p, :association_σ))
-Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.precision.(getfield(p, :pixel_θ))
-Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.precision.(getfield(p, :mix_exponential))
+Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.float_type.(getfield(p, :prior_o))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.float_type.(getfield(p, :proposal_σ_o))
+Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.float_type.(getfield(p, :normalization_constant))
+Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.float_type.(getfield(p, :pixel_σ))
+Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.float_type.(getfield(p, :association_σ))
+Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.float_type.(getfield(p, :pixel_θ))
+Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.float_type.(getfield(p, :mix_exponential))
 
-Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.precision.(getfield(p, :mean_t))
-Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.precision.(getfield(p, :σ_t))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.precision.(getfield(p, :proposal_σ_t))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.precision.(getfield(p, :proposal_σ_r))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.precision.(getfield(p, :proposal_σ_r_quat))
+Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.float_type.(getfield(p, :mean_t))
+Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.float_type.(getfield(p, :σ_t))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.float_type.(getfield(p, :proposal_σ_t))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.float_type.(getfield(p, :proposal_σ_r))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.float_type.(getfield(p, :proposal_σ_r_quat))

@@ -4,3 +4,6 @@
 
 include("common.jl")
 include("crop.jl")
+include("parameters.jl")
+include("posterior_model.jl")
+include("proposals.jl")

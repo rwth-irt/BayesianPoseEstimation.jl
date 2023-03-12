@@ -37,7 +37,7 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
     # Model specification
     # Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
     t = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
-    r = BroadcastedNode(:r, rng, QuaternionUniform, params.precision)
+    r = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
 
     μ_fn = render_fn | (render_context, experiment.scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
