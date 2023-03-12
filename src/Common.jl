@@ -67,8 +67,8 @@ Convert the input to a `Vector{Translation}`.
 to_translation(A::AbstractArray{<:Number}) = [to_translation(t) for t in eachcol(A)]
 to_translation(A::AbstractArray{<:Translation}) = A
 
-# Wrap in vector
-to_translation(v::AbstractVector{<:Number}) = Translation(v...)
+# Wrap in SVector for type stability
+to_translation(v::AbstractVector{<:Number}) = Translation(SVector{3}(v))
 to_translation(t::Translation) = t
 
 """
