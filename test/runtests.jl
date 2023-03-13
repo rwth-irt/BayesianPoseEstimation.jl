@@ -5,6 +5,7 @@
 include("association_model.jl")
 include("common.jl")
 include("crop.jl")
+include("function_manipulation.jl")
 include("parameters.jl")
 include("posterior_model.jl")
 include("proposals.jl")

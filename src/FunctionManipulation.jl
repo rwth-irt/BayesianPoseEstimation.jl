@@ -13,7 +13,7 @@ Given gen_f(;a,b), gen_f | (; a=1) returns a function generator of the form gen_
 Based on ideas from PartialFunctions.jl https://github.com/archermarx/PartialFunctions.jl/blob/master/src/PartialFunctions.jl
 
 # WARN 
-This has proven difficult using chained anonymous functions
+Implementing this has proven to be difficult using chained anonymous functions, possibly related to this: https://discourse.julialang.org/t/rfc-some-ideas-to-tackle-15276-performance-of-captured-variables-in-closures/95260.
 Main difference is that mapping the kwargs to args is more flexible and possible in any step of the partial application
 """
 
