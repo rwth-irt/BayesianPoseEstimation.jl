@@ -2,10 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
-using .MCMCDepth
-
 using Accessors
 using CUDA
 using LinearAlgebra
@@ -17,21 +13,21 @@ using Test
 
 pyplot()
 params = MCMCDepth.Parameters()
-params = @set params.mesh_files = ["meshes/BM067R.obj"]
-render_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
+gl_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
 
+@reset params.mesh_file = "meshes/BM067R.obj"
+scene = Scene(gl_context, params)
 # CvCamera like ROS looks down positive z
-scene = Scene(params, render_context)
 t = [-0.05, 0.05, 0.25]
 r = [1, 1, 0]
 p = to_pose(t, r)
-μ = render(render_context, scene, 1, p)
+μ = render(gl_context, scene, p)
 
 # Plot depth images and override some plot parameters
 plot_depth_img(μ)
 plot_depth_img(μ; color_scheme=:cividis)
 plot_depth_img(μ; reverse=false)
-histogram(μ |> flatten)
+histogram(μ |> Iterators.flatten |> collect)
 
 # Probability images
 o = rand(KernelUniform(0.5f0, 1.0f0), 100, 100)

@@ -14,7 +14,7 @@ Random.seed!(rng, 42)
 # Setup render context & scene
 params = MCMCDepth.Parameters()
 params = @set params.mesh_files = ["meshes/BM067R.obj"]
-render_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
+gl_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
 
 # Setup probability Distributions
 function mix_normal_truncated_exponential(σ::T, θ::T, μ::T, o::T) where {T<:Real}
@@ -26,23 +26,23 @@ end
 my_pixel_dist = mix_normal_truncated_exponential | (0.1f0, 1.0f0)
 
 # CvCamera like ROS looks down positive z
-scene = Scene(params, render_context)
+scene = Scene(params, gl_context)
 t = [-0.05, 0.05, 0.25]
 r = [1, 1, 0]
 p = to_pose(t, r)
-μ = copy(render(render_context, scene, 1, p))
+μ = copy(render(gl_context, scene, 1, p))
 plot_depth_img(μ)
 
 obs_params = @set params.mesh_files = ["meshes/BM067R.obj", "meshes/cube.obj"]
-obs_scene = Scene(obs_params, render_context)
+obs_scene = Scene(obs_params, gl_context)
 obs_scene = @set obs_scene.meshes[2].pose.translation = [-0.5, 0.5, 0.6]
 obs_t = [-0.05, 0.048, 0.25]
 obs_r = [1, 1.03, 0]
 obs_p = to_pose(obs_t, obs_r)
-obs_μ = copy(render(render_context, obs_scene, 1, obs_p))
+obs_μ = copy(render(gl_context, obs_scene, 1, obs_p))
 plot_depth_img(obs_μ)
 
-μ2 = copy(render(render_context, scene, 1, obs_p))
+μ2 = copy(render(gl_context, scene, 1, obs_p))
 plot_depth_img(μ - μ2; colorbar_title="depth difference [m]")
 
 o = rand(rng, KernelUniform(0.9f0, 1.0f0), 100, 100)

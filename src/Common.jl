@@ -3,12 +3,6 @@
 # All rights reserved. 
 
 """
-    flatten(x)
-Flattens x to return a 1D array.
-"""
-flatten(x) = collect(Iterators.flatten(x))
-
-"""
     map_intersect(f, a, b, default)
 Maps the function `f` over the intersection of the keys of `a` and `b`.
 Uses the value of `default`, which may be a function of `value(a[i])`, if no matching key is found in `b`.
@@ -73,8 +67,8 @@ Convert the input to a `Vector{Translation}`.
 to_translation(A::AbstractArray{<:Number}) = [to_translation(t) for t in eachcol(A)]
 to_translation(A::AbstractArray{<:Translation}) = A
 
-# Wrap in vector
-to_translation(v::AbstractVector{<:Number}) = Translation(v...)
+# Wrap in SVector for type stability
+to_translation(v::AbstractVector{<:Number}) = Translation(SVector{3}(v))
 to_translation(t::Translation) = t
 
 """
@@ -94,6 +88,7 @@ Convert an array of Quaternions to an array of Rotations.
 """
 to_rotation(Q::Array{<:Quaternion}) = QuatRotation.(Q)
 to_rotation(q::Quaternion) = QuatRotation(q)
+to_rotation(r::Rotation) = QuatRotation(r)
 
 
 """

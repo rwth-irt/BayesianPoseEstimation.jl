@@ -6,20 +6,28 @@
 # TODO might want to convert this to a dict for DrWatson
 
 """
+    Experiment
+Data which might change from one experiment to another
+
+* `scene` camera parameters or object mesh might change
+* `prior_t` estimated position of the object center e.g. via RFID or bounding box
+* `depth_img` depth image of the observed scene
+"""
+struct Experiment
+    scene::Scene
+    prior_t::Vector{Float32}
+    depth_image::AbstractMatrix{Float32}
+end
+
+"""
     Parameters
 Monolith for storing the parameters.
-Deliberately not strongly typed because the strongly typed struct are constructed in the Main script from this.
+Deliberately not strongly typed because the strongly typed structs are constructed in the Main script from this.
 
-# Scene Objects
-* `mesh_files` Meshes in the scene
-* `object_id` Index of the object to estimate the pose of in the scene
-
-# Camera
-* `width, height` Dimensions of the image.
-* `depth` z-dimension resembles the number of parallel renderings
-* `f_x, f_y` Focal length of the OpenCV camera calibration
-* `c_x, c_y` Optical center of the OpenCV camera calibration
+# Render context
+* `width, height` Dimensions of the images.
 * `min_depth, max_depth` Range limit of the sensor / region of interest
+* `depth` z-dimension resembles the number of parallel renderings
 
 # Observation Model
 ## Sensor Model
@@ -58,19 +66,13 @@ Deliberately not strongly typed because the strongly typed struct are constructe
 * `relative_ess` Relative effective sample size threshold ∈ (0,1)
 """
 Base.@kwdef struct Parameters
-    # Meshes
-    mesh_files = ["meshes/monkey.obj"]
-    object_id = 1
-    # Camera
+    # Render context
     width = 100
     height = 100
-    depth = 1_000
-    f_x = 120
-    f_y = 120
-    c_x = 50
-    c_y = 50
+    depth = 1000
     min_depth = 0.1
     max_depth = 3
+
     # Depth pixel model
     pixel_σ = 0.01
     pixel_θ = 1.0
@@ -92,16 +94,15 @@ Base.@kwdef struct Parameters
     proposal_σ_r = [0.1, 0.1, 0.1]
     proposal_σ_r_quat = 0.1
     # Inference
-    precision = Float32
+    float_type = Float32
     device = :CUDA
     seed = 8418387917544508114
-    n_steps = 5_000
+    n_steps = 3_000
     n_burn_in = 1_000
-    n_thinning = 2
+    n_thinning = 0
     n_particles = 100
-    relative_ess = 0.5
+    relative_ess = 0.8
 end
-
 
 # Automatically convert to correct precision
 Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
@@ -143,7 +144,7 @@ function device_rng(p::Parameters)
     end
 end
 
-cpu_array(p::Parameters, dims...) = Array{p.precision}(undef, dims...)
+cpu_array(p::Parameters, dims...) = Array{p.float_type}(undef, dims...)
 
 function device_array_type(p::Parameters)
     if p.device === :CUDA
@@ -156,21 +157,31 @@ function device_array_type(p::Parameters)
         Array
     end
 end
-device_array(p::Parameters, dims...) = device_array_type(p){p.precision}(undef, dims...)
+device_array(p::Parameters, dims...) = device_array_type(p){p.float_type}(undef, dims...)
 
-Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.precision.(getfield(p, :min_depth))
-Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.precision.(getfield(p, :max_depth))
+"""
+    Scene(gl_context, parameters)
+Create a scene for inference given the parameters.
+"""
+function SciGL.Scene(gl_context, p::Parameters)
+    object = upload_mesh(gl_context, p.mesh)
+    camera = Camera(p.cv_camera)
+    Scene(camera, [object])
+end
 
-Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.precision.(getfield(p, :prior_o))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.precision.(getfield(p, :proposal_σ_o))
-Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.precision.(getfield(p, :normalization_constant))
-Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.precision.(getfield(p, :pixel_σ))
-Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.precision.(getfield(p, :association_σ))
-Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.precision.(getfield(p, :pixel_θ))
-Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.precision.(getfield(p, :mix_exponential))
+Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.float_type.(getfield(p, :min_depth))
+Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.float_type.(getfield(p, :max_depth))
 
-Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.precision.(getfield(p, :mean_t))
-Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.precision.(getfield(p, :σ_t))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.precision.(getfield(p, :proposal_σ_t))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.precision.(getfield(p, :proposal_σ_r))
-Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.precision.(getfield(p, :proposal_σ_r_quat))
+Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.float_type.(getfield(p, :prior_o))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.float_type.(getfield(p, :proposal_σ_o))
+Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.float_type.(getfield(p, :normalization_constant))
+Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.float_type.(getfield(p, :pixel_σ))
+Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.float_type.(getfield(p, :association_σ))
+Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.float_type.(getfield(p, :pixel_θ))
+Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.float_type.(getfield(p, :mix_exponential))
+
+Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.float_type.(getfield(p, :mean_t))
+Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.float_type.(getfield(p, :σ_t))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.float_type.(getfield(p, :proposal_σ_t))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.float_type.(getfield(p, :proposal_σ_r))
+Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.float_type.(getfield(p, :proposal_σ_r_quat))

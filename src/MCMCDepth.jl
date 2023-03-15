@@ -48,9 +48,11 @@ include("RenderContext.jl")
 include("AssociationModel.jl")
 include("Models.jl")
 
+# Datasets
+include("BOP.jl")
+
 # Common
 export array_for_rng
-export flatten
 export map_intersect
 export norm_dims, normalize_dims!, normalize_dims
 export sum_and_dropdims
@@ -64,7 +66,6 @@ export merge
 export names
 export to_model_domain
 export to_unconstrained_domain
-export transform
 export types
 export variables
 
@@ -84,6 +85,7 @@ export propose
 export transition_probability
 
 # Parameters
+export Experiment
 export Parameters
 
 export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
@@ -119,7 +121,6 @@ export ImageLikelihoodNormalizer
 export ValidPixel
 
 export expected_pixel_count
-export image_association
 export nonzero_pixels
 export pixel_association
 export pixel_explicit
@@ -131,21 +132,23 @@ export smooth_mixture
 export smooth_tail
 export smooth_valid_mixture
 export smooth_valid_tail
-export valid_pixel_explicit
+export pixel_valid_explicit
 export pixel_valid_mixture
-export valid_pixel_normal
+export pixel_valid_normal
 export pixel_valid_tail
 
 # Visualization
 export density_variable
 export histogram_variable
 export mean_image
-export plot_depth_img, plot_prob_img
-export polar_density_variable
+export plot_depth_img
+export plot_depth_ontop
 export plot_logprob
 export plot_pose_chain
 export plot_pose_density
+export plot_prob_img
 export plot_variable
+export polar_density_variable
 export polar_histogram_variable
 export scatter_position
 export sphere_density
@@ -155,12 +158,13 @@ export sphere_scatter
 export crop_boundingbox
 export crop_image
 export depth_resize
+export scene_dataframe
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
-@reexport import SciGL: OffscreenContext, Scale, Scene
+@reexport import SciGL: OffscreenContext, Scale, Scene, destroy_context
 @reexport import StatsBase: Weights
 
 

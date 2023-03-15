@@ -95,7 +95,7 @@ Calculates the expected number of valid rendered pixels for the poses of the pri
 This number can for example be used as the normalization constant in the observation model.
 """
 function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::OffscreenContext, scene::Scene, parameters::Parameters)
-    n_pixel = Vector{parameters.precision}(undef, 0)
+    n_pixel = Vector{parameters.float_type}(undef, 0)
     for _ in 1:cld(parameters.n_normalization_samples, parameters.depth)
         prior_sample = rand(rng, prior_model, parameters.depth)
         img = render(render_context, scene, parameters.object_id, to_pose(variables(prior_sample).t, variables(prior_sample).r))
@@ -164,7 +164,7 @@ smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Rea
 
 
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
-valid_pixel_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
+pixel_valid_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
 
 """
     pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
@@ -180,18 +180,18 @@ function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) w
     if μ > 0
         pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
     else
-        # Distribution must be of same type for CUDA support so set o to zero to evaluate the tail only
+        # Distribution must be of same type for type stable CUDA support so set o to zero to evaluate the tail only
         pixel_mixture(min_depth, max_depth, θ, σ, μ, zero(T))
     end
 end
 
-valid_pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
+pixel_valid_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
 
 """
     render_fn(render_context, scene, object_id, t, r)
 Function can be conditioned on the render_context, scene & object_id to be used in a model node to render different poses for t & r.
 """
-function render_fn(render_context, scene, object_id, t, r)
+function render_fn(render_context, scene, t, r)
     p = to_pose(t, r)
-    render(render_context, scene, object_id, p)
+    render(render_context, scene, p)
 end
