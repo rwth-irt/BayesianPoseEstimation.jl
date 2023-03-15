@@ -3,17 +3,17 @@
 # All rights reserved. 
 
 using Accessors
-using CUDA
 using MCMCDepth
 using Plots
 using Random
 using SciGL
 using Test
 
-CUDA.allowscalar(false)
+
+# WARN OpenGL & CUDA interop not trivially possible in CI
 params = Parameters()
 @reset params.float_type = Float32
-@reset params.device = :CUDA
+@reset params.device = :CPU
 
 f_x = 1.2 * params.width
 f_y = f_x
@@ -26,18 +26,15 @@ cube_path = joinpath(dirname(pathof(SciGL)), "..", "examples", "meshes", "cube.o
 model = upload_mesh(gl_context, cube_path)
 scene = Scene(camera, [model])
 
-cpu_rng = Random.default_rng()
-Random.seed!(cpu_rng, params.seed)
-dev_rng = device_rng(params)
-Random.seed!(dev_rng, params.seed)
+rng = Random.default_rng()
+Random.seed!(rng, params.seed)
 
 # PriorModel
 # Pose only makes sense on CPU since CUDA cannot start render calls to OpenGL
 gt_t = ([0.0f0, 0.0f0, 2.5f0])
-t = BroadcastedNode(:t, cpu_rng, KernelNormal, gt_t, params.σ_t)
-r = BroadcastedNode(:r, cpu_rng, QuaternionUniform, Float32)
-# Using the CUDA rng requires the parameters to be stored in CuArrays
-o = BroadcastedNode(:o, dev_rng, KernelUniform, CUDA.fill(0.0f0, params.width, params.height), CUDA.fill(1.0f0, params.width, params.height))
+t = BroadcastedNode(:t, rng, KernelNormal, gt_t, params.σ_t)
+r = BroadcastedNode(:r, rng, QuaternionUniform, Float32)
+o = BroadcastedNode(:o, rng, KernelUniform, fill(0.0f0, params.width, params.height), fill(1.0f0, params.width, params.height))
 
 @testset "PosteriorModel" begin
     prior = (t=t, r=r, o=o)
@@ -46,7 +43,7 @@ o = BroadcastedNode(:o, dev_rng, KernelUniform, CUDA.fill(0.0f0, params.width, p
     @test sample.t isa Array{Float32}
     @test size(sample.t) == (3,)
     @test sample.r isa Quaternion{Float32}
-    @test sample.o isa CuArray{Float32}
+    @test sample.o isa Array{Float32}
     @test size(sample.o) == (params.width, params.height)
     ℓ = @inferred logdensityof(prior, sample)
     @test ℓ isa Float32
@@ -57,7 +54,7 @@ o = BroadcastedNode(:o, dev_rng, KernelUniform, CUDA.fill(0.0f0, params.width, p
     @test size(sample.t) == (3, 5)
     @test sample.r isa Array{Quaternion{Float32}}
     @test size(sample.r) == (5,)
-    @test sample.o isa CuArray{Float32}
+    @test sample.o isa Array{Float32}
     @test size(sample.o) == (params.width, params.height, 5)
     ℓ = @inferred logdensityof(prior, sample)
     @test ℓ isa Array{Float32}
@@ -68,8 +65,8 @@ o = BroadcastedNode(:o, dev_rng, KernelUniform, CUDA.fill(0.0f0, params.width, p
     μ_fn = render_fn | (gl_context, scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
     pixel = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, pixel, (; μ=μ, o=o))
-    z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
+    z = BroadcastedNode(:z, rng, pixel, (; μ=μ, o=o))
+    z_norm = ModifierNode(z, rng, ImageLikelihoodNormalizer | params.normalization_constant)
     depth_img = rand(z_norm).z
     posterior = PosteriorModel(z_norm, (; z=depth_img))
 
