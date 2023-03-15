@@ -2,7 +2,6 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using CUDA
 using LinearAlgebra
 using MCMCDepth
 using Plots
@@ -10,11 +9,9 @@ using Random
 using SciGL
 using Test
 
+# WARN OpenGL & CUDA interop not trivially possible in CI
 rng = Random.default_rng()
 Random.seed!(rng, 42)
-dev_rng = CUDA.default_rng()
-Random.seed!(dev_rng, 42)
-CUDA.allowscalar(false)
 
 # Parameters
 params = Parameters()
@@ -24,7 +21,7 @@ c_x = 0.5 * params.width
 c_y = 0.5 * params.height
 camera = CvCamera(params.width, params.height, f_x, f_y, c_x, c_y; near=params.min_depth, far=params.max_depth) |> Camera
 
-gl_context = depth_offscreen_context(params.width, params.height, params.depth, CuArray)
+gl_context = depth_offscreen_context(params.width, params.height, params.depth, Array)
 cube_path = joinpath(dirname(pathof(SciGL)), "..", "examples", "meshes", "cube.obj")
 model = upload_mesh(gl_context, cube_path)
 scene = Scene(camera, [model])
@@ -38,7 +35,7 @@ min_depth = 0.1f0
 max_depth = 2.0f0
 pixel_dist = pixel_mixture | (min_depth, max_depth, pixel_θ, pixel_θ)
 img_dist = BroadcastedDistribution(pixel_dist, μ_img, prior_o)
-obs = @inferred rand(dev_rng, img_dist)
+obs = @inferred rand(rng, img_dist)
 
 # PixelAssociation
 dist_is = pixel_valid_normal | pixel_σ
