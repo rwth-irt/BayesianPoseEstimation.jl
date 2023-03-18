@@ -100,16 +100,12 @@ function gt_dataframe(scene_path)
     df
 end
 
-# ImageIO loads image transposed by default
-load_depth_image(path, depth_scale) = Float32(1e-3 * depth_scale) .* (path |> load |> channelview |> rawview |> transpose)
+load_depth_image(path, depth_scale) = Float32(1e-3 * depth_scale) .* (path |> load |> channelview |> rawview)
 """
-    load_depth_image(image_df, img_id)
+    load_depth_image(df_row, img_id)
 Load the depth image as a Matrix{Float32} of size (width, height) where each pixel is the depth in meters.
 """
-function load_depth_image(df::DataFrame, img_id::Integer)
-    row = findfirst(x -> x == img_id, df.img_id)
-    load_depth_image(df.img_path[row], df.depth_scale[row])
-end
+load_depth_image(df_row::DataFrameRow) = load_depth_image(df_row.depth_path, df_row.depth_scale)
 
 """
     object_dataframe(dataset_name)

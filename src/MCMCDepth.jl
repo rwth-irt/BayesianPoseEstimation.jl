@@ -41,9 +41,9 @@ include("MultipleTry.jl")
 include("SequentialMonteCarlo.jl")
 
 # Plumbing together the depth image based pose estimator
+include("Parameters.jl")
 include("Crop.jl")
 include("Visualization.jl")
-include("Parameters.jl")
 include("RenderContext.jl")
 include("AssociationModel.jl")
 include("Models.jl")
@@ -158,6 +158,7 @@ export sphere_scatter
 export crop_boundingbox
 export crop_image
 export depth_resize
+export load_depth_image
 export scene_dataframe
 
 # Extensions and Reexports

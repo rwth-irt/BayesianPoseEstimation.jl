@@ -77,7 +77,7 @@ Plot a depth image with a given `color_scheme` on top of another image.
 `value_to_typemax` specifies the value which is converted to typemax.
 `reverse` determines whether the color scheme is reversed.
 """
-function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, kwargs...)
+function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, alpha=0.5, kwargs...)
     # Plot the image as background
     plot(img)
     # Transfer to CPU
@@ -98,7 +98,7 @@ function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viri
         kwargs = (; kwargs, right_margin=8Plots.pt)
     end
     # Plot the depth image on top
-    heatmap!(transpose(depth_img); alpha=0.5, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+    heatmap!(transpose(depth_img); alpha=alpha, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
 end
 
 """

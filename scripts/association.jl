@@ -92,7 +92,7 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
     chain = sample(rng, posterior, composed_sampler, params.n_steps; discard_initial=params.n_burn_in, thinning=params.n_thinning, kwargs...)
 
     map(chain) do sample
-        s, _ = to_model_domain(sample, bijector(z))
+        s, _ = to_model_domain(sample, bijector(posterior))
         s
     end
 end
