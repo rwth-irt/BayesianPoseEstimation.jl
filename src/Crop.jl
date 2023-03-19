@@ -2,7 +2,7 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-using ImageTransformations: imresize
+import ImageTransformations
 using Interpolations: Constant
 
 # Compared to SciGL no conversion between OpenGL and OpenCV conventions required
@@ -62,19 +62,27 @@ function crop_boundingbox(camera::CvCamera, center3d::AbstractVector, model_diam
 end
 
 """
-    crop_img(img, left, right, top, bottom)    
-    crop_img(img, (left, right, top, bottom))
-Convenience method to create a view of the image for the bounding box coordinates.    
-"""
-crop_image(img, left, right, top, bottom) = @view img[left:right, top:bottom]
-
-"""
     depth_resize(img, args...; kwargs...)
 Even though nearest neighbor `Constant()` interpolation might be the correct one on paper, a linear interpolation results in less deviations from the rendered ground truth for objects with large surfaces.
 However, for slim objects, the nearest neighbor interpolation performs better, since real cameras do not interpolate at discontinuous edges.
 Calls ImageTransformations.jl `imresize(img, args...; kwargs..., method=Constant())`
 """
-depth_resize(img, args...; kwargs...) = imresize(img, args...; kwargs..., method=Constant())
+depth_resize(img, args...; kwargs...) = ImageTransformations.imresize(img, args...; kwargs..., method=Constant())
+
+"""
+    imresize(image, parameters)
+Resize the `image` to the width and height of the `parameters` using a nearest neighbor interpolation.
+"""
+ImageTransformations.imresize(image, parameters::Parameters) = depth_resize(image, parameters.height, parameters.width)
+
+"""
+    crop_img(img, left, right, top, bottom, [parameters])    
+Convenience method to create a view of the image for the bounding box coordinates.
+Optionally provide parameters to resize the image using a nearest neighbor interpolation.
+"""
+crop_image(img, left, right, top, bottom) = @view img[left:right, top:bottom]
+crop_image(img, left, right, top, bottom, parameters) = ImageTransformations.imresize(crop_image(img, left, right, top, bottom), parameters)
+
 
 """
     depth_resize_custom(img, crop_size)
