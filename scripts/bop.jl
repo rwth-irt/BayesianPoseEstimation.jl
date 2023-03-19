@@ -33,7 +33,7 @@ scene = Scene(Camera(cv_camera), [mesh])
 MCMCDepth.diss_defaults()
 gr()
 rendered_img = draw(gl_context, scene)
-color_img = load(row.color_path)
+color_img = load_color_image(row)
 plot_depth_ontop(color_img, rendered_img)
 
 # Crop
@@ -52,12 +52,11 @@ crop_scene = Scene(crop_camera, [mesh])
 crop_render = draw(gl_context, crop_scene)
 plot_depth_ontop(crop_img, crop_render, alpha=0.8)
 
-mask_img = Bool.(load(row.mask_path))
+mask_img = load_mask_image(row)
 crop_mask = crop_image(mask_img, bounding_box..., parameters)
 
-# TODO julia images vs. OpenGL (width, height)
 depth_img = load_depth_image(row)
 crop_depth = crop_image(depth_img, bounding_box..., parameters)
-plot_depth_img((crop_depth .* crop_mask)')
+plot_depth_img((crop_depth .* crop_mask))
 
 # TODO load camera noise depending on dataset name? Probabilistic Robotics: Larger Noise than expected? Tune parameter?

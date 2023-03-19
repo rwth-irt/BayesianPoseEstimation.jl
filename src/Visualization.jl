@@ -53,9 +53,7 @@ Plot a depth image with a given `color_scheme` and use black for values of 0.
 function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, kwargs...)
     # Transfer to CPU
     img = Array(img)
-    # color_grad = cgrad(color_scheme; rev=reverse)
     color_grad = cgrad(color_scheme; rev=reverse)
-    # pushfirst!(color_scheme, 0)
     mask = img .!= value_to_typemax
     if clims === nothing
         min = minimum(img[mask])
@@ -79,12 +77,10 @@ Plot a depth image with a given `color_scheme` on top of another image.
 """
 function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, alpha=0.5, kwargs...)
     # Plot the image as background
-    plot(img)
+    img |> transpose |> plot
     # Transfer to CPU
-    depth_img = Array(depth_img)
-    # color_grad = cgrad(color_scheme; rev=reverse)
+    depth_img = depth_img |> Array |> transpose
     color_grad = cgrad(color_scheme; rev=reverse)
-    # pushfirst!(color_scheme, 0)
     mask = depth_img .!= value_to_typemax
     if clims === nothing
         min = minimum(depth_img[mask])
@@ -98,7 +94,7 @@ function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viri
         kwargs = (; kwargs, right_margin=8Plots.pt)
     end
     # Plot the depth image on top
-    heatmap!(transpose(depth_img); alpha=alpha, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+    heatmap!(depth_img; alpha=alpha, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
 end
 
 """

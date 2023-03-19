@@ -158,7 +158,9 @@ export sphere_scatter
 export crop_boundingbox
 export crop_image
 export depth_resize
+export load_color_image
 export load_depth_image
+export load_mask_image
 export scene_dataframe
 
 # Extensions and Reexports

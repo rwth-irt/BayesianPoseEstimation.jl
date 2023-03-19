@@ -20,9 +20,6 @@ RE_SIZE = (100, 100)
 cv_camera = CvCamera(WIDTH, HEIGHT, FX, FY, CX, CY)
 cam_pose = one(Pose)
 
-function setup_context(size)
-end
-
 @testset "Crop primitives" begin
     # Clamp to area which the camera can capture
     @test MCMCDepth.clamp_boundingbox(-10, 30, 0, 20, 20, 20) == (0, 20, 0, 20)

@@ -100,13 +100,6 @@ function gt_dataframe(scene_path)
     df
 end
 
-load_depth_image(path, depth_scale) = Float32(1e-3 * depth_scale) .* (path |> load |> channelview |> rawview)
-"""
-    load_depth_image(df_row, img_id)
-Load the depth image as a Matrix{Float32} of size (width, height) where each pixel is the depth in meters.
-"""
-load_depth_image(df_row::DataFrameRow) = load_depth_image(df_row.depth_path, df_row.depth_scale)
-
 """
     object_dataframe(dataset_name)
 # TODO
@@ -141,3 +134,19 @@ function scene_dataframe(dataset_name="lm", subset_name="test", scene_number=1)
     obj_df = object_dataframe(dataset_name)
     leftjoin(gt_img_df, obj_df, on=:obj_id)
 end
+
+"""
+    load_image(path)
+Load an image in OpenGL convention: (x,y) coordinates instead of Julia images (y,x) convention.
+"""
+load_image(path) = path |> load |> transpose
+
+load_depth_image(path, depth_scale) = (load_image(path) |> channelview |> rawview) .* Float32(1e-3 * depth_scale)
+"""
+    load_depth_image(df_row)
+Load the depth image as a Matrix{Float32} of size (width, height) where each pixel is the depth in meters.
+"""
+load_depth_image(df_row::DataFrameRow) = load_depth_image(df_row.depth_path, df_row.depth_scale)
+
+load_color_image(df_row::DataFrameRow) = load_image(df_row.color_path)
+load_mask_image(df_row::DataFrameRow) = load_image(df_row.mask_path) .|> Bool

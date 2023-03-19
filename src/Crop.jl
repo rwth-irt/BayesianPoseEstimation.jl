@@ -80,7 +80,7 @@ ImageTransformations.imresize(image, parameters::Parameters) = depth_resize(imag
 Convenience method to create a view of the image for the bounding box coordinates.
 Optionally provide parameters to resize the image using a nearest neighbor interpolation.
 """
-crop_image(img, left, right, top, bottom) = @view img[top:bottom, left:right]
+crop_image(img, left, right, top, bottom) = @view img[left:right, top:bottom]
 crop_image(img, left, right, top, bottom, parameters) = ImageTransformations.imresize(crop_image(img, left, right, top, bottom), parameters)
 
 
