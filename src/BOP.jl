@@ -63,7 +63,7 @@ function camera_dataframe(scene_path, img_df)
     img_sizes = Dict(img_df.img_id .=> img_df.img_size)
     json_cams = JSON.parsefile(joinpath(scene_path, "scene_camera.json"))
     img_ids = parse.(Int, keys(json_cams))
-    df = DataFrame(img_id=Int[], camera=CvCamera[], depth_scale=Float32[])
+    df = DataFrame(img_id=Int[], cv_camera=CvCamera[], depth_scale=Float32[])
     for img_id in img_ids
         width, height = img_sizes[img_id]
         json_cam = json_cams[string(img_id)]
@@ -89,7 +89,6 @@ function gt_dataframe(scene_path)
             # Saved row-wise, Julia is column major
             cam_R_m2c = reshape(gt["cam_R_m2c"], 3, 3)' |> RotMatrix3 |> QuatRotation
             cam_t_m2c = Float32.(1e-3 * gt["cam_t_m2c"])
-            # TODO to pose?
             # masks paths (mind julia vs python indexing)
             mask_filename = lpad_bop(img_id) * "_" * lpad_bop(gt_id - 1) * ".png"
             mask_path = joinpath(scene_path, "mask", mask_filename)
@@ -102,7 +101,7 @@ end
 
 """
     object_dataframe(dataset_name)
-# TODO
+Loads the object specific information into a DataFrame with the columns `obj_id, diameter, mesh`.
 """
 function object_dataframe(dataset_name)
     path = dataset_path(dataset_name)
@@ -114,13 +113,15 @@ function object_dataframe(dataset_name)
         filename = "obj_" * lpad_bop(obj_id) * ".ply"
         mesh_file = joinpath(path, "models_eval", filename)
         mesh = Scale(Float32(1e-3))(load(mesh_file))
-        # TODO It makes more sense to keep the mesh in memory so replace mesh_file & scale in Parameters.jl
         push!(df, (obj_id, diameter, mesh))
     end
     df
 end
 
-# TODO support support multiple modalities, i.e. depth_img_path & color_img_path ?
+"""
+    scene_dataframe(dataset_name, subset_name, scene_number)
+Loads the information of a single scene into a DataFrame by combining the image, object and gt information into a single DataFrame`.
+"""
 function scene_dataframe(dataset_name="lm", subset_name="test", scene_number=1)
     path = scene_path(dataset_name, subset_name, scene_number)
     # Per image
@@ -136,17 +137,33 @@ function scene_dataframe(dataset_name="lm", subset_name="test", scene_number=1)
 end
 
 """
-    load_image(path)
+    crop_boundingbox(df_row)
+Get the bounding box of the object & pose in the DataFrameRow.
+"""
+crop_boundingbox(df_row::DataFrameRow) = crop_boundingbox(df_row.cv_camera, df_row.cam_t_m2c, df_row.diameter)
+
+"""
+    crop_camera(df_row)
+Get the cropped camera for the bounding box of the object & pose in the DataFrameRow.
+"""
+crop_camera(df_row::DataFrameRow) = crop(df_row.cv_camera, crop_boundingbox(df_row)...)
+
+"""
+    load_image(path, df_row, parameters)
 Load an image in OpenGL convention: (x,y) coordinates instead of Julia images (y,x) convention.
 """
-load_image(path) = path |> load |> transpose
+function load_image(path, df_row, parameters)
+    bounding_box = crop_boundingbox(df_row)
+    image = path |> load |> transpose
+    crop_image(image, bounding_box..., parameters)
+end
 
-load_depth_image(path, depth_scale) = (load_image(path) |> channelview |> rawview) .* Float32(1e-3 * depth_scale)
+load_depth_image(path, df_row, parameters) = (load_image(path, df_row, parameters) |> channelview |> rawview) .* Float32(1e-3 * df_row.depth_scale)
 """
     load_depth_image(df_row)
 Load the depth image as a Matrix{Float32} of size (width, height) where each pixel is the depth in meters.
 """
-load_depth_image(df_row::DataFrameRow) = load_depth_image(df_row.depth_path, df_row.depth_scale)
+load_depth_image(df_row, parameters) = load_depth_image(df_row.depth_path, df_row, parameters)
 
-load_color_image(df_row::DataFrameRow) = load_image(df_row.color_path)
-load_mask_image(df_row::DataFrameRow) = load_image(df_row.mask_path) .|> Bool
+load_color_image(df_row, parameters) = load_image(df_row.color_path, df_row, parameters)
+load_mask_image(df_row, parameters) = load_image(df_row.mask_path, df_row, parameters) .|> Bool

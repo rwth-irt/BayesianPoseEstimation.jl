@@ -9,54 +9,39 @@ using MCMCDepth
 using Plots
 using SciGL
 
+# Datasets
 # s_df = scene_dataframe("tless", "test_primesense", 1)
 # s_df = scene_dataframe("itodd", "val", 1)
 s_df = scene_dataframe("lm", "test", 2)
 row = s_df[100, :]
-width, height = row.img_size
 
-parameters = Parameters()
-# Context
-@reset parameters.width = width
-@reset parameters.height = height
-@reset parameters.depth = 10
-
-gl_context = render_context(parameters)
-
-# Scene
-cv_camera = row.camera
-mesh = upload_mesh(gl_context, row.mesh)
-@reset mesh.pose = to_pose(row.cam_t_m2c, row.cam_R_m2c)
-scene = Scene(Camera(cv_camera), [mesh])
-
-# Draw result for visual validation
+# Plot setup
 MCMCDepth.diss_defaults()
 gr()
-rendered_img = draw(gl_context, scene)
-color_img = load_color_image(row)
-plot_depth_ontop(color_img, rendered_img)
 
-# Crop
+# Context
+parameters = Parameters()
+@reset parameters.device = :CPU
 @reset parameters.width = 400
 @reset parameters.height = 400
 @reset parameters.depth = 1
-bounding_box = crop_boundingbox(cv_camera, row.cam_t_m2c, row.diameter)
-crop_img = crop_image(color_img, bounding_box..., parameters)
-
 gl_context = render_context(parameters)
+
+# Scene
+camera = crop_camera(row)
 mesh = upload_mesh(gl_context, row.mesh)
 @reset mesh.pose = to_pose(row.cam_t_m2c, row.cam_R_m2c)
-crop_camera = crop(cv_camera, bounding_box...)
-crop_scene = Scene(crop_camera, [mesh])
+scene = Scene(camera, [mesh])
 
-crop_render = draw(gl_context, crop_scene)
-plot_depth_ontop(crop_img, crop_render, alpha=0.8)
+# Draw result for visual validation
+color_img = load_color_image(row, parameters)
+render_img = draw(gl_context, scene)
+plot_depth_ontop(color_img, render_img, alpha=0.8)
 
-mask_img = load_mask_image(row)
-crop_mask = crop_image(mask_img, bounding_box..., parameters)
+mask_img = load_mask_image(row, parameters)
 
-depth_img = load_depth_image(row)
-crop_depth = crop_image(depth_img, bounding_box..., parameters)
-plot_depth_img((crop_depth .* crop_mask))
+depth_img = load_depth_image(row, parameters)
+plot_depth_img((depth_img .* mask_img))
+plot_depth_img((render_img .* mask_img))
 
 # TODO load camera noise depending on dataset name? Probabilistic Robotics: Larger Noise than expected? Tune parameter?

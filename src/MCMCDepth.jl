@@ -155,8 +155,7 @@ export sphere_density
 export sphere_scatter
 
 # Data loading an preprocessing
-export crop_boundingbox
-export crop_image
+export crop_camera
 export depth_resize
 export load_color_image
 export load_depth_image
