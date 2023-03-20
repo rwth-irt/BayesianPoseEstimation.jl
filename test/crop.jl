@@ -56,16 +56,16 @@ full_img = draw(gl_context, scene) |> copy
     # Visually verified via full_img[center2d...] = 1
     @test round.(center2d) == [450, 350]
 
-    bounding_box = @inferred crop_boundingbox(cv_camera, cube.pose.translation.translation, cube_diameter)
+    bounding_box = @inferred MCMCDepth.crop_boundingbox(cv_camera, cube.pose.translation.translation, cube_diameter)
     # Verified visually
     @test bounding_box == (257, 600, 157, 400)
-    crop_img = @inferred crop_image(full_img, bounding_box...)
+    crop_img = @inferred MCMCDepth.crop_image(full_img, bounding_box...)
     @test size(crop_img) == (344, 244)
     @test minimum(crop_img[crop_img.>0]) ≈ 0.6
 end
 
 # Resize cropped image to viewport size
-bounding_box = crop_boundingbox(cv_camera, cube.pose.translation.translation, cube_diameter)
+bounding_box = MCMCDepth.crop_boundingbox(cv_camera, cube.pose.translation.translation, cube_diameter)
 
 gl_context = depth_offscreen_context((RE_SIZE)..., 1, Array)
 cube_diameter = model_diameter(cube_mesh)
@@ -74,14 +74,14 @@ cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = crop(cv_camera, bounding_box...)
 scene = Scene(camera, [cube])
 crop_render = draw(gl_context, scene) |> copy
-crop_img = crop_image(full_img, bounding_box...)
-resized = @inferred depth_resize(crop_img, RE_SIZE...)
+crop_img = MCMCDepth.crop_image(full_img, bounding_box...)
+resized = @inferred MCMCDepth.depth_resize(crop_img, RE_SIZE...)
 sum_drawn = sum(resized .> 0)
 
 @testset "Resize image" begin
     EPS = 3e-3
     # "correct" nearest neighbor implementation with bad results
-    resized = @inferred depth_resize(crop_img, RE_SIZE...)
+    resized = @inferred MCMCDepth.depth_resize(crop_img, RE_SIZE...)
     @test size(resized) == RE_SIZE
     @test minimum(resized[resized.>0]) ≈ 0.6
     sum_const = sum(abs.(resized - crop_render) .> EPS)
@@ -117,8 +117,8 @@ cube = @set cube.pose.translation = Translation(0.2, 0.2, 0.7)
 camera = Camera(cv_camera)
 scene = Scene(camera, [cube])
 full_img = draw(gl_context, scene) |> copy
-crop_img = crop_image(full_img, bounding_box...)
-resized = @inferred depth_resize(crop_img, RE_SIZE...)
+crop_img = MCMCDepth.crop_image(full_img, bounding_box...)
+resized = @inferred MCMCDepth.depth_resize(crop_img, RE_SIZE...)
 
 gl_context = depth_offscreen_context((RE_SIZE)..., 1, Array)
 cube = upload_mesh(gl_context, cube_mesh)
@@ -130,7 +130,7 @@ crop_render = draw(gl_context, scene) |> copy
 @testset "Resize slim objects" begin
     EPS = 3e-3
     # "correct" nearest neighbor implementation with bad results
-    resized = @inferred depth_resize(crop_img, RE_SIZE...)
+    resized = @inferred MCMCDepth.depth_resize(crop_img, RE_SIZE...)
     @test size(resized) == RE_SIZE
     @test minimum(resized[resized.>0]) ≈ 0.6
     sum_const = sum(abs.(resized - crop_render) .> EPS)

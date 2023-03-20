@@ -156,7 +156,6 @@ export sphere_scatter
 
 # Data loading an preprocessing
 export crop_camera
-export depth_resize
 export load_color_image
 export load_depth_image
 export load_mask_image
