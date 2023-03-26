@@ -45,7 +45,6 @@ include("Parameters.jl")
 include("Crop.jl")
 include("Visualization.jl")
 include("RenderContext.jl")
-include("AssociationModel.jl")
 include("Models.jl")
 
 # Datasets
@@ -88,7 +87,7 @@ export transition_probability
 export Experiment
 export Parameters
 
-export cpu_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
+export cuda_rng, device_rng, cpu_array, device_array_type, device_array
 
 # RenderContext
 export render_context
@@ -122,12 +121,13 @@ export ValidPixel
 
 export expected_pixel_count
 export nonzero_pixels
-export pixel_association
+export pixel_association_fn
 export pixel_explicit
 export pixel_mixture
 export pixel_normal
 export pixel_tail
 export render_fn
+export smooth_association_fn
 export smooth_mixture
 export smooth_tail
 export smooth_valid_mixture
@@ -162,13 +162,12 @@ export load_mask_image
 export scene_dataframe
 
 # Extensions and Reexports
+@reexport import BayesNet: rng
 @reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
 @reexport import SciGL: OffscreenContext, Scale, Scene, destroy_context
 @reexport import StatsBase: Weights
-
-
 
 # Distributions
 end # module

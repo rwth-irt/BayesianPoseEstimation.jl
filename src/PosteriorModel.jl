@@ -3,16 +3,18 @@
 # All rights reserved. 
 
 """
-    PosteriorModel(bijectors, data, prior, likelihood)
+    PosteriorModel(bijectors, data, prior, likelihood, node)
 Consists of the `prior` and `likelihood` model.
 On construction, the bijectors of the prior are eagerly evaluated, so samples can frequently be generated in the unconstrained domain and evaluated in the model domain - logjac correction included.
 AbstractMCMC expects a model to be conditioned on the data, so it is included here.
+The `node` is the root node of the Bayesian network.
 """
-struct PosteriorModel{B<:NamedTuple,D<:NamedTuple,P<:SequentializedGraph,L<:SequentializedGraph} <: AbstractMCMC.AbstractModel
+struct PosteriorModel{B<:NamedTuple,D<:NamedTuple,N<:AbstractNode,P<:SequentializedGraph,L<:SequentializedGraph} <: AbstractMCMC.AbstractModel
     bijectors::B
     data::D
     prior::P
     likelihood::L
+    node::N
 end
 
 function PosteriorModel(node::AbstractNode, data::NamedTuple{data_names}) where {data_names}
@@ -23,8 +25,10 @@ function PosteriorModel(node::AbstractNode, data::NamedTuple{data_names}) where 
     bijectors = prior_model |> bijector |> map_materialize
     # Data conditioned nodes form the likelihood and are not transformed for sampling
     likelihood_model = sequentialized[data_names]
-    PosteriorModel(bijectors, data, prior_model, likelihood_model)
+    PosteriorModel(bijectors, data, prior_model, likelihood_model, node)
 end
+
+Base.show(io::IO, posterior::PosteriorModel) = print(io, "PosteriorModel(root node :$(nodename(posterior.node)), prior for $(keys(posterior.prior)), likelihood for $(keys(posterior.likelihood)) & bijectors for $(keys(posterior.bijectors)))")
 
 Bijectors.bijector(posterior::PosteriorModel) = posterior.bijectors
 

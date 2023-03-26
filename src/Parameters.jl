@@ -35,7 +35,7 @@ Deliberately not strongly typed because the strongly typed structs are construct
 * `pixel_θ` Expected value of the exponential distribution → Occlusion expected closer or further away.
 
 ## Object Association
-* `association_σ` Standard deviation of the sensor noise used in the pixel association. Typically a magnitude larger than the `pixel_σ`.
+* `association_σ` Standard deviation of the sensor noise used in the pixel association. Should be a magnitude larger than the `pixel_σ`.
 * `prior_o` Constant mixture coefficient for the pixel to object association / probability that a pixel belongs to the object.
 * `proposal_σ_o` Random walk proposals for the association
 
@@ -56,7 +56,7 @@ Deliberately not strongly typed because the strongly typed structs are construct
 
 # Inference
 * `precision` Type of the floating point precision, typically Float32 (or Float64)
-* `device` :CUDA or :CPU which is used in Parameters.array_type, Parameters.rng and Parameters.cpu_rng.
+* `device` :CUDA or :CPU which is used in array_type, rng and device_rng.
 * `seed` Seed of the rng
 * `algorithm` Symbol of the inference algorithm
 * `n_samples` Number of samples in the chain
@@ -109,13 +109,13 @@ Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
 Base.getproperty(p::Parameters, ::Val{K}) where {K} = getfield(p, K)
 
 """
-    cpu_rng(parameters)
+    rng(parameters)
 Returns the seeded random number generator for the CPU.
 """
-function cpu_rng(p::Parameters)
+function BayesNet.rng(p::Parameters)
     rng = Random.default_rng()
     Random.seed!(rng, p.seed)
-    rng
+    return rng
 end
 
 """
@@ -125,7 +125,7 @@ Returns the seeded random number generator for the CUDA device.
 function cuda_rng(p::Parameters)
     rng = CUDA.default_rng()
     Random.seed!(rng, p.seed)
-    rng
+    return rng
 end
 
 """
@@ -136,11 +136,11 @@ function device_rng(p::Parameters)
     if p.device === :CUDA
         cuda_rng(p)
     elseif p.device === :CPU
-        cpu_rng(p)
+        rng(p)
     else
         @warn "Unknown device: $(p.device), falling back to CPU"
         # CPU is fallback
-        cpu_rng(p)
+        rng(p)
     end
 end
 

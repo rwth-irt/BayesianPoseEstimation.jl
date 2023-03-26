@@ -10,12 +10,27 @@ using Random
 using Plots
 using ProgressLogging
 
+CUDA.allowscalar(false)
 gr()
 MCMCDepth.diss_defaults()
 
 parameters = Parameters()
+# NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
+@reset parameters.normalization_constant = 25;
+@reset parameters.proposal_σ_r_quat = 0.1;
+@reset parameters.proposal_σ_t = [0.01, 0.01, 0.01];
+# TODO move to top
+@reset parameters.seed = rand(RandomDevice(), UInt32);
+# NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
+@reset parameters.n_steps = 1_000
+@reset parameters.n_particles = 50
+# Normalization and tempering leads to less resampling, especially in MCMC sampler
+@reset parameters.relative_ess = 0.8;
+
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
+cpu_rng = rng(parameters)
+dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
 include("fake_observation.jl")
@@ -26,26 +41,16 @@ fake_img = fake_observation(gl_context, parameters, 0.4)
 
 experiment = Experiment(Scene(camera, [model]), prior_t, fake_img)
 
-function run_inference(render_context, params::Parameters, experiment::Experiment; kwargs...)
-    # Device
-    if params.device === :CUDA
-        CUDA.allowscalar(false)
-    end
-    # RNGs
-    rng = cpu_rng(params)
-    dev_rng = device_rng(params)
-
-    # Model specification
+function posterior_model(gl_context, params, experiment, rng, dev_rng)
     t = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
 
-    μ_fn = render_fn | (render_context, experiment.scene)
+    μ_fn = render_fn | (gl_context, experiment.scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
-    dist_is = pixel_valid_normal | params.association_σ
-    dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
-    association_fn = pixel_association | (dist_is, dist_not, params.prior_o)
-    o = DeterministicNode(:o, μ -> association_fn.(μ, experiment.depth_image), (; μ=μ))
+    o_fn = smooth_association_fn(params)
+    # condition on data via closure
+    o = DeterministicNode(:o, μ -> o_fn.(μ, experiment.depth_image), (; μ=μ))
     # NOTE almost no performance gain over DeterministicNode
     # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
 
@@ -54,39 +59,55 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
     z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
 
-    posterior = PosteriorModel(z_norm, (; z=experiment.depth_image))
+    PosteriorModel(z_norm, (; z=experiment.depth_image))
+end
+posterior = posterior_model(gl_context, parameters, experiment, cpu_rng, dev_rng)
 
+function smc_forward(rng, params, posterior)
+    # TODO
+    sym_fp_kernel = ForwardProposalKernel(sym_proposal)
+    SequentialMonteCarlo(sym_fp_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+end
+
+function smc_bootstrap(rng, params, posterior)
+    # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
+    # TODO
+    sym_boot_kernel = BootstrapKernel(sym_proposal)
+    SequentialMonteCarlo(sym_boot_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+end
+
+function smc_mh(rng, params, posterior)
     # Assemble samplers
     # temp_schedule = ExponentialSchedule(params.n_steps, 0.9999)
     # NOTE LinearSchedule seems reasonable
-    temp_schedule = LinearSchedule(params.n_steps)
+    # TODO make it mutable to avoid hacky division by n_samplers in ComposedSampler
+    temp_schedule = LinearSchedule(params.n_steps / 4)
 
-    ind_proposal = independent_proposal((; t=t, r=r), z)
-    ind_mh_kernel = MhKernel(rng, ind_proposal)
-    ind_smc_mh = SequentialMonteCarlo(ind_mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    # NOTE use independent proposals only with MCMCKernel, otherwise all information is thrown away.
+    t_ind = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
+    r_ind = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
+    t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
+    r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
 
     t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
-    sym_proposal = symmetric_proposal((; t=t_sym, r=r_sym), z)
+    t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
+    r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+    proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
+    weights = Weights([1.0, 1.0, 0.1, 0.1])
 
-    sym_fp_kernel = ForwardProposalKernel(sym_proposal)
-    sym_smc_fp = SequentialMonteCarlo(sym_fp_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    samplers = map(proposals) do proposal
+        mh_kernel = MhKernel(rng, proposal)
+        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    end
 
-    sym_mh_kernel = MhKernel(rng, sym_proposal)
-    sym_smc_mh = SequentialMonteCarlo(sym_mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    # TODO is Gibbs for t & r valid in SMC?
+    ComposedSampler(weights, samplers...)
+end
+sampler = smc_mh(cpu_rng, parameters, posterior)
 
-    sym_boot_kernel = BootstrapKernel(sym_proposal)
-    sym_smc_boot = SequentialMonteCarlo(sym_boot_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
-
-    # NOTE ind_smc only makes sense when using a MCMCKernel, otherwise I throw away all the information
-    composed_sampler = ComposedSampler(Weights([0.1, 1.0]), ind_smc_mh, sym_smc_mh)
-
-    sampler = composed_sampler
-    # sampler = sym_smc_mh
-    # sampler = sym_smc_fp
-    # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
-    # sampler = sym_smc_boot
-
+# TODO implement for AbstractSampler? specialize sample?
+function run_inference(rng, posterior, sampler, params::Parameters)
     sample, state = step(rng, posterior, sampler)
     @progress for _ in 1:params.n_steps
         sample, state = step(rng, posterior, sampler, state)
@@ -94,18 +115,8 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
     sample, state
 end
 
-# NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
-@reset parameters.normalization_constant = 25;
-@reset parameters.proposal_σ_r_quat = 0.1;
-@reset parameters.proposal_σ_t = [0.01, 0.01, 0.01];
-@reset parameters.seed = rand(RandomDevice(), UInt32);
-# NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-@reset parameters.n_steps = 2_500
-@reset parameters.n_particles = 100
-# Normalization and tempering leads to less resampling, especially in MCMC sampler
-@reset parameters.relative_ess = 0.8;
-final_sample, final_state = run_inference(gl_context, parameters, experiment);
-
+@reset parameters.n_steps = 2_000
+final_sample, final_state = run_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
 

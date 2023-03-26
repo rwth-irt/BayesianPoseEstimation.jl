@@ -162,7 +162,6 @@ end
 
 smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, smooth_tail(min_depth, max_depth, θ, σ, μ))
 
-
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
 pixel_valid_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
 
@@ -194,4 +193,59 @@ Function can be conditioned on the render_context, scene & object_id to be used 
 function render_fn(render_context, scene, t, r)
     p = to_pose(t, r)
     render(render_context, scene, p)
+end
+
+function position_prior(params, experiment, rng)
+    t = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
+    r = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
+    (; t=t, r=r)
+end
+
+function μ_model(render_context, experiment, prior)
+    μ_fn = render_fn | (render_context, experiment.scene)
+    μ = DeterministicNode(:μ, μ_fn, (; t=prior.t, r=prior.r))
+    (; t=prior.t, r=prior.r, μ=μ)
+end
+
+"""
+    marginalized_association(dist_is, dist_not, prior, μ, z)
+Consists of a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
+Moreover, a `prior` is required for the association probability `o`.
+The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
+"""
+function marginalized_association(dist_is, dist_not, prior, μ, z)
+    # Internal ValidPixels handle outliers by returning 1.0 as probability which will result in the prior q without too much overhead
+    p_is = pdf(dist_is(μ), z)
+    p_not = pdf(dist_not(μ), z)
+    nominator = prior * p_is
+    # Marginalize Bernoulli distributed by summing out o
+    marginal = nominator + (1 - prior) * p_not
+    # Normalized posterior
+    nominator / marginal
+end
+
+"""
+    pixel_association_fn(params)
+Returns a function `fn(μ, z)` which analytically calculates the association probability via marginalization.
+Uses:
+* normal distribution for measuring the object of interest.
+* mixture of a truncated exponential and uniform distribution for the tail, i.e. measuring anything but the object of interest.
+"""
+function pixel_association_fn(params)
+    dist_is = pixel_valid_normal | params.association_σ
+    dist_not = pixel_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
+    marginalized_association | (dist_is, dist_not, params.prior_o)
+end
+
+"""
+    smooth_association_fn(params)
+Returns a function `fn(μ, z)` which analytically calculates the association probability via marginalization.
+Uses:
+* normal distribution for measuring the object of interest.
+* mixture of a smoothly truncated exponential and uniform distribution for the tail, i.e. measuring anything but the object of interest.
+"""
+function smooth_association_fn(params)
+    dist_is = pixel_valid_normal | params.association_σ
+    dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
+    marginalized_association | (dist_is, dist_not, params.prior_o)
 end

@@ -13,6 +13,9 @@ struct SequentialMonteCarlo{K,S} <: AbstractMCMC.AbstractSampler
     log_resample_threshold::Float64
 end
 
+Base.show(io::IO, s::SequentialMonteCarlo) = print(io, "SequentialMonteCarlo: $(s.kernel)")
+
+
 struct SmcState{S<:Sample,W<:AbstractVector,L<:AbstractVector}
     # Contains multiple values for the variables
     sample::S
@@ -92,6 +95,8 @@ struct ForwardProposalKernel{Q}
     proposal::Q
 end
 
+Base.show(io::IO, k::ForwardProposalKernel) = print(io, "ForwardProposalKernel, $(k.proposal)")
+
 proposal(kernel::ForwardProposalKernel) = kernel.proposal
 forward(kernel::ForwardProposalKernel, new_sample, old_sample) = new_sample
 
@@ -110,6 +115,8 @@ struct MhKernel{R,Q}
     rng::R
     proposal::Q
 end
+
+Base.show(io::IO, k::MhKernel) = print(io, "MhKernel, $(k.proposal)")
 
 proposal(kernel::MhKernel) = kernel.proposal
 forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel(kernel.rng, proposal(kernel), new_sample, old_sample)
@@ -130,6 +137,8 @@ Uses the transition prior probability as importance function and the weight incr
 struct BootstrapKernel{Q}
     proposal::Q
 end
+
+Base.show(io::IO, k::BootstrapKernel) = print(io, "BootstrapKernel, $(k.proposal)")
 
 proposal(kernel::BootstrapKernel) = kernel.proposal
 forward(kernel::BootstrapKernel, new_sample, old_sample) = new_sample
