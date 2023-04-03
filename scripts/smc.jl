@@ -64,24 +64,46 @@ end
 posterior = posterior_model(gl_context, parameters, experiment, cpu_rng, dev_rng)
 
 function smc_forward(rng, params, posterior)
-    # TODO implement similar to smc_mh
-    sym_fp_kernel = ForwardProposalKernel(sym_proposal)
-    SequentialMonteCarlo(sym_fp_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    temp_schedule = LinearSchedule(params.n_steps)
+
+    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
+    t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
+    r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
+    r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+    proposals = (t_sym_proposal, r_sym_proposal)
+    weights = Weights([1.0, 1.0])
+
+    samplers = map(proposals) do proposal
+        mh_kernel = ForwardProposalKernel(proposal)
+        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    end
+    ComposedSampler(weights, samplers...)
 end
 
+# NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
 function smc_bootstrap(rng, params, posterior)
-    # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
-    # TODO implement similar to smc_mh
-    sym_boot_kernel = BootstrapKernel(sym_proposal)
-    SequentialMonteCarlo(sym_boot_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    temp_schedule = LinearSchedule(params.n_steps)
+
+    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
+    t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
+    r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
+    r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+    proposals = (t_sym_proposal, r_sym_proposal)
+    weights = Weights([1.0, 1.0])
+
+    samplers = map(proposals) do proposal
+        mh_kernel = BootstrapKernel(proposal)
+        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    end
+    ComposedSampler(weights, samplers...)
 end
 
 function smc_mh(rng, params, posterior)
-    # NOTE LinearSchedule seems reasonable
-    # temp_schedule = ExponentialSchedule(params.n_steps, 0.9999)
+    # NOTE LinearSchedule seems reasonable, ExponentialSchedule and ConstantSchedule either explore too much or not enough
     temp_schedule = LinearSchedule(params.n_steps)
 
-    # NOTE use independent proposals only with MCMCKernel, otherwise all information is thrown away.
     t_ind = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
     t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
@@ -102,7 +124,6 @@ function smc_mh(rng, params, posterior)
     # TODO is Gibbs for t & r valid in SMC?
     ComposedSampler(weights, samplers...)
 end
-sampler = smc_mh(cpu_rng, parameters, posterior)
 
 # TODO implement for AbstractSampler? specialize sample?
 function run_inference(rng, posterior, sampler, params::Parameters)
@@ -113,7 +134,11 @@ function run_inference(rng, posterior, sampler, params::Parameters)
     sample, state
 end
 
-@reset parameters.n_steps = 2_000
+sampler = smc_mh(cpu_rng, parameters, posterior)
+# sampler = smc_bootstrap(cpu_rng, parameters, posterior)
+# sampler = smc_forward(cpu_rng, parameters, posterior)
+
+@reset parameters.n_steps = 1_000
 final_sample, final_state = run_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
