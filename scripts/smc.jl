@@ -64,24 +64,22 @@ end
 posterior = posterior_model(gl_context, parameters, experiment, cpu_rng, dev_rng)
 
 function smc_forward(rng, params, posterior)
-    # TODO
+    # TODO implement similar to smc_mh
     sym_fp_kernel = ForwardProposalKernel(sym_proposal)
     SequentialMonteCarlo(sym_fp_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
 end
 
 function smc_bootstrap(rng, params, posterior)
     # NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
-    # TODO
+    # TODO implement similar to smc_mh
     sym_boot_kernel = BootstrapKernel(sym_proposal)
     SequentialMonteCarlo(sym_boot_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
 end
 
 function smc_mh(rng, params, posterior)
-    # Assemble samplers
-    # temp_schedule = ExponentialSchedule(params.n_steps, 0.9999)
     # NOTE LinearSchedule seems reasonable
-    # TODO make it mutable to avoid hacky division by n_samplers in ComposedSampler
-    temp_schedule = LinearSchedule(params.n_steps / 4)
+    # temp_schedule = ExponentialSchedule(params.n_steps, 0.9999)
+    temp_schedule = LinearSchedule(params.n_steps)
 
     # NOTE use independent proposals only with MCMCKernel, otherwise all information is thrown away.
     t_ind = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
