@@ -19,7 +19,7 @@ parameters = Parameters()
 @reset parameters.normalization_constant = 25;
 @reset parameters.proposal_σ_r_quat = 0.1;
 @reset parameters.proposal_σ_t = [0.01, 0.01, 0.01];
-# TODO move to top
+# TODO same seed for experiments
 @reset parameters.seed = rand(RandomDevice(), UInt32);
 # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
 @reset parameters.n_steps = 1_000
@@ -120,13 +120,11 @@ function smc_mh(rng, params, posterior)
         mh_kernel = MhKernel(rng, proposal)
         SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end
-
-    # TODO is Gibbs for t & r valid in SMC?
     ComposedSampler(weights, samplers...)
 end
 
-# TODO implement for AbstractSampler? specialize sample?
-function run_inference(rng, posterior, sampler, params::Parameters)
+# TODO implement for AbstractSampler? specialize sample? specialize step? Both solutions are pretty inconvenient since the type cannot easily be inferred for ComposedSampler (SMC vs. MCMC) → name functions
+function smc_inference(rng, posterior, sampler, params::Parameters)
     sample, state = step(rng, posterior, sampler)
     @progress for _ in 1:params.n_steps
         sample, state = step(rng, posterior, sampler, state)
@@ -139,7 +137,7 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
 @reset parameters.n_steps = 1_000
-final_sample, final_state = run_inference(cpu_rng, posterior, sampler, parameters);
+final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
 
