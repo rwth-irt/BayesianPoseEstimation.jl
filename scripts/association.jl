@@ -31,23 +31,24 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
         CUDA.allowscalar(false)
     end
     # RNGs
-    rng = cpu_rng(params)
+    cpu_rng = rng(params)
     dev_rng = device_rng(params)
 
     # Model specification
     # Pose must be calculated on CPU since there is now way to pass it from CUDA to OpenGL
-    t = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
-    r = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
+    t = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
+    r = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
 
     μ_fn = render_fn | (render_context, experiment.scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
     # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
-    # NOTE the σ of the association must be larger than the one for the pose estimation
-    dist_is = pixel_valid_normal | params.association_σ
-    dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
-    association_fn = pixel_association | (dist_is, dist_not, params.prior_o)
-    o = DeterministicNode(:o, μ -> association_fn.(μ, experiment.depth_image), (; μ=μ))
+    # TODO remove
+    # dist_is = pixel_valid_normal | params.association_σ
+    # dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
+    # association_fn = pixel_association | (dist_is, dist_not, params.prior_o)
+    o_fn = smooth_association_fn(params)
+    o = DeterministicNode(:o, μ -> o_fn.(μ, experiment.depth_image), (; μ=μ))
 
     # NOTE valid_pixel diverges without normalization
     pixel_model = smooth_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
@@ -60,36 +61,36 @@ function run_inference(render_context, params::Parameters, experiment::Experimen
 
     # Assemble samplers
     # t & r change expected depth, o not
-    t_ind = independent_proposal(t, z)
+    t_ind = independent_proposal(t, z_norm)
     t_ind_mh = MetropolisHastings(t_ind)
     # NOTE twice the compute budget
     t_ind_mtm = MultipleTry(t_ind, params.n_particles * 2)
 
-    t_sym = symmetric_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t), z)
+    t_sym = symmetric_proposal(BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t), z_norm)
     t_sym_mh = MetropolisHastings(t_sym)
 
-    t_add = additive_proposal(BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t), z)
+    t_add = additive_proposal(BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t), z_norm)
     t_add_mtm = MultipleTry(t_add, params.n_particles)
 
-    r_ind = independent_proposal(r, z)
+    r_ind = independent_proposal(r, z_norm)
     r_ind_mh = MetropolisHastings(r_ind)
     # NOTE twice the compute budget
     r_ind_mtm = MultipleTry(r_ind, params.n_particles * 2)
 
-    r_sym = symmetric_proposal(BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat), z)
+    r_sym = symmetric_proposal(BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat), z_norm)
     r_sym_mh = MetropolisHastings(r_sym)
 
-    r_add = additive_proposal(BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat), z)
+    r_add = additive_proposal(BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat), z_norm)
     r_add_mtm = MultipleTry(r_add, params.n_particles)
 
     # ComposedSampler
     # NOTE Independent should have low weights because almost no samples will be accepted
     # NOTE These parameters seem to be quite important for convergence
-    composed_sampler = ComposedSampler(Weights([0.1, 0.1, 1.0, 1.0]), t_ind_mtm, r_ind_mtm, t_add_mtm, r_add_mtm)
+    composed_sampler = ComposedSampler(Weights([0.01, 0.1, 1.0, 1.0]), t_ind_mtm, r_ind_mtm, t_add_mtm, r_add_mtm)
     # composed_sampler = ComposedSampler(Weights([0.1, 0.1, 1.0, 1.0]), t_ind_mh, r_ind_mh, t_sym_mh, r_sym_mh)
 
     # WARN random acceptance needs to be calculated on CPU, thus CPU rng
-    chain = sample(rng, posterior, composed_sampler, params.n_steps; discard_initial=params.n_burn_in, thinning=params.n_thinning, kwargs...)
+    chain = sample(cpu_rng, posterior, composed_sampler, params.n_steps; discard_initial=params.n_burn_in, thinning=params.n_thinning, kwargs...)
 
     map(chain) do sample
         s, _ = to_model_domain(sample, bijector(posterior))
@@ -104,10 +105,10 @@ end
 @reset parameters.proposal_σ_r_quat = 0.3
 @reset parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 @reset parameters.seed = rand(RandomDevice(), UInt32)
-@reset parameters.n_steps = 1_000
+@reset parameters.n_steps = 1_500
 @reset parameters.n_burn_in = 0
 @reset parameters.n_thinning = 1
-@reset parameters.n_particles = 150
+@reset parameters.n_particles = 100
 model_chain = run_inference(gl_context, parameters, experiment);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(model_chain, 50)

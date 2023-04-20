@@ -48,6 +48,7 @@ function posterior_model(gl_context, params, experiment, rng, dev_rng)
     μ_fn = render_fn | (gl_context, experiment.scene)
     μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 
+    # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
     o_fn = smooth_association_fn(params)
     # condition on data via closure
     o = DeterministicNode(:o, μ -> o_fn.(μ, experiment.depth_image), (; μ=μ))
@@ -66,11 +67,11 @@ posterior = posterior_model(gl_context, parameters, experiment, cpu_rng, dev_rng
 function smc_forward(rng, params, posterior)
     temp_schedule = LinearSchedule(params.n_steps)
 
-    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
     t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+
     proposals = (t_sym_proposal, r_sym_proposal)
     weights = Weights([1.0, 1.0])
 
@@ -85,11 +86,11 @@ end
 function smc_bootstrap(rng, params, posterior)
     temp_schedule = LinearSchedule(params.n_steps)
 
-    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
     t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+
     proposals = (t_sym_proposal, r_sym_proposal)
     weights = Weights([1.0, 1.0])
 
@@ -104,6 +105,7 @@ function smc_mh(rng, params, posterior)
     # NOTE LinearSchedule seems reasonable, ExponentialSchedule and ConstantSchedule either explore too much or not enough
     temp_schedule = LinearSchedule(params.n_steps)
 
+    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
     t_ind = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
     t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
@@ -113,6 +115,7 @@ function smc_mh(rng, params, posterior)
     r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
     weights = Weights([1.0, 1.0, 0.1, 0.1])
 
@@ -136,7 +139,6 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
-@reset parameters.n_steps = 1_000
 final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
