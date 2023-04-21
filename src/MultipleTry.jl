@@ -5,7 +5,7 @@
 """
     MultipleTry
 Multiple Try Metropolis sampler (MTM).
-Proposes multiple samples and selects one according to its probability → acceptance rate increases with the number of tries `n_tries`.
+Proposes multiple samples and selects one according to its importance weight → acceptance rate increases with the number of tries `n_tries`.
 However, the standard implementation requires to propose `2*n_tries` to calculate auxiliary weights for the acceptance ratio.
 """
 struct MultipleTry{Q} <: AbstractMCMC.AbstractSampler
@@ -31,30 +31,31 @@ end
 
 """
     step(rng, model, sampler, state)
-General MTM case without independence simplifications.
+General MTM case without simplifications.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry, state::Sample)
-    # Mind the log domain
-    # Propose one sample via a kind of importance sampling
-    proposed = propose(sampler.proposal, state, sampler.n_tries)
-    ℓ_model = logdensityof(model, proposed)
-    ℓ_transition = transition_probability(sampler.proposal, proposed, state)
-    proposed_weights = ℓ_model .- ℓ_transition
+    # Propose N samples and calculate their importance weights
+    pro = propose(sampler.proposal, state, sampler.n_tries)
+    pro_model = logdensityof(model, pro)
+    pro_transition = transition_probability(sampler.proposal, pro, state)
+    pro_weights = pro_model .- pro_transition
 
-    selected_index = gumbel_index(rng, proposed_weights)
-    # Select proposed and evaluated variables
-    selected_vars = select_variables_dim(variables(proposed), sampler.proposal, selected_index)
-    selected = Sample(selected_vars, ℓ_model[selected_index])
+    # Select one sample proportional to its importance weight
+    selected_index = gumbel_index(rng, pro_weights)
+    selected_variables = select_variables_dim(variables(pro), sampler.proposal, selected_index)
+    selected = Sample(selected_variables, pro_model[selected_index])
 
-    # Propose the N-1 auxiliary variables samples
-    auxiliary = propose(sampler.proposal, selected, sampler.n_tries - 1)
-    auxiliary_weights = logdensityof(model, selected) .- transition_probability(sampler.proposal, auxiliary, selected)
+    # Propose N-1 auxiliary variables samples
+    aux = propose(sampler.proposal, selected, sampler.n_tries - 1)
+    aux_model = logdensityof(model, aux)
+    aux_transition = transition_probability(sampler.proposal, aux, selected)
+    aux_weights = aux_model .- aux_transition
     # Sample from previous step is the N th auxiliary variables
     state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)
-    append!(auxiliary_weights, state_weight)
+    append!(aux_weights, state_weight)
 
     # acceptance ratio - sum in nominator and denominator
-    α = logsumexp(proposed_weights) - logsumexp(auxiliary_weights)
+    α = logsumexp(pro_weights) - logsumexp(aux_weights)
     # MetropolisHastings acceptance
     if log(rand(rng)) > α
         # reject
@@ -71,18 +72,17 @@ Simplification for independent proposals: I-MTM
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, state::Sample)
     # Propose one sample via a kind of importance sampling
-    proposed = propose(sampler.proposal, state, sampler.n_tries)
-    ℓ_model = logdensityof(model, proposed)
-    ℓ_transition = transition_probability(sampler.proposal, proposed, state)
-    proposed_weights = ℓ_model .- ℓ_transition
+    pro = propose(sampler.proposal, state, sampler.n_tries)
+    pro_model = logdensityof(model, pro)
+    pro_transition = transition_probability(sampler.proposal, pro, state)
+    proposed_weights = pro_model .- pro_transition
     # First part of acceptance ratio
     α_nominator = logsumexp(proposed_weights)
 
     # Replace a sample according to its weight with the previous sample
     selected_index = gumbel_index(rng, proposed_weights)
-    # Select proposed and evaluated variables
-    selected_vars = select_variables_dim(variables(proposed), sampler.proposal, selected_index)
-    selected = Sample(selected_vars, ℓ_model[selected_index])
+    selected_vars = select_variables_dim(variables(pro), sampler.proposal, selected_index)
+    selected = Sample(selected_vars, pro_model[selected_index])
 
     # From previous step, IndependentProposal so prev_sample can be anything
     state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)
@@ -107,6 +107,7 @@ Select an index from a categorical distribution ~ unnormalized `log_weights`.
 The Gumbel-max trick is used to stay in the log domain and avoid numerical unstable exp or the more expensive log-sum-exp trick.
 """
 gumbel_index(rng, log_weights) = argmax(log_weights .+ rand(rng, Gumbel(), size(log_weights)))
+
 
 select_variables_dim(variables::NamedTuple, proposal::Proposal, index) = select_variables_dim(variables, updated_variables(proposal), index)
 
