@@ -16,16 +16,15 @@ parameters = Parameters()
 # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
 @reset parameters.normalization_constant = 25
 # NOTE Should be able to increase σ in MTM
-@reset parameters.proposal_σ_r_quat = 0.3
+@reset parameters.proposal_σ_r_quat = 0.5
 @reset parameters.proposal_σ_t = [0.02, 0.02, 0.02]
 # TODO same seed for experiments
 @reset parameters.seed = rand(RandomDevice(), UInt32)
-@reset parameters.n_steps = 1_500
+@reset parameters.n_steps = 1_000
 @reset parameters.n_burn_in = 0
 @reset parameters.n_thinning = 1
 @reset parameters.n_particles = 100
 # TODO tempering in MCMC?
-@reset parameters.relative_ess = 0.8;
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
@@ -98,7 +97,7 @@ function mtm_sampler(rng, params, posterior)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([1.0, 1.0, 0.01, 0.1])
+    weights = Weights([1.0, 1.0, 0.01, 0.01])
     # proposals = (t_ind_proposal, r_ind_proposal)
     # proposals = (t_sym_proposal, r_sym_proposal)
     # weights = Weights([1.0, 1.0])
