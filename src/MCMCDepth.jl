@@ -46,6 +46,8 @@ include("Crop.jl")
 include("Visualization.jl")
 include("RenderContext.jl")
 include("Models.jl")
+include("ExperimentModels.jl")
+include("ExperimentSamplers.jl")
 
 # Datasets
 include("BOP.jl")
@@ -153,6 +155,22 @@ export polar_histogram_variable
 export scatter_position
 export sphere_density
 export sphere_scatter
+
+# Experiment models & samplers
+export association_posterior
+export point_prior
+export simple_posterior
+export smooth_posterior
+
+export mh_local_sampler
+export mh_sampler
+
+export mtm_local_sampler
+export mtm_sampler
+
+export smc_bootstrap
+export smc_forward
+export smc_mh
 
 # Data loading an preprocessing
 export crop_camera

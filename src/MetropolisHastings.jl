@@ -40,7 +40,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Met
 end
 
 """
-    mh_kernel!(rng, proposal, proposed, previous)
+    mh_kernel(rng, proposal, proposed, previous)
 Metropolis-Hastings transition kernel for the `proposed` and `previous` sample.
 For both samples, `logprob(sample)` must be valid.
 Vectorization for multiple proposals is supported out of box.

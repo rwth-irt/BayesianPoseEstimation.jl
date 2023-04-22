@@ -38,93 +38,7 @@ camera = fake_camera(parameters)
 model = upload_mesh(gl_context, fake_mesh)
 prior_t = fake_gt_position + [0.05, -0.05, -0.1]
 fake_img = fake_observation(gl_context, parameters, 0.4)
-
 experiment = Experiment(Scene(camera, [model]), prior_t, fake_img)
-
-function posterior_model(gl_context, params, experiment, rng, dev_rng)
-    t = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
-    r = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
-
-    μ_fn = render_fn | (gl_context, experiment.scene)
-    μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
-
-    # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
-    o_fn = smooth_association_fn(params)
-    # condition on data via closure
-    o = DeterministicNode(:o, μ -> o_fn.(μ, experiment.depth_image), (; μ=μ))
-    # NOTE almost no performance gain over DeterministicNode
-    # o = BroadcastedNode(:o, dev_rng, KernelDirac, parameters.prior_o)
-
-    # NOTE valid_pixel diverges without normalization
-    pixel_model = smooth_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ, o=o))
-    z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
-
-    PosteriorModel(z_norm, (; z=experiment.depth_image))
-end
-posterior = posterior_model(gl_context, parameters, experiment, cpu_rng, dev_rng)
-
-function smc_forward(rng, params, posterior)
-    temp_schedule = LinearSchedule(params.n_steps)
-
-    t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
-    t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
-    r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
-
-    proposals = (t_sym_proposal, r_sym_proposal)
-    weights = Weights([1.0, 1.0])
-
-    samplers = map(proposals) do proposal
-        mh_kernel = ForwardProposalKernel(proposal)
-        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
-    end
-    ComposedSampler(weights, samplers...)
-end
-
-# NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge to very precise values since there is no prior holding it back.
-function smc_bootstrap(rng, params, posterior)
-    temp_schedule = LinearSchedule(params.n_steps)
-
-    t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
-    t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
-    r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
-
-    proposals = (t_sym_proposal, r_sym_proposal)
-    weights = Weights([1.0, 1.0])
-
-    samplers = map(proposals) do proposal
-        mh_kernel = BootstrapKernel(proposal)
-        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
-    end
-    ComposedSampler(weights, samplers...)
-end
-
-function smc_mh(rng, params, posterior)
-    # NOTE LinearSchedule seems reasonable, ExponentialSchedule and ConstantSchedule either explore too much or not enough
-    temp_schedule = LinearSchedule(params.n_steps)
-
-    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
-    t_ind = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
-    r_ind = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)
-    t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
-    r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
-
-    t_sym = BroadcastedNode(:t, rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, rng, QuaternionPerturbation, params.proposal_σ_r_quat)
-    t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
-    r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
-
-    proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([1.0, 1.0, 0.1, 0.1])
-
-    samplers = map(proposals) do proposal
-        mh_kernel = MhKernel(rng, proposal)
-        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
-    end
-    ComposedSampler(weights, samplers...)
-end
 
 # TODO implement for AbstractSampler? specialize sample? specialize step? Both solutions are pretty inconvenient since the type cannot easily be inferred for ComposedSampler (SMC vs. MCMC) → name functions
 function smc_inference(rng, posterior, sampler, params::Parameters)
@@ -135,10 +49,16 @@ function smc_inference(rng, posterior, sampler, params::Parameters)
     sample, state
 end
 
-sampler = smc_mh(cpu_rng, parameters, posterior)
+prior = point_prior(gl_context, parameters, experiment, cpu_rng)
+# posterior = association_posterior(parameters, experiment, prior, dev_rng)
+posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
+sampler = smc_mh(cpu_rng, parameters, experiment, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
+# NOTE Benchmark results for smc_mh, 1_000 steps & 50 particles
+# association_posterior ~ 1.51sec, simple_posterior ~ 1.15sec & smooth_posterior ~ 1.53sec (all±40mss)
 final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
