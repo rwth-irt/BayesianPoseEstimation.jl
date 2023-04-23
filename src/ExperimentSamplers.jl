@@ -3,11 +3,11 @@
 # All rights reserved. 
 
 """
-    mh_sampler(cpu_rng, params, posterior)
+    mh_sampler(cpu_rng, params, experiment, posterior)
 Component-wise sampling of the position and orientation via Metropolis-Hastings.
 With a low probability (~1%) the sample is drawn independently from the prior a to avoid local minima.
 """
-function mh_sampler(cpu_rng, params, posterior)
+function mh_sampler(cpu_rng, params, experiment, posterior)
     t_ind = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
     t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
@@ -38,7 +38,7 @@ function mh_local_sampler(cpu_rng, params, posterior)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
     proposals = (t_sym_proposal, r_sym_proposal)
-    weights = Weights([1.0, 1.0, 0.1, 0.1])
+    weights = Weights([1.0, 1.0])
     samplers = map(proposals) do proposal
         MetropolisHastings(proposal)
     end

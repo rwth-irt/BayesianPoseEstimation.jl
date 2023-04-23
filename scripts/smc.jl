@@ -49,16 +49,20 @@ function smc_inference(rng, posterior, sampler, params::Parameters)
     sample, state
 end
 
+# Model
 prior = point_prior(gl_context, parameters, experiment, cpu_rng)
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
 posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
+
+# Sampler
 sampler = smc_mh(cpu_rng, parameters, experiment, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
 # NOTE Benchmark results for smc_mh, 1_000 steps & 50 particles
 # association_posterior ~ 1.51sec, simple_posterior ~ 1.15sec & smooth_posterior ~ 1.53sec (all±40mss)
+# smc_forward simple_posterior ~ 1.08sec \pm
 final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false)
