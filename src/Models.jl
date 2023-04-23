@@ -67,6 +67,7 @@ Distributions
 # Depth pixels can have any positive value, zero and negative are invalid
 Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 
+########## Likelihood normalization ##########
 
 """
     ImageLikelihoodNormalizer
@@ -110,6 +111,7 @@ Calculates the number of nonzero pixels for each image with the given dims.
 """
 nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
 
+######### Pixel models #########
 
 """
     pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
@@ -121,14 +123,15 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 """
 function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
-    tail = pixel_tail(min_depth, max_depth, θ, σ, μ)
+    # NOTE Exponential in pixel_tail does not seem beneficial
+    tail = TailUniform(min_depth, max_depth)
     BinaryMixture(normal, tail, o, one(o) - o)
 end
 
 pixel_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
-    # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth
+    # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth. Here, a smooth Exponential is beneficial which avoids 0.
     exponential = KernelExponential()
     uniform = TailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
@@ -164,6 +167,8 @@ smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Rea
 
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
 pixel_valid_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
+
+pixel_valid_uniform(min_depth, max_depth, μ) = ValidPixel(μ, TailUniform(min_depth, max_depth))
 
 """
     pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
@@ -226,20 +231,21 @@ end
 
 """
     pixel_association_fn(params)
-Returns a function `fn(μ, z)` which analytically calculates the association probability via marginalization.
+Returns a function `fn(prior, μ, z)` which analytically calculates the association probability via marginalization.
 Uses:
 * normal distribution for measuring the object of interest.
-* mixture of a truncated exponential and uniform distribution for the tail, i.e. measuring anything but the object of interest.
+* uniform distribution for the tail, i.e. measuring anything but the object of interest.
 """
 function pixel_association_fn(params)
     dist_is = pixel_valid_normal | params.association_σ
-    dist_not = pixel_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
-    marginalized_association | (dist_is, dist_not, params.prior_o)
+    # NOTE Seems like dist_not should not contain exponential term to avoid favouring close objects
+    dist_not = pixel_valid_uniform | (params.min_depth, params.max_depth)
+    marginalized_association | (dist_is, dist_not)
 end
 
 """
     smooth_association_fn(params)
-Returns a function `fn(μ, z)` which analytically calculates the association probability via marginalization.
+Returns a function `fn(prior, μ, z)` which analytically calculates the association probability via marginalization.
 Uses:
 * normal distribution for measuring the object of interest.
 * mixture of a smoothly truncated exponential and uniform distribution for the tail, i.e. measuring anything but the object of interest.
@@ -247,5 +253,5 @@ Uses:
 function smooth_association_fn(params)
     dist_is = pixel_valid_normal | params.association_σ
     dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
-    marginalized_association | (dist_is, dist_not, params.prior_o)
+    marginalized_association | (dist_is, dist_not)
 end

@@ -15,6 +15,7 @@ Data which might change from one experiment to another
 """
 struct Experiment
     scene::Scene
+    prior_o::AbstractMatrix{Float32}
     prior_t::Vector{Float32}
     depth_image::AbstractMatrix{Float32}
 end
@@ -69,17 +70,16 @@ Base.@kwdef struct Parameters
     # Render context
     width = 100
     height = 100
-    depth = 1000
+    depth = 500
     min_depth = 0.1
     max_depth = 3
 
     # Depth pixel model
     pixel_σ = 0.01
-    pixel_θ = 1.0
+    pixel_θ = 1
     mix_exponential = 0.8
     # Pixel association
-    association_σ = 0.2
-    prior_o = 0.5
+    association_σ = 1.0
     proposal_σ_o = 0.01
     # Image Model
     normalize_img = true
@@ -88,10 +88,10 @@ Base.@kwdef struct Parameters
 
     # Pose Model
     mean_t = [0.0, 0.0, 2.0]
-    σ_t = [0.1, 0.1, 0.1]
+    σ_t = fill(0.05, 3)
     # Proposal Model
-    proposal_σ_t = [0.01, 0.01, 0.01]
-    proposal_σ_r = [0.1, 0.1, 0.1]
+    proposal_σ_t = fill(0.01, 3)
+    proposal_σ_r = fill(0.1, 3)
     proposal_σ_r_quat = 0.1
     # Inference
     float_type = Float32

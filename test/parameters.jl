@@ -17,7 +17,6 @@ using Test
     @test p.pixel_σ isa Float16
     @test p.pixel_θ isa Float16
     @test p.mix_exponential isa Float16
-    @test p.prior_o |> eltype == Float16
 
     @test p.mean_t |> eltype == Float16
     @test p.σ_t |> eltype == Float16

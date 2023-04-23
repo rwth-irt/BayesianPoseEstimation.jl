@@ -104,15 +104,11 @@ Plot a probability image with a given `color_scheme` and use black for values of
 plot_prob_img(img; color_scheme=:viridis, reverse=false, colorbar_title="probability [0,1]", kwargs...) = plot_depth_img(img; value_to_typemax=nothing, color_scheme=color_scheme, reverse=reverse, colorbar_title=colorbar_title, clims=(0, 1), kwargs...)
 
 """
-    mean_image(chain, var_name)
+    mean_image(sample, var_name)
 Creates an image of the mean of the given variable.
 """
+mean_image(sample::Sample, var_name) = dropdims(mean(variables(sample)[var_name], dims=3); dims=3)
 mean_image(chain::AbstractVector{<:Sample}, var_name) = mean(x -> variables(x)[var_name], chain)
-
-"""
-    mean_image(chain, var_name)
-Creates an image of the mean of the given variable.
-"""
 mean_image(chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name) = mean(x -> mean_image(x, var_name), chains)
 
 # Position and Orientation conversion
