@@ -98,10 +98,10 @@ println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false, legend=true)
 plot_prob_img(mean_image(final_sample, :o))
 
-# anim = @animate for i ∈ 0:2:360
-#     scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-# end;
-# gif(anim, "anim_fps15.gif", fps=20)
+anim = @animate for i ∈ 0:2:360
+    scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+end;
+gif(anim, "anim_fps15.gif", fps=20)
 
 # MCMC samplers
 parameters = mtm_parameters()
@@ -115,7 +115,7 @@ plot_pose_chain(chain, 50)
 plot_logprob(chain, 50)
 plot_prob_img(mean_image(chain, :o))
 
-# anim = @animate for i ∈ 0:2:360
-#     scatter_position(chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-# end;
-# gif(anim, "anim_fps15.gif", fps=20)
+anim = @animate for i ∈ 0:2:360
+    scatter_position(chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+end;
+gif(anim, "anim_fps15.gif", fps=20)
