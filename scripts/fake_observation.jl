@@ -14,7 +14,7 @@ function fake_camera(params)
     f_y = f_x
     c_x = 0.5 * params.width
     c_y = 0.5 * params.height
-    CvCamera(params.width, params.height, f_x, f_y, c_x, c_y; near=params.min_depth, far=params.max_depth) |> Camera
+    CvCamera(params.width, params.height, f_x, f_y, c_x, c_y) |> Camera
 end
 
 function fake_observation(gl_context, params, occlusion_factor)
