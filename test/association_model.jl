@@ -40,7 +40,7 @@ obs = @inferred rand(rng, img_dist)
 # PixelAssociation
 dist_is = pixel_valid_normal | pixel_σ
 dist_not = pixel_valid_tail | (min_depth, max_depth, pixel_θ, pixel_σ)
-pix_ass = pixel_association | (dist_is, dist_not, prior_o)
+pix_ass = MCMCDepth.marginalized_association | (dist_is, dist_not, prior_o)
 
 @testset "Pixel association" begin
     # Test pixel formula
@@ -63,7 +63,7 @@ end
 # prior_range = 0:0.01:1
 # μ = 1.0f0
 # z = 0.99f0
-# plot(prior_range, pixel_association.(dist_is, dist_not, prior_range, μ, z), label="p(o|μ=$μ,z=$z,oₚᵣᵢₒᵣ)", xlabel="oₚᵣᵢₒᵣ")
+# plot(prior_range, MCMCDepth.marginalized_association.(dist_is, dist_not, prior_range, μ, z), label="p(o|μ=$μ,z=$z,oₚᵣᵢₒᵣ)", xlabel="oₚᵣᵢₒᵣ")
 # # Unlinkely to be associated
 # z = 0.7f0
-# plot!(prior_range, pixel_association.(dist_is, dist_not, prior_range, μ, z), label="p(o|μ=$μ,z=$z,oₚᵣᵢₒᵣ)", xlabel="oₚᵣᵢₒᵣ")
+# plot!(prior_range, MCMCDepth.marginalized_association.(dist_is, dist_not, prior_range, μ, z), label="p(o|μ=$μ,z=$z,oₚᵣᵢₒᵣ)", xlabel="oₚᵣᵢₒᵣ")
