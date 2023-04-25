@@ -13,6 +13,7 @@ using EllipsisNotation
 using LogExpFunctions
 using Logging
 using PoseErrors
+using ProgressLogging
 using Quaternions
 using Random
 using Reexport
@@ -164,12 +165,12 @@ export smooth_posterior
 
 export mh_local_sampler
 export mh_sampler
-
 export mtm_local_sampler
 export mtm_sampler
 
 export smc_bootstrap
 export smc_forward
+export smc_inference
 export smc_mh
 
 # Data loading an preprocessing

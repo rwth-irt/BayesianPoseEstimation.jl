@@ -14,6 +14,21 @@ CUDA.allowscalar(false)
 gr()
 MCMCDepth.diss_defaults()
 
+function mtm_parameters()
+    parameters = Parameters()
+    # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
+    @reset parameters.normalization_constant = 25
+    # NOTE Should be able to increase σ in MTM
+    @reset parameters.proposal_σ_r_quat = 0.5
+    @reset parameters.proposal_σ_t = [0.02, 0.02, 0.02]
+    # TODO same seed for experiments
+    @reset parameters.seed = rand(RandomDevice(), UInt32)
+    @reset parameters.n_steps = 800
+    @reset parameters.n_burn_in = 200
+    @reset parameters.n_thinning = 1
+    @reset parameters.n_particles = 100
+end
+
 function smc_parameters()
     parameters = Parameters()
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
@@ -27,12 +42,13 @@ function smc_parameters()
     @reset parameters.n_particles = 250
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.8
+    # TODO tempering in MCMC?
 end
 parameters = smc_parameters()
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
-cpu_rng = rng(parameters)
+cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
@@ -47,7 +63,7 @@ mesh = upload_mesh(gl_context, row.mesh)
 mask_img = load_mask_image(row, parameters)
 # TODO Add to Parameters. Quite strong prior is required. However, too strong priors are also bad, since the tail distribution would be neglected.
 prior_o = mask_img .* 0.6f0 .+ 0.2f0 .|> parameters.float_type |> device_array_type(parameters)
-# NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference?)
+# NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
 # fill!(prior_o, 0.5)
 
 depth_img = load_depth_image(row, parameters) |> device_array_type(parameters)
@@ -61,15 +77,6 @@ render_img = draw(gl_context, scene)
 @assert !iszero(render_img)
 plot_depth_ontop(color_img, render_img, alpha=0.8)
 
-# TODO implement for AbstractSampler? specialize sample? specialize step? Both solutions are pretty inconvenient since the type cannot easily be inferred for ComposedSampler (SMC vs. MCMC) → name functions
-function smc_inference(rng, posterior, sampler, params::Parameters)
-    sample, state = step(rng, posterior, sampler)
-    @progress for _ in 1:params.n_steps
-        sample, state = step(rng, posterior, sampler, state)
-    end
-    sample, state
-end
-
 # Model
 prior = point_prior(gl_context, parameters, experiment, cpu_rng)
 posterior = association_posterior(parameters, experiment, prior, dev_rng)
@@ -78,21 +85,37 @@ posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
+parameters = smc_parameters()
 sampler = smc_mh(cpu_rng, parameters, experiment, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
 # NOTE Benchmark results for smc_mh association & simple ≈ 4.28sec, smooth ≈ 4.74sec
-
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
+# TODO diagnostics: Accepted steps, resampling steps
 final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 println("Final log-evidence: $(final_state.log_evidence)")
 plot_pose_density(final_sample; trim=false, legend=true)
-
 plot_prob_img(mean_image(final_sample, :o))
 
-anim = @animate for i ∈ 0:2:360
-    scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-end;
-gif(anim, "anim_fps15.gif", fps=20)
-# TODO diagnostics: Accepted steps, resampling steps
+# anim = @animate for i ∈ 0:2:360
+#     scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+# end;
+# gif(anim, "anim_fps15.gif", fps=20)
+
+# MCMC samplers
+parameters = mtm_parameters()
+# sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
+# sampler = mh_local_sampler(cpu_rng, parameters, posterior)
+sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior)
+# sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
+chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
+# NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
+plot_pose_chain(chain, 50)
+plot_logprob(chain, 50)
+plot_prob_img(mean_image(chain, :o))
+
+# anim = @animate for i ∈ 0:2:360
+#     scatter_position(chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+# end;
+# gif(anim, "anim_fps15.gif", fps=20)

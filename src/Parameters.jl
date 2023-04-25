@@ -71,15 +71,15 @@ Base.@kwdef struct Parameters
     width = 100
     height = 100
     depth = 500
-    min_depth = 0.1
-    max_depth = 3
+    min_depth = 0
+    max_depth = 10
 
     # Depth pixel model
     pixel_σ = 0.01
     pixel_θ = 1
     mix_exponential = 0.8
     # Pixel association
-    association_σ = 1.0
+    association_σ = 0.1
     proposal_σ_o = 0.01
     # Image Model
     normalize_img = true
@@ -88,7 +88,7 @@ Base.@kwdef struct Parameters
 
     # Pose Model
     mean_t = [0.0, 0.0, 2.0]
-    σ_t = fill(0.05, 3)
+    σ_t = fill(0.03, 3)
     # Proposal Model
     proposal_σ_t = fill(0.01, 3)
     proposal_σ_r = fill(0.1, 3)
@@ -109,10 +109,10 @@ Base.getproperty(p::Parameters, s::Symbol) = getproperty(p, Val(s))
 Base.getproperty(p::Parameters, ::Val{K}) where {K} = getfield(p, K)
 
 """
-    rng(parameters)
+    default_rng(parameters)
 Returns the seeded random number generator for the CPU.
 """
-function BayesNet.rng(p::Parameters)
+function Random.default_rng(p::Parameters)
     rng = Random.default_rng()
     Random.seed!(rng, p.seed)
     return rng
