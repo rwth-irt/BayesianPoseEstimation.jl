@@ -11,6 +11,9 @@ using JSON
 using SciGL
 using StaticArrays
 
+# TODO output poses in BOP evaluation format. Output sampler diagnostics in separate file.
+# TODO load this file in PoseErrors.jl (new BOP.jl file there) and save the errors in a new file. Finally calculate recall, plot error histograms, recall/threshold curve.
+
 dataset_path(dataset_name) = joinpath(pwd(), "datasets", dataset_name)
 datasubset_path(dataset_name, subset_name="test") = joinpath(dataset_path(dataset_name), subset_name)
 
@@ -80,6 +83,7 @@ end
 Load the ground truth information for each object and image as a DataFrame with the columns `img_id, obj_id, cam_R_m2c, cam_t_m2c, mask_path, mask_visib_path`.
 """
 function gt_dataframe(scene_path)
+    # TODO consider only valid visibilities >= 0.1 from scene_gt_info.json (or less general test_targets_bop19.json) file.
     gt_json = JSON.parsefile(joinpath(scene_path, "scene_gt.json"))
     df = DataFrame(img_id=Int[], obj_id=Int[], gt_id=Int[], cam_R_m2c=QuatRotation[], cam_t_m2c=Vector{Float32}[], mask_path=String[], mask_visib_path=String[])
     for (img_id, body) in gt_json

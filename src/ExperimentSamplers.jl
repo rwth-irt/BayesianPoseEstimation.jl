@@ -164,6 +164,7 @@ function smc_mh(cpu_rng, params, experiment, posterior)
     ComposedSampler(weights, samplers...)
 end
 
+# TODO loop until time budget is up? Not a good idea, might be disturbed by updates etc. Before each experiment run a short benchmark and calculate steps/sec and use this to calculate n_steps for the experiment
 """
     smc_inference(cpu_rng, posterior, sampler, params)
 Run the inference iterations and return the final `(sample, state)`.
