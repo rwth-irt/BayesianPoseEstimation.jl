@@ -9,6 +9,7 @@ using MCMCDepth
 using Random
 using Plots
 using ProgressLogging
+using SciGL
 
 CUDA.allowscalar(false)
 gr()
@@ -44,6 +45,17 @@ function smc_parameters()
     @reset parameters.relative_ess = 0.8
     # TODO tempering in MCMC?
 end
+
+function mh_parameters()
+    parameters = Parameters()
+    @reset parameters.normalization_constant = 25
+    # TODO same seed for experiments
+    @reset parameters.seed = rand(RandomDevice(), UInt32)
+    @reset parameters.n_steps = 10_000
+    @reset parameters.n_burn_in = 0
+    @reset parameters.n_thinning = 1
+end
+
 parameters = smc_parameters()
 
 # NOTE takes minutes instead of seconds
@@ -64,7 +76,7 @@ mask_img = load_mask_image(row, parameters)
 # TODO Add to Parameters. Quite strong prior is required. However, too strong priors are also bad, since the tail distribution would be neglected.
 prior_o = mask_img .* 0.6f0 .+ 0.2f0 .|> parameters.float_type |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
-# fill!(prior_o, 0.5)
+fill!(prior_o, 0.5)
 
 depth_img = load_depth_image(row, parameters) |> device_array_type(parameters)
 experiment = Experiment(Scene(camera, [mesh]), prior_o, row.cam_t_m2c, depth_img)
@@ -79,9 +91,10 @@ plot_depth_ontop(color_img, render_img, alpha=0.8)
 
 # Model
 prior = point_prior(gl_context, parameters, experiment, cpu_rng)
-posterior = association_posterior(parameters, experiment, prior, dev_rng)
+# posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
-# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
@@ -105,17 +118,26 @@ end;
 gif(anim, "anim_fps15.gif", fps=20)
 
 # MCMC samplers
-parameters = mtm_parameters()
+parameters = mh_parameters()
 # sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
-# sampler = mh_local_sampler(cpu_rng, parameters, posterior)
-sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior)
+sampler = mh_local_sampler(cpu_rng, parameters, posterior)
+# parameters = mtm_parameters()
+# sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior)
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
-plot_pose_chain(chain, 50)
-plot_logprob(chain, 50)
-plot_prob_img(mean_image(chain, :o))
+# plot_pose_chain(chain, 50)
+# plot_logprob(chain, 50)
+# plot_prob_img(mean_image(chain, :o))
+
+# Visualize the maximum posterior
+# TODO also track likelihood - plot maximum likelihood pose
+logp, ind = findmax((s) -> s.logp, chain)
+@reset mesh.pose = to_pose(chain[ind].variables.t, chain[ind].variables.r)
+scene = Scene(camera, [mesh])
+render_img = draw(gl_context, scene)
+plot_depth_ontop(color_img, render_img, alpha=0.8)
 
 anim = @animate for i ∈ 0:2:360
     scatter_position(chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
