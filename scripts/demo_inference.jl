@@ -34,8 +34,6 @@ function smc_parameters()
     parameters = Parameters()
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
     @reset parameters.normalization_constant = 25
-    @reset parameters.proposal_σ_r_quat = 0.1
-    @reset parameters.proposal_σ_t = [0.01, 0.01, 0.01]
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
