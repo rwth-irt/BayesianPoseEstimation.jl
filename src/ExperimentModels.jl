@@ -18,13 +18,12 @@ end
 
 """
     simple_posterior(params, experiment, μ_node, dev_rng)
-A simple posterior model which does not calculate the pixel association probability `o` but uses a flat prior via `params.o`.
+A simple posterior model which does not calculate the pixel association probability `o` but uses a fixed prior via `params.o`.
 The pixel tail distribution is a mixture of an exponential and uniform distribution and checks for invalid values of `μ` via `ValidPixel`.
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function simple_posterior(params, experiment, μ_node, dev_rng)
-    # NOTE almost no performance gain over DeterministicNode?
-    o = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
+    o = DeterministicNode(:o, () -> experiment.prior_o, (;))
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (; μ=μ_node, o=o))
