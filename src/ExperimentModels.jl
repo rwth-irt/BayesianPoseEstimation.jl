@@ -23,7 +23,7 @@ The pixel tail distribution is a mixture of an exponential and uniform distribut
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function simple_posterior(params, experiment, μ_node, dev_rng)
-    o = DeterministicNode(:o, () -> experiment.prior_o, (;))
+    o = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (; μ=μ_node, o=o))
