@@ -17,7 +17,8 @@ using ProgressLogging
 using Quaternions
 using Random
 using Reexport
-using Rotations
+# Avoid loading ⊕ and ⊖
+using Rotations: Rotation, QuatRotation, RotMatrix3
 using SciGL
 using StatsBase
 

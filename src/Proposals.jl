@@ -83,7 +83,7 @@ Propose a new sample by adding a random perturbation from the proposal model.
 """
 function propose_additive(proposal::Proposal, previous_sample, dims...)
     # Propose in unconstrained domain
-    proposed = previous_sample + rand(proposal.model, dims...)
+    proposed = previous_sample ⊕ rand(proposal.model, dims...)
     # Evaluate in model domain
     model_sample, _ = to_model_domain(proposed, proposal.posterior_bijectors)
     evaluated = evaluate(proposal.evaluation, variables(model_sample))
@@ -111,7 +111,7 @@ end
     transition_probability_additive(proposal, new_sample, prev_sample)
 For the general case of additive proposals, where the forward and backward transition probabilities do not cancel out.
 """
-transition_probability_additive(proposal::Proposal{names}, new_sample, previous_sample) where {names} = logdensityof(proposal.model, variables(new_sample[Val(names)] - previous_sample))
+transition_probability_additive(proposal::Proposal{names}, new_sample, previous_sample) where {names} = logdensityof(proposal.model, variables(new_sample[Val(names)] ⊖ previous_sample[Val(names)]))
 
 """
     transition_probability_independent(proposal, new_sample, prev_sample)

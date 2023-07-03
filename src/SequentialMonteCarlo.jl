@@ -70,6 +70,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     # Update weights using backward kernel
     incr_weights = incremental_weights(sampler.kernel, new_sample, log_likelihood, new_temp, old_state)
     new_weights = add_logdensity(old_state.log_weights, incr_weights)
+    # Unnormalized new weights from (12) are the elements of (14) in the SMC paper
     new_evidence = old_state.log_evidence + logsumexp(new_weights)
     normalized_weights = normalize_log_weights(new_weights)
     new_state = SmcState(new_sample, normalized_weights, log_likelihood, new_evidence, new_temp)

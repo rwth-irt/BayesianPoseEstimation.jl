@@ -2,6 +2,11 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+import Distributions
+
+# hack Distributions.jl to allow logdensityof for MvNormal and multiple samples
+DensityInterface.logdensityof(d::Distributions.MvNormal, x::AbstractMatrix) = Distributions.logpdf(d, x)
+
 """
     mh_sampler(cpu_rng, params, experiment, posterior)
 Component-wise sampling of the position and orientation via Metropolis-Hastings.
@@ -14,7 +19,7 @@ function mh_sampler(cpu_rng, params, experiment, posterior)
     r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
 
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
@@ -33,7 +38,7 @@ Local moves only, no sample is drawn independently from the prior.
 """
 function mh_local_sampler(cpu_rng, params, posterior)
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
@@ -57,7 +62,7 @@ function mtm_sampler(cpu_rng, params, experiment, posterior)
     r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
 
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
@@ -76,7 +81,7 @@ Local moves only, no sample is drawn independently from the prior.
 """
 function mtm_local_sampler(cpu_rng, params, posterior)
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
@@ -96,7 +101,7 @@ Local moves only, no sample is drawn independently from the prior.
 function smc_forward(cpu_rng, params, posterior)
     temp_schedule = LinearSchedule(params.n_steps)
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
@@ -118,7 +123,7 @@ Local moves only, no sample is drawn independently from the prior.
 function smc_bootstrap(cpu_rng, params, posterior)
     temp_schedule = LinearSchedule(params.n_steps)
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
@@ -147,7 +152,7 @@ function smc_mh(cpu_rng, params, experiment, posterior)
     r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
 
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, params.proposal_σ_r_quat)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 

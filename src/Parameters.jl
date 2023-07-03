@@ -92,7 +92,6 @@ Base.@kwdef struct Parameters
     # Proposal Model
     proposal_σ_t = fill(0.01, 3)
     proposal_σ_r = fill(0.1, 3)
-    proposal_σ_r_quat = 0.1
     # Inference
     float_type = Float32
     device = :CUDA

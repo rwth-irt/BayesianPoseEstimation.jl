@@ -106,17 +106,20 @@ end
 map_merge(f, a::Sample, b::Sample) = map_merge(f, a, variables(b))
 
 """
-    +(a, b)
+    ⊕(a, b)
 Add the raw states (unconstrained domain) of two samples.
 The returned sample is of the same type as `a`.
+Uses additive operator ⊕ which supports the quaternion tangent space in KernelDistributions.jl.
 """
-Base.:+(a::Sample, b::NamedTuple) = map_merge(.+, a, b)
-Base.:+(a::Sample, b::Sample) = a + variables(b)
+KernelDistributions.:⊕(a::Sample, b::NamedTuple) = map_merge(.⊕, a, b)
+KernelDistributions.:⊕(a::Sample, b::Sample) = a ⊕ variables(b)
 
 """
-    -(a, b)
+    ⊖(a, b)
 Subtract the raw states (unconstrained domain) of two samples.
 Only same type is supported to prevent surprises in the return type.
+Uses subtractive operator ⊖ which supports the quaternion tangent space in KernelDistributions.jl.
 """
-Base.:-(a::Sample, b::NamedTuple) = map_merge(.-, a, b)
-Base.:-(a::Sample, b::Sample) = a - variables(b)
+KernelDistributions.:⊖(a::Sample, b::NamedTuple) = map_merge(.⊖, a, b)
+KernelDistributions.:⊖(a::Sample, b::Sample) = a ⊖ variables(b)
+
