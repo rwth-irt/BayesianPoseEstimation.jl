@@ -20,14 +20,13 @@ function mtm_parameters()
     # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
     @reset parameters.normalization_constant = 25
     # NOTE Should be able to increase σ in MTM
-    @reset parameters.proposal_σ_r_quat = 0.5
-    @reset parameters.proposal_σ_t = [0.02, 0.02, 0.02]
+    @reset parameters.proposal_σ_r = fill(0.2, 3)
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
-    @reset parameters.n_steps = 800
-    @reset parameters.n_burn_in = 200
+    @reset parameters.n_steps = 1_000
+    @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 1
-    @reset parameters.n_particles = 100
+    @reset parameters.n_particles = 50
 end
 
 function smc_parameters()
@@ -37,10 +36,11 @@ function smc_parameters()
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-    @reset parameters.n_steps = 1_000
-    @reset parameters.n_particles = 250
+    # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
+    @reset parameters.n_steps = 100
+    @reset parameters.n_particles = 50
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
-    @reset parameters.relative_ess = 0.8
+    @reset parameters.relative_ess = 0.5
     # TODO tempering in MCMC?
 end
 
