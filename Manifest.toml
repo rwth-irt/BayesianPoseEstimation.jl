@@ -732,7 +732,7 @@ version = "0.6.7"
 
 [[deps.KernelDistributions]]
 deps = ["Bijectors", "CUDA", "ChangesOfVariables", "DensityInterface", "Distributions", "LogExpFunctions", "Quaternions", "Random", "Random123", "Reexport", "SpecialFunctions", "StatsFuns"]
-git-tree-sha1 = "b221e861ed466ba10b842ca506b608d285e5df2f"
+git-tree-sha1 = "fc59234aa9780ed05780a206cd915b27526f263c"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/kerneldistributions.jl.git"
 uuid = "9994844f-d2c8-4ad1-b0b3-ac5ee308e667"
