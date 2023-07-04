@@ -50,6 +50,7 @@ function mh_parameters()
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 10_000
+    # NOTE burn in not required/even harmful if maximum likelihood/posteriori is the goal
     @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 1
 end

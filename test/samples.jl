@@ -16,14 +16,14 @@ using Test
     @test logprob(sa) == 0
     @test logprob(sb) == 0
 
-    sum_ab = @inferred sa + sb
+    sum_ab = @inferred sa ⊕ sb
     @test logprob(sum_ab) == -Inf
     @test variables(sum_ab).a == 0.5
     @test variables(sum_ab).a isa Float32
     @test variables(sum_ab).b == [1.5, 1.5]
     @test variables(sum_ab).b isa Vector{Float64}
 
-    diff_ab = @inferred sa - sb
+    diff_ab = @inferred sa ⊖ sb
     @test logprob(diff_ab) == -Inf
     @test variables(diff_ab).a == 0.5
     @test variables(diff_ab).a isa Float32
