@@ -145,8 +145,9 @@ export pixel_valid_tail
 export density_variable
 export histogram_variable
 export mean_image
+export plot_best_pose
 export plot_depth_img
-export plot_depth_ontop
+export plot_depth_ontop, plot_scene_ontop
 export plot_logprob
 export plot_pose_chain
 export plot_pose_density

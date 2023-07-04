@@ -9,11 +9,14 @@
     Experiment
 Data which might change from one experiment to another
 
+* `gl_context` offscreen render context
 * `scene` camera parameters or object mesh might change
+* `prior_o` object association probability, e.g. segmentation mask or all the same
 * `prior_t` estimated position of the object center e.g. via RFID or bounding box
 * `depth_img` depth image of the observed scene
 """
 struct Experiment
+    gl_context::OffscreenContext
     scene::Scene
     prior_o::AbstractMatrix{Float32}
     prior_t::Vector{Float32}

@@ -5,14 +5,14 @@
 # TODO Does it make more sense to return (;t=t,r=r) and reuse it in samplers where the prior is sampled?
 
 """
-    point_prior(gl_context, params, experiment, cpu_rng)
+    point_prior(params, experiment, cpu_rng)
 Returns a BayesNet for μ(t,r) for an approximately known position and unknown orientation.
 """
-function point_prior(gl_context, params, experiment, cpu_rng)
+function point_prior(params, experiment, cpu_rng)
     t = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
 
-    μ_fn = render_fn | (gl_context, experiment.scene)
+    μ_fn = render_fn | (experiment.gl_context, experiment.scene)
     DeterministicNode(:μ, μ_fn, (; t=t, r=r))
 end
 

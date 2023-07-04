@@ -78,18 +78,15 @@ prior_o = mask_img .* 0.6f0 .+ 0.2f0 .|> parameters.float_type |> device_array_t
 fill!(prior_o, 0.5)
 
 depth_img = load_depth_image(row, parameters) |> device_array_type(parameters)
-experiment = Experiment(Scene(camera, [mesh]), prior_o, row.cam_t_m2c, depth_img)
+experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, row.cam_t_m2c, depth_img)
 
 # Draw result for visual validation
 color_img = load_color_image(row, parameters)
 scene = Scene(camera, [mesh])
-render_img = draw(gl_context, scene)
-# TODO when overriding the context, rendering might be zero?
-@assert !iszero(render_img)
-plot_depth_ontop(color_img, render_img, alpha=0.8)
+plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
-prior = point_prior(gl_context, parameters, experiment, cpu_rng)
+prior = point_prior(parameters, experiment, cpu_rng)
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
 posterior = simple_posterior(parameters, experiment, prior, dev_rng)
@@ -105,38 +102,38 @@ sampler = smc_mh(cpu_rng, parameters, experiment, posterior)
 # NOTE Benchmark results for smc_mh association & simple ≈ 4.28sec, smooth ≈ 4.74sec
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
-final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
+final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters)
+@time smc_inference(cpu_rng, posterior, sampler, parameters);
+
 println("Final log-evidence: $(final_state.log_evidence)")
 # WARN final_sample does not represent the final distribution. The final_state does since the samples are weighted. However, for selecting the maximum likelihood sample, no resampling is required.
 plot_pose_density(final_sample; trim=false, legend=true)
-plot_prob_img(mean_image(final_sample, :o))
+# plot_prob_img(mean_image(final_sample, :o))
+plot_best_pose(final_sample, experiment, color_img)
 
 anim = @animate for i ∈ 0:2:360
     scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
 gif(anim, "anim_fps15.gif", fps=20)
 
+
 # MCMC samplers
-parameters = mh_parameters()
+# parameters = mh_Kparameters()
 # sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
-sampler = mh_local_sampler(cpu_rng, parameters, posterior)
-# parameters = mtm_parameters()
-# sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior)
+# sampler = mh_local_sampler(cpu_rng, parameters, posterior)
+parameters = mtm_parameters()
+sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior)
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
-# plot_pose_chain(chain, 50)
+plot_pose_chain(chain, 50)
 # plot_logprob(chain, 50)
 # plot_prob_img(mean_image(chain, :o))
+plot_best_pose(chain, experiment, color_img)
 
 # Visualize the maximum posterior
 # TODO also track likelihood - plot maximum likelihood pose
-logp, ind = findmax((s) -> s.logp, chain)
-@reset mesh.pose = to_pose(chain[ind].variables.t, chain[ind].variables.r)
-scene = Scene(camera, [mesh])
-render_img = draw(gl_context, scene)
-plot_depth_ontop(color_img, render_img, alpha=0.8)
 
 anim = @animate for i ∈ 0:2:360
     scatter_position(chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)

@@ -70,10 +70,12 @@ function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=
 end
 
 """
-    plot_depth_img(img, depth_img; [value_to_typemax=0, reverse=true])
+    plot_depth_ontop(img, depth_img; [value_to_typemax=0, reverse=true])
 Plot a depth image with a given `color_scheme` on top of another image.
 `value_to_typemax` specifies the value which is converted to typemax.
 `reverse` determines whether the color scheme is reversed.
+
+See also [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
 """
 function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, alpha=0.5, kwargs...)
     # Plot the image as background
@@ -96,6 +98,50 @@ function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viri
     # Plot the depth image on top
     heatmap!(depth_img; alpha=alpha, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
 end
+
+"""
+    plot_scene_ontop(gl_context, scene, img; kwargs...)
+Plot a scene as depth image on top of another image.
+
+See also [`plot_depth_ontop`](@ref), [`plot_best_pose`](@ref).
+"""
+function plot_scene_ontop(gl_context, scene, img; kwargs...)
+    render_img = draw(gl_context, scene)
+    # BUG when overriding the context, rendering might be zero?
+    @assert !iszero(render_img)
+    plot_depth_ontop(img, render_img; kwargs...)
+end
+
+"""
+    plot_best_pose(chain, experiment, img; kwargs...)
+Plot the best pose of a chain/sample as depth image on top of another image.
+
+See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref).
+"""
+function plot_best_pose(sample::Sample, experiment, img; kwargs...)
+    # TODO use loglikelihood?
+    _, ind = findmax(sample.logp)
+    scene = experiment.scene
+    mesh = first(scene.meshes)
+    @reset mesh.pose = to_pose(variables(sample).t[:, ind], variables(sample).r[ind])
+    @reset scene.meshes = [mesh]
+    plot_scene_ontop(experiment.gl_context, scene, img)
+end
+
+function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img; kwargs...)
+    _, ind = findmax((s) -> s.logp, chain)
+    scene = experiment.scene
+    mesh = first(scene.meshes)
+    @reset mesh.pose = to_pose(chain[ind].variables.t, chain[ind].variables.r)
+    @reset scene.meshes = [mesh]
+    plot_scene_ontop(experiment.gl_context, scene, img)
+end
+
+
+# function plot_depth_ontop(img, gl_context, scene; kwargs...)
+#     render_img = draw(gl_context, scene)
+#     plot_depth_ontop(color_img, render_img, alpha=0.8)
+# end
 
 """
     plot_prob_img
