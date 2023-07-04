@@ -103,7 +103,6 @@ sampler = smc_mh(cpu_rng, parameters, experiment, posterior)
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
 final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters)
-@time smc_inference(cpu_rng, posterior, sampler, parameters);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 # WARN final_sample does not represent the final distribution. The final_state does since the samples are weighted. However, for selecting the maximum likelihood sample, no resampling is required.
