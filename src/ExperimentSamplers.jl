@@ -123,7 +123,7 @@ Local moves only, no sample is drawn independently from the prior.
 function smc_bootstrap(cpu_rng, params, posterior)
     temp_schedule = LinearSchedule(params.n_steps)
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_sym = BroadcastedNode(:r, cpu_rng, QuaternionPerturbation, 0, params.proposal_σ_r)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
 
