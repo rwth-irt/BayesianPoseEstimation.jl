@@ -65,7 +65,7 @@ acceptance_ratio(proposal::Proposal, proposed::Sample, previous::Sample) = (
 
 """
     should_reject(rng, log_α)
-Returns an (Array of) Bool which is true, if the element should be rejected according to the logarithmic acceptance ration `log_α`.
+Returns an (Array of) Bool which is true, if the element should be rejected according to the logarithmic acceptance ratio `log_α`.
 Calculation of rejection is easier since for the random number u: log([0,1]) ∈ [-∞,0].
 Thus, `should_reject` always returns `false`, if α >= 1 ⇔ log(α) >= 0.
 """

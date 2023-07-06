@@ -13,7 +13,7 @@ function point_prior(params, experiment, cpu_rng)
     r = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
 
     μ_fn = render_fn | (experiment.gl_context, experiment.scene)
-    DeterministicNode(:μ, μ_fn, (; t=t, r=r))
+    DeterministicNode(:μ, μ_fn, (t, r))
 end
 
 """
@@ -26,7 +26,7 @@ function simple_posterior(params, experiment, μ_node, dev_rng)
     o = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, z_i, (; μ=μ_node, o=o))
+    z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     PosteriorModel(z_norm, (; z=experiment.depth_image))
 end
@@ -40,10 +40,10 @@ Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 function association_posterior(params, experiment, μ_node, dev_rng)
     o_fn = pixel_association_fn(params)
     # condition on data via closure
-    o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (; μ=μ_node))
+    o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (μ_node,))
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, z_i, (; μ=μ_node, o=o))
+    z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     PosteriorModel(z_norm, (; z=experiment.depth_image))
 end
@@ -58,10 +58,10 @@ function smooth_posterior(params, experiment, μ_node, dev_rng)
     # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
     o_fn = smooth_association_fn(params)
     # condition on data via closure
-    o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (; μ=μ_node))
+    o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (μ_node,))
     # ValidPixel diverges without normalization
     pixel_model = smooth_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, pixel_model, (; μ=μ_node, o=o))
+    z = BroadcastedNode(:z, dev_rng, pixel_model, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     PosteriorModel(z_norm, (; z=experiment.depth_image))
 end

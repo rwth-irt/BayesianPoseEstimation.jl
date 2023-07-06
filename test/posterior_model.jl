@@ -63,9 +63,9 @@ o = BroadcastedNode(:o, rng, KernelUniform, fill(0.0f0, params.width, params.hei
 
     # PosteriorModel
     μ_fn = render_fn | (gl_context, scene)
-    μ = DeterministicNode(:μ, μ_fn, (; t=t, r=r))
+    μ = DeterministicNode(:μ, μ_fn, (t, r))
     pixel = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, rng, pixel, (; μ=μ, o=o))
+    z = BroadcastedNode(:z, rng, pixel, (μ, o))
     z_norm = ModifierNode(z, rng, ImageLikelihoodNormalizer | params.normalization_constant)
     depth_img = rand(z_norm).z
     posterior = PosteriorModel(z_norm, (; z=depth_img))

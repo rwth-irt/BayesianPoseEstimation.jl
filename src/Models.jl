@@ -208,7 +208,7 @@ end
 
 function μ_model(render_context, experiment, prior)
     μ_fn = render_fn | (render_context, experiment.scene)
-    μ = DeterministicNode(:μ, μ_fn, (; t=prior.t, r=prior.r))
+    μ = DeterministicNode(:μ, μ_fn, (prior.t, prior.r))
     (; t=prior.t, r=prior.r, μ=μ)
 end
 

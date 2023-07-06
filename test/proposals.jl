@@ -12,7 +12,7 @@ using Test
     a = BroadcastedNode(:a, rng, KernelExponential, Float16(2.0))
     b = BroadcastedNode(:b, rng, KernelExponential, [2.0f0, 1.0f0, 0.5f0])
     rand(b)
-    c = BroadcastedNode(:c, rng, KernelNormal, (; a=a, b=b))
+    c = BroadcastedNode(:c, rng, KernelNormal, (a, b))
     s = Sample(rand(c))
 
     @test variables(s).a |> size == ()
@@ -225,8 +225,8 @@ using Test
     # evaluation of DeterministicNode
     a = BroadcastedNode(:a, rng, KernelExponential, [2.0f0, 1.0f0, 0.5f0])
     fn(x) = 2 * x
-    b = DeterministicNode(:b, fn, (; a=a))
-    c = BroadcastedNode(:c, rng, KernelExponential, (; b=b))
+    b = DeterministicNode(:b, fn, (a,))
+    c = BroadcastedNode(:c, rng, KernelExponential, (b,))
     s = rand(c) |> Sample
 
     # evaluation should update b
