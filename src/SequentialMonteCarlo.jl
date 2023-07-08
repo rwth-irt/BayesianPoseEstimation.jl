@@ -61,7 +61,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     new_temp = increment_temperature(sampler.temp_scheduler, old_state.temperature)
 
     # Draw new particles using the forward kernel
-    proposed_sample = propose(sampler.kernel, old_state.sample, sampler.n_particles)
+    proposed_sample = propose(sampler.kernel, old_state, sampler.n_particles)
     log_prior, log_likelihood = prior_and_likelihood(model, proposed_sample)
     log_full = tempered_logdensity(log_prior, log_likelihood, new_temp)
     proposed_sample = set_logp(proposed_sample, log_full)
@@ -79,12 +79,10 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     resampled.sample, resampled
 end
 
-# SmcKernels, implement:
-# proposal(kernel): Getter for the proposal
-# forward(kernel, new_sample, old_state): forward kernel for the proposed sample
-# incremental_weights(kernel, new_sample, new_likelihood, new_temp, old_state): calculate the unnormalized incremental weights
-
-propose(kernel, previous_sample, n_particles) = propose(proposal(kernel), previous_sample, n_particles)
+# SmcKernels, must have a `proposal` field. 
+# propose(kernel, old_state, n_particles): propose a new `Sample` using the old `SmcState`
+# forward(kernel, new_sample, old_sample): forward kernel for the proposed sample
+# incremental_weights(kernel, new_sample, new_likelihood, new_temp, old_state::SmcState): calculate the unnormalized incremental weights
 
 """
     ForwardProposalKernel(proposal)
@@ -98,7 +96,7 @@ end
 
 Base.show(io::IO, k::ForwardProposalKernel) = print(io, "ForwardProposalKernel, $(k.proposal)")
 
-proposal(kernel::ForwardProposalKernel) = kernel.proposal
+propose(kernel::ForwardProposalKernel, old_state, n_particles) = propose(kernel.proposal, old_state.sample, n_particles)
 forward(kernel::ForwardProposalKernel, new_sample, old_sample) = new_sample
 
 """
@@ -119,8 +117,8 @@ end
 
 Base.show(io::IO, k::MhKernel) = print(io, "MhKernel, $(k.proposal)")
 
-proposal(kernel::MhKernel) = kernel.proposal
-forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel(kernel.rng, proposal(kernel), new_sample, old_sample)
+propose(kernel::MhKernel, old_state, n_particles) = propose(kernel.proposal, old_state.sample, n_particles)
+forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel(kernel.rng, kernel.proposal, new_sample, old_sample)
 
 """
     increment_weights(kernel, new_sample, new_likelihood, new_temp, old_state)
@@ -141,7 +139,7 @@ end
 
 Base.show(io::IO, k::BootstrapKernel) = print(io, "BootstrapKernel, $(k.proposal)")
 
-proposal(kernel::BootstrapKernel) = kernel.proposal
+propose(kernel::BootstrapKernel, old_state, n_particles) = propose(kernel.proposal, old_state.sample, n_particles)
 forward(kernel::BootstrapKernel, new_sample, old_sample) = new_sample
 
 """
@@ -150,6 +148,64 @@ Bootstrap particle filter: tempered likelihood is the weight increment.
 """
 incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = new_likelihood
 
+"""
+    AdaptiveKernel(kernel)
+Wraps an SMC kernel which is expected to use a symmetric proposal model, accessible via kernel.proposal. 
+"""
+struct AdaptiveKernel{R,K}
+    rng::R
+    kernel::K
+end
+# TODO Should I enforce symmetric proposal model? How?
+
+# TODO change all propose functions for SmcKernels to SmcState
+function propose(kernel::AdaptiveKernel, old_state::SmcState, n_particles)
+    internal = kernel.kernel
+    # TODO Fragile? Unit test?
+    # NOTE immutable does not modify the parameter only locally
+    # TODO Should I use unbiased estimate compared to nguyenEfficientSequentialMonteCarlo2016 
+    @reset internal.proposal = adaptive_mvnormal(kernel.rng, internal.proposal, old_state; corrected=false)
+    propose(internal, old_state, n_particles)
+end
+
+forward(kernel::AdaptiveKernel, new_sample, old_sample) = forward(kernel.kernel, new_sample, old_sample)
+
+incremental_weights(kernel::AdaptiveKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = incremental_weights(kernel.kernel, new_sample, new_likelihood, new_temp, old_state)
+
+# TEST
+"""
+    adaptive_mvnormal(proposal::Proposal, state::SmcState; [corrected=true])
+Replaces the model of the proposal with multivariate normal distributions.
+These distributions are zero-centered and have the covariance of the `state`'s distribution.
+
+If the state has zero covariance, i.e. all particles are in the same state, the proposal is not modified and returned as fallback.
+"""
+function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::SmcState; corrected=true) where {names}
+    vars = variables(state.sample)[names]
+    # analytic / reliability weights describe an importance of each observation
+    weights = state.log_weights .|> exp |> AnalyticWeights
+    Σ_vars = map(vars) do x
+        # TODO Array(x) because cov is not implemented for views...
+        cov(Array(x), weights, 2; corrected=corrected) .|> quat_eltype(x)
+    end
+
+    # peaked likelihood - essentially one particle / sample with all the weight
+    # might lead to zero covariance
+    if (any(iszero, Σ_vars))
+        # Fallback to unmodified proposal
+        return proposal
+    else
+        # Replace model with MvNormal moves
+        nodes = map(names) do name
+            SimpleNode(name, rng, MvNormal, Σ_vars[name])
+        end
+        return @reset proposal.model = NamedTuple{names}(nodes)
+    end
+end
+
+# Weights alter the precision of the covariance matrices
+quat_eltype(::AbstractArray{Quaternion{T}}) where {T} = T
+quat_eltype(::AbstractArray{T}) where {T} = T
 
 # Resampling
 

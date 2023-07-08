@@ -150,21 +150,26 @@ function smc_mh(cpu_rng, params, experiment, posterior)
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
     t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
     r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
+    t_ind_kernel = MhKernel(cpu_rng, t_ind_proposal)
+    r_ind_kernel = MhKernel(cpu_rng, r_ind_proposal)
 
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+    # NOTE adaptive kernel does not seem to work great with rotations. Supposedly because the distribution is far from normally distributed.
+    t_sym_kernel = AdaptiveKernel(cpu_rng, MhKernel(cpu_rng, t_sym_proposal))
+    r_sym_kernel = MhKernel(cpu_rng, r_sym_proposal)
 
     # TODO o needs dev_rng
     # o_sym = BroadcastedNode(:o, CUDA.default_rng(), KernelNormal, 0.0f0, 0.1f0)
     # o_sym_proposal = symmetric_proposal((; o=o_sym), posterior.node)
 
-    proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([1.0, 1.0, 0.01, 0.01])
-    samplers = map(proposals) do proposal
-        mh_kernel = MhKernel(cpu_rng, proposal)
-        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    # NOTE t_ind should not be required since it is quite local and driven via the adaptive variance
+    kernels = (t_sym_kernel, r_sym_kernel, r_ind_kernel)
+    weights = Weights([1.0, 1.0, 0.05])
+    samplers = map(kernels) do kernel
+        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end
     ComposedSampler(weights, samplers...)
 end

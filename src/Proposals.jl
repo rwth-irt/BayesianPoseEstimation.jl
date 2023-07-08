@@ -18,7 +18,7 @@ function evaluation_nodes(proposal::SequentializedGraph, posterior::AbstractNode
 end
 evaluation_nodes(proposal_model::AbstractNode, posterior_model::AbstractNode) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
 
-struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B<:NamedTuple{names},C}
+struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B<:NamedTuple{names},C<:NamedTuple}
     propose_fn::F
     transition_probability_fn::G
     model::M

@@ -38,7 +38,7 @@ function smc_parameters()
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
     # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
     @reset parameters.n_steps = 100
-    @reset parameters.n_particles = 50
+    @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
     # TODO tempering in MCMC?
