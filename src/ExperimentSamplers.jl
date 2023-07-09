@@ -51,7 +51,7 @@ function mh_local_sampler(cpu_rng, params, posterior)
 end
 
 """
-    mh_sampler(cpu_rng, params, posterior)
+    mh_sampler(cpu_rng, params, experiment, posterior)
 Component-wise sampling of the position and orientation via Multiple-Try-Metropolis.
 With a low probability (~1%) the sample is drawn independently from the prior a to avoid local minima.
 """
@@ -137,27 +137,25 @@ function smc_bootstrap(cpu_rng, params, posterior)
 end
 
 """
-    smc_mh(cpu_rng, params, experiment, posterior)
+    smc_mh(cpu_rng, params, posterior)
 Component-wise sampling of the position and orientation via Sequential Monte Carlo with a Metropolis Hastings kernel which uses a likelihood-tempered weight update.
-Thanks to the Metropolis Hastings kernel which only replaces a subset of the samples, samples are drawn with a low probability (~1%) from the prior.
+Thanks to the Metropolis Hastings kernel which only replaces a subset of the samples, samples are drawn with a low probability (~5%) from the prior.
+Use this sample for exploration.
 """
-function smc_mh(cpu_rng, params, experiment, posterior)
+function smc_mh(cpu_rng, params, posterior)
     # NOTE LinearSchedule seems reasonable, ExponentialSchedule and ConstantSchedule either explore too much or not enough
     temp_schedule = LinearSchedule(params.n_steps)
 
     # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
-    t_ind = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
-    t_ind_proposal = independent_proposal((; t=t_ind), posterior.node)
     r_ind_proposal = independent_proposal((; r=r_ind), posterior.node)
-    t_ind_kernel = MhKernel(cpu_rng, t_ind_proposal)
     r_ind_kernel = MhKernel(cpu_rng, r_ind_proposal)
 
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
-    # NOTE adaptive kernel does not seem to work great with rotations. Supposedly because the distribution is far from normally distributed.
+    # NOTE adaptive rotations proposals do not work well since the rotation are usually not normally distributed.
     t_sym_kernel = AdaptiveKernel(cpu_rng, MhKernel(cpu_rng, t_sym_proposal))
     r_sym_kernel = MhKernel(cpu_rng, r_sym_proposal)
 
@@ -167,7 +165,7 @@ function smc_mh(cpu_rng, params, experiment, posterior)
 
     # NOTE t_ind should not be required since it is quite local and driven via the adaptive variance
     kernels = (t_sym_kernel, r_sym_kernel, r_ind_kernel)
-    weights = Weights([1.0, 1.0, 0.05])
+    weights = Weights([1.0, 1.0, 0.1])
     samplers = map(kernels) do kernel
         SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end

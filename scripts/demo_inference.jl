@@ -32,13 +32,13 @@ end
 function smc_parameters()
     parameters = Parameters()
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
-    @reset parameters.normalization_constant = 25
+    @reset parameters.normalization_constant = 30
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
     # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
-    @reset parameters.n_steps = 100
-    @reset parameters.n_particles = 100
+    @reset parameters.n_steps = 200
+    @reset parameters.n_particles = 50
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
     # TODO tempering in MCMC?
