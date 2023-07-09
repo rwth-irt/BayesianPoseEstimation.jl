@@ -124,11 +124,7 @@ end
     cuda_rng(parameters)
 Returns the seeded random number generator for the CUDA device.
 """
-function cuda_rng(p::Parameters)
-    rng = CUDA.default_rng()
-    Random.seed!(rng, p.seed)
-    return rng
-end
+cuda_rng(p::Parameters) = Random.seed!(CUDA.default_rng(), p.seed)
 
 """
     device_rng(parameters)
@@ -138,11 +134,11 @@ function device_rng(p::Parameters)
     if p.device === :CUDA
         cuda_rng(p)
     elseif p.device === :CPU
-        rng(p)
+        Random.default_rng(p)
     else
         @warn "Unknown device: $(p.device), falling back to CPU"
         # CPU is fallback
-        rng(p)
+        Random.default_rng(p)
     end
 end
 

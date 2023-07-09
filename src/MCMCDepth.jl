@@ -32,8 +32,8 @@ include("Common.jl")
 # Model primitives
 include("Samples.jl")
 include("FunctionManipulation.jl")
-include("Proposals.jl")
 include("PosteriorModel.jl")
+include("Proposals.jl")
 # Inference / Sampling algorithms
 include("Tempering.jl")
 
@@ -184,7 +184,6 @@ export load_mask_image
 export scene_dataframe
 
 # Extensions and Reexports
-@reexport import BayesNet: rng
 @reexport import Quaternions: Quaternion
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation

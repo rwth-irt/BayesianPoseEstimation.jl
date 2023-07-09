@@ -185,7 +185,7 @@ function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::S
     # analytic / reliability weights describe an importance of each observation
     weights = state.log_weights .|> exp |> AnalyticWeights
     Σ_vars = map(vars) do x
-        # TODO Array(x) because cov is not implemented for views...
+        # Array(x) because cov is not implemented for views...
         cov(Array(x), weights, 2; corrected=corrected) .|> quat_eltype(x)
     end
 

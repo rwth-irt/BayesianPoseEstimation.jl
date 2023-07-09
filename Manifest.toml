@@ -103,11 +103,11 @@ version = "0.1.1"
 
 [[deps.BayesNet]]
 deps = ["Bijectors", "DensityInterface", "KernelDistributions", "Random", "Reexport", "Unrolled"]
-git-tree-sha1 = "5f51f0478a2d5c4c0fd2c4f9ca990c2de122d835"
+git-tree-sha1 = "73ca44fe1a70b705da604a2c6879b6b6d246b0af"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/bayesnet.jl.git"
 uuid = "d9c86ec7-3148-4780-bde1-0046e5c48677"
-version = "0.2.0"
+version = "0.2.2"
 
 [[deps.BenchmarkTools]]
 deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
@@ -455,9 +455,9 @@ version = "1.0.10+0"
 
 [[deps.Functors]]
 deps = ["LinearAlgebra"]
-git-tree-sha1 = "478f8c3145bb91d82c2cf20433e8c1b30df454cc"
+git-tree-sha1 = "9a68d75d466ccc1218d0552a8e1631151c569545"
 uuid = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
-version = "0.4.4"
+version = "0.4.5"
 
 [[deps.Future]]
 deps = ["Random"]
