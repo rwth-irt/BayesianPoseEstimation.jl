@@ -18,9 +18,7 @@ MCMCDepth.diss_defaults()
 function mtm_parameters()
     parameters = Parameters()
     # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-    @reset parameters.normalization_constant = 25
-    # NOTE Should be able to increase σ in MTM
-    @reset parameters.proposal_σ_r = fill(0.2, 3)
+    @reset parameters.normalization_constant = 20
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 1_000
@@ -32,7 +30,7 @@ end
 function smc_parameters()
     parameters = Parameters()
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
-    @reset parameters.normalization_constant = 30
+    @reset parameters.normalization_constant = 20
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
@@ -95,14 +93,14 @@ posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters()
-sampler = smc_mh(cpu_rng, parameters, experiment, posterior)
+sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
 # NOTE Benchmark results for smc_mh association & simple ≈ 4.28sec, smooth ≈ 4.74sec
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
-final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters)
+final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 
 println("Final log-evidence: $(final_state.log_evidence)")
 # WARN final_sample does not represent the final distribution. The final_state does since the samples are weighted. However, for selecting the maximum likelihood sample, no resampling is required.
@@ -117,7 +115,7 @@ gif(anim, "anim_fps15.gif", fps=20)
 
 
 # MCMC samplers
-# parameters = mh_Kparameters()
+# parameters = mh_parameters()
 # sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
 parameters = mtm_parameters()
