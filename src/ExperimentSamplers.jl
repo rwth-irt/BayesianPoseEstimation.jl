@@ -104,12 +104,13 @@ function smc_forward(cpu_rng, params, posterior)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+    t_sym_kernel = AdaptiveKernel(cpu_rng, ForwardProposalKernel(t_sym_proposal))
+    r_sym_kernel = ForwardProposalKernel(r_sym_proposal)
 
-    proposals = (t_sym_proposal, r_sym_proposal)
+    kernels = (t_sym_kernel, r_sym_kernel)
     weights = Weights([1.0, 1.0])
-    samplers = map(proposals) do proposal
-        mh_kernel = ForwardProposalKernel(proposal)
-        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    samplers = map(kernels) do kernel
+        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end
     ComposedSampler(weights, samplers...)
 end
@@ -126,12 +127,13 @@ function smc_bootstrap(cpu_rng, params, posterior)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal((; t=t_sym), posterior.node)
     r_sym_proposal = symmetric_proposal((; r=r_sym), posterior.node)
+    t_sym_kernel = AdaptiveKernel(cpu_rng, ForwardProposalKernel(t_sym_proposal))
+    r_sym_kernel = ForwardProposalKernel(r_sym_proposal)
 
-    proposals = (t_sym_proposal, r_sym_proposal)
+    kernels = (t_sym_kernel, r_sym_kernel)
     weights = Weights([1.0, 1.0])
-    samplers = map(proposals) do proposal
-        mh_kernel = BootstrapKernel(proposal)
-        SequentialMonteCarlo(mh_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    samplers = map(kernels) do kernel
+        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end
     ComposedSampler(weights, samplers...)
 end
