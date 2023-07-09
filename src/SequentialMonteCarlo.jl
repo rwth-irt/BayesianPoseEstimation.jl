@@ -178,7 +178,7 @@ incremental_weights(kernel::AdaptiveKernel, new_sample::Sample, new_likelihood, 
 Replaces the model of the proposal with multivariate normal distributions.
 These distributions are zero-centered and have the covariance of the `state`'s distribution.
 
-If the state has zero covariance, i.e. all particles are in the same state, the proposal is not modified and returned as fallback.
+If the state has close to zero covariance, the Cholesky factorization fails and the original proposal distribution is returned for that variable.
 """
 function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::SmcState; corrected=true) where {names}
     vars = variables(state.sample)[names]
@@ -189,18 +189,19 @@ function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::S
         cov(Array(x), weights, 2; corrected=corrected) .|> quat_eltype(x)
     end
 
-    # peaked likelihood - essentially one particle / sample with all the weight
-    # might lead to zero covariance
-    if (any(iszero, Σ_vars))
-        # Fallback to unmodified proposal
-        return proposal
-    else
-        # Replace model with MvNormal moves
-        nodes = map(names) do name
+    # Replace model with MvNormal moves
+    nodes = map(names) do name
+        # peaked likelihood - essentially one particle / sample with all the weight
+        # Σ might be close to zero → Cholesky factorization fails
+        Σ = Σ_vars[name]
+        if isposdef(Σ)
             SimpleNode(name, rng, MvNormal, Σ_vars[name])
+        else
+            # Fall back to original proposal distribution
+            proposal.model[name]
         end
-        return @reset proposal.model = NamedTuple{names}(nodes)
     end
+    @set proposal.model = NamedTuple{names}(nodes)
 end
 
 # Weights alter the precision of the covariance matrices

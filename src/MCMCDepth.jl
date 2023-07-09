@@ -10,6 +10,7 @@ using CoordinateTransformations
 using CUDA
 using DensityInterface
 using EllipsisNotation
+using LinearAlgebra: isposdef
 using LogExpFunctions
 using Logging
 using PoseErrors
