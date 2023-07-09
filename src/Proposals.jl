@@ -16,7 +16,8 @@ function evaluation_nodes(proposal::SequentializedGraph, posterior::AbstractNode
     p = parents(posterior, values(proposal)...)
     Base.structdiff(p, (; name => ()))
 end
-evaluation_nodes(proposal_model::AbstractNode, posterior_model::AbstractNode) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
+evaluation_nodes(proposal_model::SequentializedGraph, posterior_model::PosteriorModel) = evaluation_nodes(sequentialize(proposal_model), posterior_model.node)
+evaluation_nodes(proposal_model::AbstractNode, posterior_model) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
 
 struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B<:NamedTuple{names},C<:NamedTuple}
     propose_fn::F
