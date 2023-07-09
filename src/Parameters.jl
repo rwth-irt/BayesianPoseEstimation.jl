@@ -124,7 +124,12 @@ end
     cuda_rng(parameters)
 Returns the seeded random number generator for the CUDA device.
 """
-cuda_rng(p::Parameters) = Random.seed!(CUDA.default_rng(), p.seed)
+function cuda_rng(p::Parameters)
+    rng = CUDA.default_rng()
+    Random.seed!(rng, p.seed)
+    return rng
+end
+
 
 """
     device_rng(parameters)
