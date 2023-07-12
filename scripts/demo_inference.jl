@@ -103,8 +103,8 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 
 println("Final log-evidence: $(final_state.log_evidence)")
-# WARN final_sample does not represent the final distribution. The final_state does since the samples are weighted. However, for selecting the maximum likelihood sample, no resampling is required.
-plot_pose_density(final_sample; trim=false, legend=true)
+# Plot state which uses the weights
+plot_pose_density(final_state; trim=false, legend=true)
 # plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_sample, experiment, color_img)
 

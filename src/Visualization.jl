@@ -197,6 +197,8 @@ function plot_pose_density(sample; kwargs...)
     )
 end
 
+plot_pose_density(state::SmcState; kwargs...) = plot_pose_density(state.sample; weights=exp.(state.log_weights), kwargs...)
+
 function plot_pose_chain(model_chain, len=50)
     plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Position / m", legend=false)
     plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position / m", ylabel="Density", legend=false, left_margin=5mm)
