@@ -10,6 +10,7 @@ struct SequentialMonteCarlo{K,S} <: AbstractMCMC.AbstractSampler
     kernel::K
     temp_scheduler::S
     n_particles::Int64
+    # TODO Why not use a constructor and the relative_ess ?
     log_resample_threshold::Float64
 end
 
