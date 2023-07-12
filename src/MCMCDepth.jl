@@ -114,6 +114,7 @@ export Gibbs
 export MetropolisHastings
 export MultipleTry
 
+export AdaptiveKernel
 export BootstrapKernel
 export ForwardProposalKernel
 export MhKernel

@@ -185,9 +185,15 @@ function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::S
     vars = variables(state.sample)[names]
     # analytic / reliability weights describe an importance of each observation
     weights = state.log_weights .|> exp |> AnalyticWeights
+    # TODO assumes that the variables are grouped in vectors, e.g. [x,y,z] components of Translation.
+    # Otherwise we would have to assemble one large covariance matrix for the different variables and somehow tell the proposal how to divide it back into variables.
     Σ_vars = map(vars) do x
-        # Array(x) because cov is not implemented for views...
-        cov(Array(x), weights, 2; corrected=corrected) .|> quat_eltype(x)
+        if x isa AbstractMatrix
+            cov(Array(x), weights, 2; corrected=corrected) .|> quat_eltype(x)
+        else
+            # not positive definite
+            0
+        end
     end
 
     # Replace model with MvNormal moves

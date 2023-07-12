@@ -26,7 +26,7 @@ struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B
     posterior_bijectors::C
 end
 
-Base.show(io::IO, q::Proposal{names}) where {names} = print(io, "Proposal(names: $(names), $(q.propose_fn) & $(q.transition_probability_fn))")
+Base.show(io::IO, q::Proposal{names}) where {names} = print(io, "Proposal(names: $(names), $(q.propose_fn), $(q.transition_probability_fn))")
 
 Proposal(proposal_model, posterior_model, propose_fn, transition_probability_fn) = Proposal(propose_fn, transition_probability_fn, sequentialize(proposal_model), evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(proposal_model)), map_materialize(bijector(posterior_model)))
 

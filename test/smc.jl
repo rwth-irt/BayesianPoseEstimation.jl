@@ -36,15 +36,44 @@ sample = @inferred rand(posterior_model, 5)
   @test ℓ isa Float32
 end
 
-proposal_model = (; a=SimpleNode(:a, rng, KernelNormal, Float32), b=SimpleNode(:b, rng, KernelNormal, Float32))
+proposal_model = (; a=BroadcastedNode(:a, rng, KernelNormal, Float32), b=BroadcastedNode(:b, rng, KernelNormal, [0.0f0, 0.0f0], [1.0f0, 1.0f0]))
 proposal = symmetric_proposal(proposal_model, posterior_model)
 
-@testset "SMC forward kernel" begin
-  kernel = ForwardProposalKernel(proposal)
+kernels = (ForwardProposalKernel(proposal), BootstrapKernel(proposal), MhKernel(rng, proposal), AdaptiveKernel(rng, ForwardProposalKernel(proposal)), AdaptiveKernel(rng, BootstrapKernel(proposal)), AdaptiveKernel(rng, MhKernel(rng, proposal)))
+
+@testset "SMC kernel: $(kernel |> typeof |> nameof)" for kernel in kernels
   n_steps = 42
   n_particles = 6
   smc = SequentialMonteCarlo(kernel, LinearSchedule(n_steps), n_particles, log(0.5 * n_particles))
-  sample, state = AbstractMCMC.step(rng, posterior_model, smc)
-  # BUG
-  # sample, state = AbstractMCMC.step(rng, posterior_model, smc, state)
-end
+
+  sample, state = @inferred AbstractMCMC.step(rng, posterior_model, smc)
+
+  @test sample.variables.a isa AbstractArray{Float32}
+  @test sample.variables.b isa AbstractArray{Float32}
+  # logp will change to Float64 due to Tempering
+
+  @test size(sample.variables.a) == (6,)
+  @test size(sample.variables.b) == (2, 6)
+  @test size(sample.logp) == (6,)
+
+  @test state.log_evidence == 0
+  @test size(state.log_likelihood) == (6,)
+  @test size(state.log_weights) == (6,)
+  @test state.sample == sample
+  @test state.temperature == 0
+
+  sample, state = AbstractMCMC.step(rng, posterior_model, smc, state)
+
+  @test sample.variables.a isa AbstractArray{Float32}
+  @test sample.variables.b isa AbstractArray{Float32}
+
+  @test size(sample.variables.a) == (6,)
+  @test size(sample.variables.b) == (2, 6)
+  @test size(sample.logp) == (6,)
+
+  @test state.log_evidence != 0
+  @test state.log_likelihood isa AbstractArray{Float32}
+  @test state.log_weights isa AbstractArray{Float64}
+  @test state.sample == sample
+  @test state.temperature > 0
+end;
