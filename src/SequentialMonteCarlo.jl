@@ -224,19 +224,22 @@ quat_eltype(::AbstractArray{T}) where {T} = T
     maybe_resample(rng, state, log_threshold)
 Resample the variables of the `state` with their respective log-weights & -probabilities if the log effective sample size is smaller than the `log_threshold`
 """
-function maybe_resample(rng::AbstractRNG, state::SmcState, log_threshold)
-    if effective_sample_size(state.log_weights) < log_threshold
-        # Resample variables
-        indices = systematic_resampling_indices(rng, state.log_weights)
-        vars = map(x -> @view(x[.., indices]), variables(state.sample))
-        log_probs = logprob(state.sample)[indices]
-        re_sample = Sample(vars, log_probs)
-        # Reset weights
-        log_weights = fill(-log(length(log_probs)), length(log_probs))
-        SmcState(re_sample, log_weights, state.log_likelihood, state.log_evidence, state.temperature)
-    else
-        state
-    end
+maybe_resample(rng::AbstractRNG, state::SmcState, log_threshold) = effective_sample_size(state.log_weights) < log_threshold ? resample_systematic(rng, state) : state
+
+"""
+    resample_systematic(rng, state, log_threshold)
+Systematic resampling scheme according to the log-weights.
+Returns the resampled SmcState where all log-weights are equal.
+"""
+function resample_systematic(rng::AbstractRNG, state::SmcState)
+    # Resample variables
+    indices = systematic_resampling_indices(rng, state.log_weights)
+    vars = map(x -> @view(x[.., indices]), variables(state.sample))
+    log_probs = logprob(state.sample)[indices]
+    re_sample = Sample(vars, log_probs)
+    # Reset weights
+    log_weights = fill(-log(length(log_probs)), length(log_probs))
+    SmcState(re_sample, log_weights, state.log_likelihood, state.log_evidence, state.temperature)
 end
 
 """
