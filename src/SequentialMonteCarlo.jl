@@ -157,15 +157,13 @@ struct AdaptiveKernel{R,K}
     rng::R
     kernel::K
 end
-# TODO Should I enforce symmetric proposal model? How?
+# TODO Should I enforce symmetric proposal model in constructor? How?
 
-# TODO change all propose functions for SmcKernels to SmcState
 function propose(kernel::AdaptiveKernel, old_state::SmcState, n_particles)
     internal = kernel.kernel
-    # TODO Fragile? Unit test?
-    # NOTE immutable does not modify the parameter only locally
+    # immutable does not modify the parameter only locally
     # TODO Should I use unbiased estimate compared to nguyenEfficientSequentialMonteCarlo2016 
-    @reset internal.proposal = adaptive_mvnormal(kernel.rng, internal.proposal, old_state; corrected=false)
+    @reset internal.proposal = adaptive_mvnormal(kernel.rng, internal.proposal, old_state; corrected=true)
     propose(internal, old_state, n_particles)
 end
 
@@ -173,7 +171,6 @@ forward(kernel::AdaptiveKernel, new_sample, old_sample) = forward(kernel.kernel,
 
 incremental_weights(kernel::AdaptiveKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = incremental_weights(kernel.kernel, new_sample, new_likelihood, new_temp, old_state)
 
-# TEST
 """
     adaptive_mvnormal(proposal::Proposal, state::SmcState; [corrected=true])
 Replaces the model of the proposal with multivariate normal distributions.
@@ -185,11 +182,13 @@ function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::S
     vars = variables(state.sample)[names]
     # analytic / reliability weights describe an importance of each observation
     weights = state.log_weights .|> exp |> AnalyticWeights
-    # TODO assumes that the variables are grouped in vectors, e.g. [x,y,z] components of Translation.
-    # Otherwise we would have to assemble one large covariance matrix for the different variables and somehow tell the proposal how to divide it back into variables.
+    # TODO assumes that the variables are grouped in vectors, e.g. [x,y,z] components of Translation. Otherwise we would have to assemble one large covariance matrix for the different variables and somehow tell the proposal how to divide it back into variables. Fallback could be to evaluate variance instead?
     Σ_vars = map(vars) do x
+        # eltype required since weights would change it to Float64
         if x isa AbstractMatrix
             cov(Array(x), weights, 2; corrected=corrected) .|> quat_eltype(x)
+        elseif x isa AbstractVector
+            var(Array(x), weights; corrected=corrected) |> eltype(x)
         else
             # not positive definite
             0
@@ -202,7 +201,11 @@ function adaptive_mvnormal(rng::AbstractRNG, proposal::Proposal{names}, state::S
         # Σ might be close to zero → Cholesky factorization fails
         Σ = Σ_vars[name]
         if isposdef(Σ)
-            SimpleNode(name, rng, MvNormal, Σ_vars[name])
+            if Σ isa AbstractMatrix
+                SimpleNode(name, rng, MvNormal, Σ)
+            else
+                SimpleNode(name, rng, KernelNormal, 0, Σ)
+            end
         else
             # Fall back to original proposal distribution
             proposal.model[name]

@@ -77,3 +77,31 @@ kernels = (ForwardProposalKernel(proposal), BootstrapKernel(proposal), MhKernel(
   @test state.sample == sample
   @test state.temperature > 0
 end;
+
+n_steps = 42
+n_particles = 6
+smc = SequentialMonteCarlo(kernel, LinearSchedule(n_steps), n_particles, log(0.5 * n_particles))
+
+@testset "adaptive_mvnormal" begin
+  _, state = @inferred AbstractMCMC.step(rng, posterior_model, smc)
+
+  # Univariate - KernelNormal
+  # TODO Do I want to try to make it type stable?
+  proposal = symmetric_proposal(BroadcastedNode(:a, rng, KernelNormal, Float32), posterior_model)
+  res = MCMCDepth.adaptive_mvnormal(rng, proposal, state)
+  @test res.model != proposal.model
+  @test res.model.a.model isa KernelNormal
+
+  # Multivariate - MvNormal
+  proposal = symmetric_proposal(BroadcastedNode(:b, rng, KernelNormal, [0.0f0, 0.0f0], [1.0f0, 1.0f0]), posterior_model)
+  res = MCMCDepth.adaptive_mvnormal(rng, proposal, state)
+  @test res.model != proposal.model
+  @test res.model.b.model isa MvNormal
+
+  # Both variables
+  proposal = symmetric_proposal((; a=BroadcastedNode(:a, rng, KernelNormal, Float32), b=BroadcastedNode(:b, rng, KernelNormal, [0.0f0, 0.0f0], [1.0f0, 1.0f0])), posterior_model)
+  res = MCMCDepth.adaptive_mvnormal(rng, proposal, state)
+  @test res.model != proposal.model
+  @test res.model.a.model isa KernelNormal
+  @test res.model.b.model isa MvNormal
+end
