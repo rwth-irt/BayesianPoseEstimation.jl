@@ -10,14 +10,12 @@ Implement common proposal models with the convention of always proposing in the 
 """
     evaluation_nodes(proposal, posterior)
 Extract a SequentializedGraph of the nodes that need to be re-evaluated after proposing the new sample.
-It contains all parents of the `proposal` nodes in the prior of the `posterior` node.
+It contains all parents of the `proposal` nodes.
+If the posterior is a PosteriorModel only the nodes of the prior are considered.
 """
-function evaluation_nodes(proposal::SequentializedGraph, posterior::AbstractNode{name}) where {name}
-    p = parents(posterior, values(proposal)...)
-    Base.structdiff(p, (; name => ()))
-end
-evaluation_nodes(proposal_model::SequentializedGraph, posterior_model::PosteriorModel) = evaluation_nodes(sequentialize(proposal_model), posterior_model.node)
-evaluation_nodes(proposal_model::AbstractNode, posterior_model) = evaluation_nodes(sequentialize(proposal_model), posterior_model)
+evaluation_nodes(proposal::SequentializedGraph, posterior) = parents(posterior, values(proposal)...)
+evaluation_nodes(proposal::SequentializedGraph, posterior::PosteriorModel) = parents(posterior.prior, proposal...)
+evaluation_nodes(node::AbstractNode, posterior) = evaluation_nodes(sequentialize(node), posterior)
 
 struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B<:NamedTuple{names},C<:NamedTuple}
     propose_fn::F
@@ -29,7 +27,6 @@ struct Proposal{names,F,G,M<:SequentializedGraph{names},E<:SequentializedGraph,B
 end
 
 Base.show(io::IO, q::Proposal{names}) where {names} = print(io, "Proposal(names: $(names), $(q.propose_fn) & $(q.transition_probability_fn))")
-
 
 Proposal(proposal_model, posterior_model, propose_fn, transition_probability_fn) = Proposal(propose_fn, transition_probability_fn, sequentialize(proposal_model), evaluation_nodes(proposal_model, posterior_model), map_materialize(bijector(proposal_model)), map_materialize(bijector(posterior_model)))
 

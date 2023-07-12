@@ -2,33 +2,34 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# TODO move to BayesNet or is the bijectors stuff not agnostic enough?
+
 """
-    PosteriorModel(bijectors, data, prior, likelihood, node)
+    PosteriorModel(bijectors, prior, likelihood)
 Consists of the `prior` and `likelihood` model.
 On construction, the bijectors of the prior are eagerly evaluated, so samples can frequently be generated in the unconstrained domain and evaluated in the model domain - logjac correction included.
 AbstractMCMC expects a model to be conditioned on the data, so it is included here.
-The `node` is the root node of the Bayesian network.
 """
-struct PosteriorModel{B<:NamedTuple,D<:NamedTuple,N<:AbstractNode,P<:SequentializedGraph,L<:SequentializedGraph} <: AbstractMCMC.AbstractModel
+struct PosteriorModel{B<:NamedTuple,P<:SequentializedGraph,L<:SequentializedGraph} <: AbstractMCMC.AbstractModel
     bijectors::B
-    data::D
     prior::P
     likelihood::L
-    node::N
 end
 
-function PosteriorModel(node::AbstractNode, data::NamedTuple{data_names}) where {data_names}
-    sequentialized = sequentialize(node)
+function PosteriorModel(graph::SequentializedGraph)
+    obs_names = findall(x -> isa(x, ObservationNode), graph)
+    obs_nodes = isempty(obs_names) ? (;) : graph[obs_names]
     # Only sample variables which are not conditioned on data
-    prior_model = Base.structdiff(sequentialized, data)
+    prior_nodes = Base.structdiff(graph, obs_nodes)
     # Eagerly evaluate any lazily broadcasted bijectors
-    bijectors = prior_model |> bijector |> map_materialize
-    # Data conditioned nodes form the likelihood and are not transformed for sampling
-    likelihood_model = sequentialized[data_names]
-    PosteriorModel(bijectors, data, prior_model, likelihood_model, node)
+    bijectors = prior_nodes |> bijector |> map_materialize
+    PosteriorModel(bijectors, prior_nodes, obs_nodes)
 end
 
-Base.show(io::IO, posterior::PosteriorModel) = print(io, "PosteriorModel(root node :$(nodename(posterior.node)), prior for $(keys(posterior.prior)), likelihood for $(keys(posterior.likelihood)) & bijectors for $(keys(posterior.bijectors)))")
+# TODO replace with BayesNet::ObserationNode?
+PosteriorModel(root_node::AbstractNode) = PosteriorModel(sequentialize(root_node))
+
+Base.show(io::IO, posterior::PosteriorModel) = print(io, "PosteriorModel(prior for $(keys(posterior.prior)), likelihood for $(keys(posterior.likelihood)) & bijectors for $(keys(posterior.bijectors)))")
 
 Bijectors.bijector(posterior::PosteriorModel) = posterior.bijectors
 
@@ -59,7 +60,6 @@ function prior_and_likelihood(posterior::PosteriorModel, sample)
     model_sample, logjac = to_model_domain(sample, posterior.bijectors)
     ℓ_prior = logdensityof(posterior.prior, variables(model_sample))
     ℓ_prior_logjac = add_logdensity(ℓ_prior, logjac)
-    conditioned_sample = merge(model_sample, posterior.data)
-    ℓ_likelihood = logdensityof(posterior.likelihood, variables(conditioned_sample))
+    ℓ_likelihood = logdensityof(posterior.likelihood, variables(model_sample))
     ℓ_prior_logjac, ℓ_likelihood
 end

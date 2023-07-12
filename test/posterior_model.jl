@@ -60,7 +60,6 @@ o = BroadcastedNode(:o, rng, KernelUniform, fill(0.0f0, params.width, params.hei
     @test ℓ isa Array{Float32}
     @test size(ℓ) == (5,)
 
-
     # PosteriorModel
     μ_fn = render_fn | (gl_context, scene)
     μ = DeterministicNode(:μ, μ_fn, (t, r))
@@ -68,7 +67,8 @@ o = BroadcastedNode(:o, rng, KernelUniform, fill(0.0f0, params.width, params.hei
     z = BroadcastedNode(:z, rng, pixel, (μ, o))
     z_norm = ModifierNode(z, rng, ImageLikelihoodNormalizer | params.normalization_constant)
     depth_img = rand(z_norm).z
-    posterior = PosteriorModel(z_norm, (; z=depth_img))
+    z_obs = z_norm | depth_img
+    posterior = PosteriorModel(z_obs)
 
     sample = @inferred rand(posterior, 5)
     ℓ = @inferred logdensityof(posterior, sample)

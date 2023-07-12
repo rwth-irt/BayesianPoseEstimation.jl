@@ -28,7 +28,7 @@ function simple_posterior(params, experiment, μ_node, dev_rng)
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
-    PosteriorModel(z_norm, (; z=experiment.depth_image))
+    PosteriorModel(z_norm | experiment.depth_image)
 end
 
 """
@@ -45,7 +45,7 @@ function association_posterior(params, experiment, μ_node, dev_rng)
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
-    PosteriorModel(z_norm, (; z=experiment.depth_image))
+    PosteriorModel(z_norm | experiment.depth_image)
 end
 
 """
@@ -63,6 +63,6 @@ function smooth_posterior(params, experiment, μ_node, dev_rng)
     pixel_model = smooth_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, pixel_model, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
-    PosteriorModel(z_norm, (; z=experiment.depth_image))
+    PosteriorModel(z_norm | experiment.depth_image)
 end
 

@@ -27,7 +27,7 @@ end
 # Probabilistic model: domain [0,∞) for bijector test
 target = KernelExponential(3.0f0)
 model = SimpleNode(:z, rng, KernelExponential, 3.0f0)
-posterior = PosteriorModel(model, (;))
+posterior = PosteriorModel(model)
 
 # Requires adjustment of prior
 sym_proposal = symmetric_proposal(SimpleNode(:z, rng, KernelNormal, 0, 0.1), model)
