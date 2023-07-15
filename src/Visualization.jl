@@ -200,10 +200,10 @@ end
 plot_pose_density(state::SmcState; kwargs...) = plot_pose_density(state.sample; weights=exp.(state.log_weights), kwargs...)
 
 function plot_pose_chain(model_chain, len=50)
-    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Position / m", legend=false)
+    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(length(model_chain) ÷ len)]", ylabel="Position / m", legend=false)
     plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position / m", ylabel="Density", legend=false, left_margin=5mm)
 
-    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(len)]", ylabel="Orientation / rad", legend=false, top_margin=5mm)
+    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(length(model_chain) ÷ len)]", ylabel="Orientation / rad", legend=false, top_margin=5mm)
     plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientation / rad", ylabel="Density", legend=false)
 
     plot(
@@ -282,14 +282,21 @@ function plot_variable(chain, var_name, len=100; kwargs...)
     scatter(transpose(M); palette=distinguishable_rwth(first(size(M))), kwargs...)
 end
 
-plot_logprob(logprobs::AbstractVector{<:Number}; kwargs...) = scatter(logprobs; palette=distinguishable_rwth(first(size(logprobs))), label="logprob", kwargs...)
+plot_logprob(logprobs::AbstractVector{<:Number}; kwargs...) = scatter(logprobs; palette=distinguishable_rwth(first(size(logprobs))), label="log probability", kwargs...)
 
 """
     plot_logprob(chains, [len=100]; kwargs...)
 Plot of the logdensity over the samples.
 """
-plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprob.(chain), len))
-plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprob(final_sample), len))
+plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprob.(chain)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprob(final_sample)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+
+"""
+    plot_logevidence(states, [len=100]; kwargs...)
+Plot of the logdensity of the SMC states.
+"""
+plot_logevidence(chain::AbstractVector{<:SmcState}, len=100; kwargs...) = plot_logprob(step_data(logevidence.(chain), len); label="log evidence", xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+
 
 """
     discrete_palette(cscheme, [len=3])
