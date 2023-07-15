@@ -150,6 +150,7 @@ export mean_image
 export plot_best_pose
 export plot_depth_img
 export plot_depth_ontop, plot_scene_ontop
+export plot_logevidence
 export plot_logprob
 export plot_pose_chain
 export plot_pose_density

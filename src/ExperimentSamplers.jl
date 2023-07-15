@@ -176,13 +176,20 @@ end
 
 # TODO loop until time budget is up? Not a good idea, might be disturbed by updates etc. Before each experiment run a short benchmark and calculate steps/sec and use this to calculate n_steps for the experiment
 """
-    smc_inference(cpu_rng, posterior, sampler, params)
-Run the inference iterations and return the final `(sample, state)`.
+    smc_inference(cpu_rng, posterior, sampler, params; [collect_vars=(:t, :r)])
+Run the inference iterations and return `(states, final_state)`.
+Use `collect_vars` to specify which variables to collect in `states`, e.g. to avoid out of GPU memory errors.
 """
-function smc_inference(cpu_rng, posterior, sampler, params::Parameters)
-    sample, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
-    @progress for _ in 1:params.n_steps
-        sample, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
+function smc_inference(cpu_rng, posterior, sampler, params::Parameters; collect_vars=(:t, :r))
+    states = Vector{SmcState}(undef, params.n_steps)
+    _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
+    states[1] = collect_variables(state, collect_vars)
+    @progress for idx in 2:params.n_steps
+        _, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
+        collect_state = @set state.sample.variables = state.sample.variables[collect_vars]
+        states[idx] = collect_variables(state, collect_vars)
     end
-    sample, state
+    states, state
 end
+
+collect_variables(state::SmcState, var_names) = @set state.sample.variables = state.sample.variables[var_names]

@@ -26,6 +26,8 @@ struct SmcState{S<:Sample,W<:AbstractVector,L<:AbstractVector}
     temperature::Float64
 end
 
+logevidence(state::SmcState) = state.log_evidence
+
 function tempered_logdensity(log_prior, log_likelihood, temp=1)
     if temp == 0
         return log_prior

@@ -93,6 +93,7 @@ posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters()
+@reset parameters.n_steps = 100
 sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
@@ -100,16 +101,16 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # NOTE Benchmark results for smc_mh association & simple ≈ 4.28sec, smooth ≈ 4.74sec
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
-final_sample, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
-
-println("Final log-evidence: $(final_state.log_evidence)")
+states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
+# TODO evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
+plot_logevidence(states)
 # Plot state which uses the weights
-plot_pose_density(final_state; trim=false, legend=true)
+plot_pose_density(final_state.sample; trim=false, legend=true)
 # plot_prob_img(mean_image(final_sample, :o))
-plot_best_pose(final_sample, experiment, color_img)
+plot_best_pose(final_state.sample, experiment, color_img)
 
 anim = @animate for i ∈ 0:2:360
-    scatter_position(final_sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+    scatter_position(final_state.sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
 gif(anim, "anim_fps15.gif", fps=20)
 
