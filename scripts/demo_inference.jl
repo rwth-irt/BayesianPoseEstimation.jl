@@ -93,7 +93,6 @@ posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters()
-@reset parameters.n_steps = 100
 sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
@@ -109,10 +108,16 @@ plot_pose_density(final_state.sample; trim=false, legend=true)
 # plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_state.sample, experiment, color_img)
 
+anim = @animate for idx in 1:length(states)
+    plot_best_pose(states[idx].sample, experiment, color_img)
+    plot!(title="Iteration $(idx)")
+end;
+gif(anim, "anim.gif", fps=20)
+
 anim = @animate for i ∈ 0:2:360
     scatter_position(final_state.sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
-gif(anim, "anim_fps15.gif", fps=20)
+gif(anim, "anim.gif", fps=20)
 
 
 # MCMC samplers
@@ -128,7 +133,15 @@ chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=
 plot_pose_chain(chain, 50)
 # plot_logprob(chain, 50)
 # plot_prob_img(mean_image(chain, :o))
-plot_best_pose(chain, experiment, color_img)
+plot_best_pose(last(chain), experiment, color_img)
+
+step_size = length(chain) ÷ 100
+anim = @animate for idx in 1:step_size:length(chain)
+    plot_best_pose(chain[idx], experiment, color_img)
+    plot!(title="Iteration $(idx)")
+end;
+gif(anim, "anim.gif", fps=15)
+
 
 # Visualize the maximum posterior
 # TODO also track likelihood - plot maximum likelihood pose

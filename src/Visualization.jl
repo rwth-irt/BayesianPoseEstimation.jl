@@ -113,14 +113,14 @@ function plot_scene_ontop(gl_context, scene, img; kwargs...)
 end
 
 """
-    plot_best_pose(chain, experiment, img; kwargs...)
+    plot_best_pose(chain, experiment, img; [getter=loglike, kwargs...])
 Plot the best pose of a chain/sample as depth image on top of another image.
+Use the `getter` parameter to specify whether `loglike` or `logprob` should be used.
 
 See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref).
 """
-function plot_best_pose(sample::Sample, experiment, img; kwargs...)
-    # TODO use loglikelihood?
-    _, ind = findmax(sample.logp)
+function plot_best_pose(sample::Sample, experiment, img, getter=loglike; kwargs...)
+    _, ind = findmax(getter(sample))
     scene = experiment.scene
     mesh = first(scene.meshes)
     @reset mesh.pose = to_pose(variables(sample).t[:, ind], variables(sample).r[ind])
@@ -128,8 +128,8 @@ function plot_best_pose(sample::Sample, experiment, img; kwargs...)
     plot_scene_ontop(experiment.gl_context, scene, img)
 end
 
-function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img; kwargs...)
-    _, ind = findmax((s) -> s.logp, chain)
+function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img, getter=loglike; kwargs...)
+    _, ind = findmax((s) -> getter(s), chain)
     scene = experiment.scene
     mesh = first(scene.meshes)
     @reset mesh.pose = to_pose(chain[ind].variables.t, chain[ind].variables.r)
