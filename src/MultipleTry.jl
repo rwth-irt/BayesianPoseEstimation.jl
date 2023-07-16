@@ -21,6 +21,7 @@ If the proposal is independent from the previous sample, no auxiliary weights ar
 const IndependentMultipleTry = MultipleTry{<:Proposal{<:Any,typeof(propose_independent)}}
 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry)
+    # TODO tempering
     # rand on PosteriorModel samples from prior in unconstrained domain
     sample = rand(model)
     # initial evaluation of the posterior logdensity
@@ -53,7 +54,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     aux_transition = transition_probability(sampler.proposal, aux, selected)
     aux_weights = aux_model .- aux_transition
     # Sample from previous step is the N th auxiliary variables
-    state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)
+    state_weight = logprobability(state) - transition_probability(sampler.proposal, state, selected)
     append!(aux_weights, state_weight)
 
     # acceptance ratio - sum in nominator and denominator
@@ -90,7 +91,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Ind
     selected = Sample(selected_vars, pro_model[selected_index], pro_like[selected_index])
 
     # From previous step, IndependentProposal so prev_sample can be anything
-    state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)
+    state_weight = logprobability(state) - transition_probability(sampler.proposal, state, selected)
     proposed_weights[selected_index] = state_weight
     α_denominator = logsumexp(proposed_weights)
 

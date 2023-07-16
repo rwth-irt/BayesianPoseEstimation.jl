@@ -21,21 +21,21 @@ By default -Inf is assigned as log probability.
 """
 Sample(variables::NamedTuple) = Sample(variables, -Inf, -Inf)
 
-Base.show(io::IO, s::Sample) = print(io, "Sample\n  log probability: $(logprob(s))\n log likelihood: $(loglike(s))\n Variable names: $(names(s)) \n  Variable types: $(types(s))")
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  log probability: $(logprobability(s))\n log likelihood: $(loglikelihood(s))\n Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
-    set_logprob(sample, log_prob)
+    set_logprobability(sample, log_prob)
 Immutable update the log probability of the sample.
 The original is untouched and a new sample returned. 
 """
-set_logprob(sample::Sample, log_prob) = @set sample.log_prob = log_prob
+set_logprobability(sample::Sample, log_prob) = @set sample.log_prob = log_prob
 
 """
-    set_loglike(sample, log_like)
+    set_loglikelihood(sample, log_like)
 Immutable update the log likelihood of the sample.
 The original is untouched and a new sample returned. 
 """
-set_loglike(sample::Sample, log_like) = @set sample.log_like = log_like
+set_loglikelihood(sample::Sample, log_like) = @set sample.log_like = log_like
 
 """
     names(sample)
@@ -75,20 +75,20 @@ Transform the sample to ℝⁿ by transforming the affected variables of the sam
 """
 function to_unconstrained_domain(sample::Sample, bijectors::NamedTuple)
     tr_variables = merge(variables(sample), map_intersect((b, v) -> b(v), bijectors, variables(sample)))
-    Sample(tr_variables, logprob(sample), loglike(sample))
+    Sample(tr_variables, logprobability(sample), loglikelihood(sample))
 end
 
 """
-    logprob(sample)
-(Logjac corrected) posterior log probability of the sample.
+    logprobability(sample)
+(Logjac corrected posterior) log probability of the sample.
 """
-logprob(sample::Sample) = sample.log_prob
+logprobability(sample::Sample) = sample.log_prob
 
 """
-    loglike(sample)
+    loglikelihood(sample)
 (Logjac corrected) posterior log likelihood of the sample.
 """
-loglike(sample::Sample) = sample.log_like
+loglikelihood(sample::Sample) = sample.log_like
 
 """
     getindex(sample, idx)

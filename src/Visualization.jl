@@ -119,7 +119,7 @@ Use the `getter` parameter to specify whether `loglike` or `logprob` should be u
 
 See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref).
 """
-function plot_best_pose(sample::Sample, experiment, img, getter=loglike; kwargs...)
+function plot_best_pose(sample::Sample, experiment, img, getter=loglikelihood; kwargs...)
     _, ind = findmax(getter(sample))
     scene = experiment.scene
     mesh = first(scene.meshes)
@@ -128,7 +128,7 @@ function plot_best_pose(sample::Sample, experiment, img, getter=loglike; kwargs.
     plot_scene_ontop(experiment.gl_context, scene, img)
 end
 
-function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img, getter=loglike; kwargs...)
+function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img, getter=loglikelihood; kwargs...)
     _, ind = findmax((s) -> getter(s), chain)
     scene = experiment.scene
     mesh = first(scene.meshes)
@@ -288,8 +288,8 @@ plot_logprob(logprobs::AbstractVector{<:Number}; kwargs...) = scatter(logprobs; 
     plot_logprob(chains, [len=100]; kwargs...)
 Plot of the logdensity over the samples.
 """
-plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprob.(chain)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
-plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprob(final_sample)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprobability.(chain)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprobability(final_sample)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
 
 """
     plot_logevidence(states, [len=100]; kwargs...)

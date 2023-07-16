@@ -57,8 +57,8 @@ end
 Vectorized Metropolis-Hastings acceptance ratio via broadcasting.
 """
 acceptance_ratio(proposal::Proposal, proposed::Sample, previous::Sample) = (
-    logprob(proposed) .-
-    logprob(previous) .+
+    logprobability(proposed) .-
+    logprobability(previous) .+
     transition_probability(proposal, previous, proposed) .-
     transition_probability(proposal, proposed, previous)
 )
@@ -82,8 +82,8 @@ function reject_barrier(rejected::AbstractArray{Bool}, proposed, previous)
         # WARN copying both to avoid weird illegal access errors if previous<:SubArray{<:Any,<:Any,<:CuArray}
         reject_vectorized!(rejected, copy(prop), copy(prev))
     end
-    log_prob = reject_vectorized!(rejected, copy(logprob(proposed)), logprob(previous))
-    log_like = reject_vectorized!(rejected, copy(loglike(proposed)), loglike(previous))
+    log_prob = reject_vectorized!(rejected, copy(logprobability(proposed)), logprobability(previous))
+    log_like = reject_vectorized!(rejected, copy(loglikelihood(proposed)), loglikelihood(previous))
     # No mutation in scalar case...
     Sample(vars, log_prob, log_like)
 end

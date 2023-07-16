@@ -38,7 +38,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     # ϕ₀=0 → importance distribution = target density → wᵢ=1, normalized:
     normalized_log_weights = fill(-log(sampler.n_particles), sampler.n_particles)
     # IS normalizing constant: 1/n * ∑ₙ wᵢ = n_particles / n_particles = 1 → log(1) = 0
-    state = SmcState(s, normalized_log_weights, loglike(s), 0.0, 0.0)
+    state = SmcState(s, normalized_log_weights, loglikelihood(s), 0.0, 0.0)
 
     state.sample, state
 end
@@ -57,12 +57,12 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     new_sample = forward(sampler.kernel, proposed_sample, old_state.sample)
 
     # Update weights using backward kernel
-    incr_weights = incremental_weights(sampler.kernel, new_sample, loglike(new_sample), new_temp, old_state)
+    incr_weights = incremental_weights(sampler.kernel, new_sample, loglikelihood(new_sample), new_temp, old_state)
     new_weights = add_logdensity(old_state.log_weights, incr_weights)
     # Unnormalized new weights from (12) are the elements of (14) in the SMC paper
     new_evidence = old_state.log_evidence + logsumexp(new_weights)
     normalized_weights = normalize_log_weights(new_weights)
-    new_state = SmcState(new_sample, normalized_weights, loglike(new_sample), new_evidence, new_temp)
+    new_state = SmcState(new_sample, normalized_weights, loglikelihood(new_sample), new_evidence, new_temp)
 
     resampled = maybe_resample(rng, new_state, sampler.log_resample_threshold)
     resampled.sample, resampled
@@ -96,7 +96,7 @@ The weights are updated similarly to a Metropolis-Hastings acceptance ratio.
 function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState)
     forward = transition_probability(kernel.proposal, new_sample, old_state.sample)
     backward = transition_probability(kernel.proposal, old_state.sample, new_sample)
-    logprob(new_sample) .+ backward .- logprob(old_state.sample) .- forward
+    logprobability(new_sample) .+ backward .- logprobability(old_state.sample) .- forward
 end
 
 struct MhKernel{R,Q}
@@ -223,8 +223,8 @@ function resample_systematic(rng::AbstractRNG, state::SmcState)
     # Resample variables
     indices = systematic_resampling_indices(rng, state.log_weights)
     vars = map(x -> @view(x[.., indices]), variables(state.sample))
-    log_probs = logprob(state.sample)[indices]
-    log_likes = loglike(state.sample)[indices]
+    log_probs = logprobability(state.sample)[indices]
+    log_likes = loglikelihood(state.sample)[indices]
     re_sample = Sample(vars, log_probs, log_likes)
     # Reset weights
     log_weights = fill(-log(length(log_probs)), length(log_probs))

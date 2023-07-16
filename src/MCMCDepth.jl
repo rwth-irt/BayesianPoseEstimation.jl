@@ -64,8 +64,8 @@ export to_rotation, to_translation, to_pose
 
 # Samples
 export Sample
-export loglike
-export logprob
+export loglikelihood
+export logprobability
 export merge
 export names
 export to_model_domain
