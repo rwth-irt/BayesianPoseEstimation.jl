@@ -2,14 +2,16 @@
 # Copyright (c) 2021, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# TODO should I enforce log_prob and log_like to be stored on CPU RAM? Avoids some scalar indexing and GPU out-of-memory errors. Might hinder massively parallelized calculations.
 """
-    Sample{T,V}(variables, logp)
-Consists of the state `variables` and the corrected posterior probability `logp=logpₓ(t(θ)|z)+logpₓ(θ)+logjacdet(t(θ))`.
+    Sample{T,V}(variables, logp, logℓ)
+Consists of the state `variables θ`, the log likelihood `log_like(t(θ)|z)+`, and the corrected log posterior probability `log_prob=log_liket(θ)|z)+logp(θ)+logjacdet(t(θ))`.
 Samples are typed by `T,V` as the internal named tuple for the variable names types.
 """
-struct Sample{T<:NamedTuple,L}
+struct Sample{T<:NamedTuple,L<:Union{Real,Array},P<:Union{Real,Array}}
     variables::T
-    logp::L
+    log_prob::L
+    log_like::P
 end
 
 """
@@ -17,16 +19,23 @@ end
 Generate a new sample from a named tuple of variables.
 By default -Inf is assigned as log probability.
 """
-Sample(variables::NamedTuple) = Sample(variables, -Inf)
+Sample(variables::NamedTuple) = Sample(variables, -Inf, -Inf)
 
-Base.show(io::IO, s::Sample) = print(io, "Sample\n  Log probability: $(logprob(s))\n  Variable names: $(names(s)) \n  Variable types: $(types(s))")
+Base.show(io::IO, s::Sample) = print(io, "Sample\n  log probability: $(logprob(s))\n log likelihood: $(loglike(s))\n Variable names: $(names(s)) \n  Variable types: $(types(s))")
 
 """
-    set_logp(sample, logp)
+    set_logprob(sample, log_prob)
 Immutable update the log probability of the sample.
 The original is untouched and a new sample returned. 
 """
-set_logp(sample::Sample, logp) = @set sample.logp = logp
+set_logprob(sample::Sample, log_prob) = @set sample.log_prob = log_prob
+
+"""
+    set_loglike(sample, log_like)
+Immutable update the log likelihood of the sample.
+The original is untouched and a new sample returned. 
+"""
+set_loglike(sample::Sample, log_like) = @set sample.log_like = log_like
 
 """
     names(sample)
@@ -62,24 +71,30 @@ end
 
 """
     to_unconstrained_domain(sample, bijector)
-Transform the sample to ℝⁿ by transforming the (some) variables of the sample using the bijectors.
+Transform the sample to ℝⁿ by transforming the affected variables of the sample using the bijectors.
 """
 function to_unconstrained_domain(sample::Sample, bijectors::NamedTuple)
     tr_variables = merge(variables(sample), map_intersect((b, v) -> b(v), bijectors, variables(sample)))
-    Sample(tr_variables, logprob(sample))
+    Sample(tr_variables, logprob(sample), loglike(sample))
 end
 
 """
     logprob(sample)
 (Logjac corrected) posterior log probability of the sample.
 """
-logprob(sample::Sample) = sample.logp
+logprob(sample::Sample) = sample.log_prob
+
+"""
+    loglike(sample)
+(Logjac corrected) posterior log likelihood of the sample.
+"""
+loglike(sample::Sample) = sample.log_like
 
 """
     getindex(sample, idx)
 Returns a sample with only a subset of the variables.
 """
-Base.getindex(sample::Sample, ::Val{T}) where {T} = Sample(sample.variables[T], -Inf)
+Base.getindex(sample::Sample, ::Val{T}) where {T} = Sample(sample.variables[T], -Inf, -Inf)
 
 """
     merge(a, b)

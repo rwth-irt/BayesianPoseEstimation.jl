@@ -28,29 +28,17 @@ end
 
 logevidence(state::SmcState) = state.log_evidence
 
-function tempered_logdensity(log_prior, log_likelihood, temp=1)
-    if temp == 0
-        return log_prior
-    end
-    if temp == 1
-        return add_logdensity(log_prior, log_likelihood)
-    end
-    add_logdensity(log_prior, temp .* log_likelihood)
-end
-
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
     # NOTE This is an IS step
     # rand on PosteriorModel samples from prior in unconstrained domain
     s = rand(model, sampler.n_particles)
     # tempering starts with ϕ₀=0
-    log_prior, log_likelihood = prior_and_likelihood(model, s)
-    log_full = tempered_logdensity(log_prior, log_likelihood, 0)
-    s = set_logp(s, log_full)
+    s = tempered_logdensity_sample(model, s, 0)
 
     # ϕ₀=0 → importance distribution = target density → wᵢ=1, normalized:
     normalized_log_weights = fill(-log(sampler.n_particles), sampler.n_particles)
     # IS normalizing constant: 1/n * ∑ₙ wᵢ = n_particles / n_particles = 1 → log(1) = 0
-    state = SmcState(s, normalized_log_weights, log_likelihood, 0.0, 0.0)
+    state = SmcState(s, normalized_log_weights, loglike(s), 0.0, 0.0)
 
     state.sample, state
 end
@@ -65,18 +53,16 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
 
     # Draw new particles using the forward kernel
     proposed_sample = propose(sampler.kernel, old_state, sampler.n_particles)
-    log_prior, log_likelihood = prior_and_likelihood(model, proposed_sample)
-    log_full = tempered_logdensity(log_prior, log_likelihood, new_temp)
-    proposed_sample = set_logp(proposed_sample, log_full)
+    proposed_sample = tempered_logdensity_sample(model, proposed_sample, new_temp)
     new_sample = forward(sampler.kernel, proposed_sample, old_state.sample)
 
     # Update weights using backward kernel
-    incr_weights = incremental_weights(sampler.kernel, new_sample, log_likelihood, new_temp, old_state)
+    incr_weights = incremental_weights(sampler.kernel, new_sample, loglike(new_sample), new_temp, old_state)
     new_weights = add_logdensity(old_state.log_weights, incr_weights)
     # Unnormalized new weights from (12) are the elements of (14) in the SMC paper
     new_evidence = old_state.log_evidence + logsumexp(new_weights)
     normalized_weights = normalize_log_weights(new_weights)
-    new_state = SmcState(new_sample, normalized_weights, log_likelihood, new_evidence, new_temp)
+    new_state = SmcState(new_sample, normalized_weights, loglike(new_sample), new_evidence, new_temp)
 
     resampled = maybe_resample(rng, new_state, sampler.log_resample_threshold)
     resampled.sample, resampled
@@ -238,7 +224,8 @@ function resample_systematic(rng::AbstractRNG, state::SmcState)
     indices = systematic_resampling_indices(rng, state.log_weights)
     vars = map(x -> @view(x[.., indices]), variables(state.sample))
     log_probs = logprob(state.sample)[indices]
-    re_sample = Sample(vars, log_probs)
+    log_likes = loglike(state.sample)[indices]
+    re_sample = Sample(vars, log_probs, log_likes)
     # Reset weights
     log_weights = fill(-log(length(log_probs)), length(log_probs))
     SmcState(re_sample, log_weights, state.log_likelihood, state.log_evidence, state.temperature)

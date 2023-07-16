@@ -64,7 +64,7 @@ export to_rotation, to_translation, to_pose
 
 # Samples
 export Sample
-
+export loglike
 export logprob
 export merge
 export names

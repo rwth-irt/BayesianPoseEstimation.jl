@@ -3,9 +3,6 @@
 # All rights reserved. 
 
 # WARN Do not run this if you want Revise to work
-include("../src/MCMCDepth.jl")
-using .MCMCDepth
-
 using KernelDistributions
 using MCMCDepth
 using Random
@@ -18,20 +15,20 @@ rng = Random.default_rng()
     q = BroadcastedNode(:a, rng, KernelNormal, 0.0, 1.0)
     proposal = symmetric_proposal(q, p)
     nt1 = rand(q)
-    s1 = Sample(nt1, logdensityof(p, nt1))
+    s1 = Sample(nt1, logdensityof(p, nt1), logdensityof(p, nt1))
     nt2 = propose(proposal, s1) |> variables
-    s2 = Sample(nt2, logdensityof(p, nt2))
+    s2 = Sample(nt2, logdensityof(p, nt2), logdensityof(p, nt2))
     α = @inferred MCMCDepth.acceptance_ratio(proposal, s2, s1)
 
     # Some fake logdensities to check values
-    s1 = Sample(nt1, 1)
-    s2 = Sample(nt2, 1)
+    s1 = Sample(nt1, 1, 1)
+    s2 = Sample(nt2, 1, 1)
     α = @inferred MCMCDepth.acceptance_ratio(proposal, s2, s1)
     @test α === 0
-    s2 = Sample(nt2, 2)
+    s2 = Sample(nt2, 2, 2)
     α = @inferred MCMCDepth.acceptance_ratio(proposal, s2, s1)
     @test α === 1
-    s2 = Sample(nt2, [1, 2])
+    s2 = Sample(nt2, [1, 2], [1, 2])
     α = @inferred MCMCDepth.acceptance_ratio(proposal, s2, s1)
     @test α == [0, 1]
 end
@@ -53,7 +50,7 @@ end
 
     # Reject, vectorized should select from the arrays
     previous = Sample((; a=fill(1, 2, 3)))
-    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0])
+    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
     rejected = [true, false, false]
     result = @inferred MCMCDepth.reject_barrier(rejected, proposed, previous)
     @test variables(result) == (; a=[1 2 2; 1 2 2])
@@ -61,7 +58,7 @@ end
 
     # Scalar previous
     previous = Sample((; a=1))
-    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0])
+    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
     rejected = [true, false, false]
     result = @inferred MCMCDepth.reject_barrier(rejected, proposed, previous)
     @test variables(result) == (; a=[1 2 2; 1 2 2])
@@ -69,7 +66,7 @@ end
 
     # Smaller previous
     previous = Sample((; a=fill(1, 2)))
-    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0])
+    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
     rejected = [true, false, false]
     result = @inferred MCMCDepth.reject_barrier(rejected, proposed, previous)
     @test variables(result) == (; a=[1 2 2; 1 2 2])
@@ -77,7 +74,7 @@ end
 
     # Larger previous
     previous = Sample((; a=fill(1, 2, 2, 3)))
-    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0])
+    proposed = Sample((; a=fill(2, 2, 3)), [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
     rejected = [true, false, false]
     @test_throws ArgumentError MCMCDepth.reject_barrier(rejected, proposed, previous)
 end

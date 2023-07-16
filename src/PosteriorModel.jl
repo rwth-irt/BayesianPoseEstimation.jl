@@ -61,5 +61,28 @@ function prior_and_likelihood(posterior::PosteriorModel, sample)
     ℓ_prior = logdensityof(posterior.prior, variables(model_sample))
     ℓ_prior_logjac = add_logdensity(ℓ_prior, logjac)
     ℓ_likelihood = logdensityof(posterior.likelihood, variables(model_sample))
-    ℓ_prior_logjac, ℓ_likelihood
+    # Do not broadcast over tuple to avoid invocation of GPU compiler
+    to_cpu(ℓ_prior_logjac), to_cpu(ℓ_likelihood)
+end
+
+function logdensity_sample(posterior::PosteriorModel, sample)
+    ℓ_prior, ℓ_likelihood = prior_and_likelihood(posterior, sample)
+    ℓ_posterior = add_logdensity(ℓ_prior, ℓ_likelihood)
+    Sample(variables(sample), ℓ_posterior, ℓ_likelihood)
+end
+
+function tempered_logdensity_sample(posterior::PosteriorModel, sample, temp)
+    ℓ_prior, ℓ_likelihood = prior_and_likelihood(posterior, sample)
+    ℓ_posterior = tempered_logdensity(ℓ_prior, ℓ_likelihood, temp)
+    Sample(variables(sample), ℓ_posterior, ℓ_likelihood)
+end
+
+function tempered_logdensity(log_prior, log_likelihood, temp=1)
+    if temp == 0
+        return log_prior
+    end
+    if temp == 1
+        return add_logdensity(log_prior, log_likelihood)
+    end
+    add_logdensity(log_prior, temp .* log_likelihood)
 end

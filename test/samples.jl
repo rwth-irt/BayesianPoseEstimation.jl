@@ -9,12 +9,14 @@ using Test
 
 @testset "Sample construction & arithmetics" begin
     nta = (; zip((:a, :b), fill(0.5f0, 2))...)
-    sa = Sample(nta, 0.0)
+    sa = Sample(nta, 0.0, 0.0)
     # Broadcasted addition of multiple variables
     ntb = (; zip((:b, :c), fill([1.0, 1.0], 2))...)
-    sb = Sample(ntb, 0.0)
+    sb = Sample(ntb, 0.0, 0.0)
     @test logprob(sa) == 0
     @test logprob(sb) == 0
+    @test loglike(sa) == 0
+    @test loglike(sb) == 0
 
     sum_ab = @inferred sa ⊕ sb
     @test logprob(sum_ab) == -Inf

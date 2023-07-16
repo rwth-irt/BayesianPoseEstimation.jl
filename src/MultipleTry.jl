@@ -22,11 +22,11 @@ const IndependentMultipleTry = MultipleTry{<:Proposal{<:Any,typeof(propose_indep
 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry)
     # rand on PosteriorModel samples from prior in unconstrained domain
-    s = rand(model)
+    sample = rand(model)
     # initial evaluation of the posterior logdensity
-    s = set_logp(s, logdensityof(model, s))
+    sample = logdensity_sample(model, sample)
     # sample, state are the same for MTM
-    s, s
+    sample, sample
 end
 
 """
@@ -36,6 +36,8 @@ General MTM case without simplifications.
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry, state::Sample)
     # Propose N samples and calculate their importance weights
     pro = propose(sampler.proposal, state, sampler.n_tries)
+    pro_prior, pro_like = prior_and_likelihood(model, pro)
+    pro_model = add_logdensity(pro_prior, pro_like)
     pro_model = logdensityof(model, pro)
     pro_transition = transition_probability(sampler.proposal, pro, state)
     pro_weights = pro_model .- pro_transition
@@ -43,7 +45,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     # Select one sample proportional to its importance weight
     selected_index = gumbel_index(rng, pro_weights)
     selected_variables = select_variables_dim(variables(pro), sampler.proposal, selected_index)
-    selected = Sample(selected_variables, pro_model[selected_index])
+    selected = Sample(selected_variables, pro_model[selected_index], pro_like[selected_index])
 
     # Propose N-1 auxiliary variables samples
     aux = propose(sampler.proposal, selected, sampler.n_tries - 1)
@@ -71,9 +73,12 @@ end
 Simplification for independent proposals: I-MTM
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, state::Sample)
+    # TODO likelihood tempering
+
     # Propose one sample via a kind of importance sampling
     pro = propose(sampler.proposal, state, sampler.n_tries)
-    pro_model = logdensityof(model, pro)
+    pro_prior, pro_like = prior_and_likelihood(model, pro)
+    pro_model = add_logdensity(pro_prior, pro_like)
     pro_transition = transition_probability(sampler.proposal, pro, state)
     proposed_weights = pro_model .- pro_transition
     # First part of acceptance ratio
@@ -82,7 +87,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Ind
     # Replace a sample according to its weight with the previous sample
     selected_index = gumbel_index(rng, proposed_weights)
     selected_vars = select_variables_dim(variables(pro), sampler.proposal, selected_index)
-    selected = Sample(selected_vars, pro_model[selected_index])
+    selected = Sample(selected_vars, pro_model[selected_index], pro_like[selected_index])
 
     # From previous step, IndependentProposal so prev_sample can be anything
     state_weight = logprob(state) - transition_probability(sampler.proposal, state, selected)

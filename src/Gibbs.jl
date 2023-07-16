@@ -53,11 +53,11 @@ Proposes one sample from the prior distribution of the model.
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Gibbs)
     # rand on PosteriorModel samples from prior in unconstrained domain
-    s = rand(model)
+    sample = rand(model)
     # initial evaluation of the posterior logdensity
-    s = set_logp(s, logdensityof(model, s))
+    sample = logdensity_sample(model, s)
     # sample, state are the same for Gibbs
-    s, s
+    sample, sample
 end
 
 """
@@ -68,7 +68,7 @@ AnalyticalGibbs always accepts the sample, since it is always the best possible 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Gibbs, state::Sample)
     proposed = propose(sampler, state)
     # Even though it is always accepted different samplers expect a valid log probability for the previous sample to avoid re-evaluating the logdensity multiple times
-    proposed = set_logp(proposed, logdensityof(model, proposed))
+    proposed = logdensity_sample(model, proposed)
     # sample, state
     proposed, proposed
 end

@@ -118,3 +118,11 @@ Normalize the array A so that its p-norm equals unity, i.e. norm(a, p) == 1.
 Compared to normalize, you can specify the dims to sum over.
 """
 normalize_dims(A::AbstractArray, p=2; dims=(1,)) = normalize_dims!(similar(A), p; dims=dims)
+
+"""
+    to_cpu(x)
+If required, x is converted to an Array.
+"""
+to_cpu(x::AbstractArray) = Array(x)
+to_cpu(x::Array) = x
+to_cpu(x::Real) = x

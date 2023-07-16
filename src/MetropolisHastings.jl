@@ -20,11 +20,11 @@ Proposes one sample from the prior of the sampler.
 """
 function AbstractMCMC.step(::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings)
     # rand on PosteriorModel samples from prior in unconstrained domain
-    s = rand(model)
+    sample = rand(model)
     # initial evaluation of the posterior logdensity
-    s = set_logp(s, logdensityof(model, s))
+    sample = logdensity_sample(model, sample)
     # sample, state are the same for MH
-    s, s
+    sample, sample
 end
 
 """
@@ -33,7 +33,7 @@ Implementing the AbstractMCMC interface for steps given a state from the last st
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
     proposed = propose(sampler.proposal, state)
-    proposed = set_logp(proposed, logdensityof(model, proposed))
+    proposed = logdensity_sample(model, proposed)
     result = mh_kernel(rng, sampler.proposal, proposed, state)
     # sample, state
     result, result
@@ -82,9 +82,10 @@ function reject_barrier(rejected::AbstractArray{Bool}, proposed, previous)
         # WARN copying both to avoid weird illegal access errors if previous<:SubArray{<:Any,<:Any,<:CuArray}
         reject_vectorized!(rejected, copy(prop), copy(prev))
     end
-    ℓ = reject_vectorized!(rejected, copy(logprob(proposed)), logprob(previous))
+    log_prob = reject_vectorized!(rejected, copy(logprob(proposed)), logprob(previous))
+    log_like = reject_vectorized!(rejected, copy(loglike(proposed)), loglike(previous))
     # No mutation in scalar case...
-    Sample(vars, ℓ)
+    Sample(vars, log_prob, log_like)
 end
 # Scalar case
 reject_barrier(rejected::Bool, proposed, previous) = rejected ? previous : proposed
