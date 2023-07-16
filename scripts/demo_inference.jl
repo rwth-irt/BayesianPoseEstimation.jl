@@ -21,7 +21,7 @@ function mtm_parameters()
     @reset parameters.normalization_constant = 20
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
-    @reset parameters.n_steps = 1_000
+    @reset parameters.n_steps = 500
     @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 1
     @reset parameters.n_particles = 50
@@ -125,7 +125,7 @@ gif(anim, "anim.gif", fps=20)
 # sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
 parameters = mtm_parameters()
-sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior)
+sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior);
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);

@@ -13,6 +13,8 @@ Component-wise sampling of the position and orientation via Metropolis-Hastings.
 With a low probability (~1%) the sample is drawn independently from the prior a to avoid local minima.
 """
 function mh_sampler(cpu_rng, params, experiment, posterior)
+    temp_schedule = LinearSchedule(params.n_steps)
+
     t_ind = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
     t_ind_proposal = independent_proposal(t_ind, posterior)
@@ -26,7 +28,7 @@ function mh_sampler(cpu_rng, params, experiment, posterior)
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
     weights = Weights([1.0, 1.0, 0.01, 0.01])
     samplers = map(proposals) do proposal
-        MetropolisHastings(proposal)
+        MetropolisHastings(proposal, temp_schedule)
     end
     ComposedSampler(weights, samplers...)
 end
@@ -37,6 +39,8 @@ Component-wise sampling of the position and orientation via Metropolis-Hastings.
 Local moves only, no sample is drawn independently from the prior.
 """
 function mh_local_sampler(cpu_rng, params, posterior)
+    temp_schedule = LinearSchedule(params.n_steps)
+
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal(t_sym, posterior)
@@ -45,7 +49,7 @@ function mh_local_sampler(cpu_rng, params, posterior)
     proposals = (t_sym_proposal, r_sym_proposal)
     weights = Weights([1.0, 1.0])
     samplers = map(proposals) do proposal
-        MetropolisHastings(proposal)
+        MetropolisHastings(proposal, temp_schedule)
     end
     ComposedSampler(weights, samplers...)
 end
@@ -56,6 +60,8 @@ Component-wise sampling of the position and orientation via Multiple-Try-Metropo
 With a low probability (~1%) the sample is drawn independently from the prior a to avoid local minima.
 """
 function mtm_sampler(cpu_rng, params, experiment, posterior)
+    temp_schedule = LinearSchedule(params.n_steps)
+
     t_ind = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
     t_ind_proposal = independent_proposal(t_ind, posterior)
@@ -67,9 +73,9 @@ function mtm_sampler(cpu_rng, params, experiment, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([1.0, 1.0, 0.01, 0.01])
+    weights = Weights([1.0, 1.0, 0.1, 0.1])
     samplers = map(proposals) do proposal
-        MultipleTry(proposal, params.n_particles)
+        MultipleTry(proposal, params.n_particles, temp_schedule)
     end
     ComposedSampler(weights, samplers...)
 end
@@ -80,6 +86,8 @@ Component-wise sampling of the position and orientation via Multiple-Try-Metropo
 Local moves only, no sample is drawn independently from the prior.
 """
 function mtm_local_sampler(cpu_rng, params, posterior)
+    temp_schedule = LinearSchedule(params.n_steps)
+
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal(t_sym, posterior)
@@ -88,7 +96,7 @@ function mtm_local_sampler(cpu_rng, params, posterior)
     proposals = (t_sym_proposal, r_sym_proposal)
     weights = Weights([1.0, 1.0])
     samplers = map(proposals) do proposal
-        MultipleTry(proposal, params.n_particles)
+        MultipleTry(proposal, params.n_particles, temp_schedule)
     end
     ComposedSampler(weights, samplers...)
 end

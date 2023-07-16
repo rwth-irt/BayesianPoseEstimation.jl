@@ -8,9 +8,10 @@ Multiple Try Metropolis sampler (MTM).
 Proposes multiple samples and selects one according to its importance weight → acceptance rate increases with the number of tries `n_tries`.
 However, the standard implementation requires to propose `2*n_tries` to calculate auxiliary weights for the acceptance ratio.
 """
-struct MultipleTry{Q} <: AbstractMCMC.AbstractSampler
+struct MultipleTry{Q,S} <: AbstractMCMC.AbstractSampler
     proposal::Q
     n_tries::Int64
+    temp_schedule::S
 end
 
 """
@@ -25,36 +26,37 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     # rand on PosteriorModel samples from prior in unconstrained domain
     sample = rand(model)
     # initial evaluation of the posterior logdensity
-    sample = logdensity_sample(model, sample)
+    sample = tempered_logdensity_sample(model, sample, 0.0)
     # sample, state are the same for MTM
-    sample, sample
+    sample, MCMCState(sample, 0.0)
 end
 
 """
     step(rng, model, sampler, state)
 General MTM case without simplifications.
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry, state::Sample)
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry, old_state::MCMCState)
+    # Schedule the likelihood tempering
+    new_temp = increment_temperature(sampler.temp_schedule, old_state.temperature)
     # Propose N samples and calculate their importance weights
-    pro = propose(sampler.proposal, state, sampler.n_tries)
-    pro_prior, pro_like = prior_and_likelihood(model, pro)
-    pro_model = add_logdensity(pro_prior, pro_like)
-    pro_model = logdensityof(model, pro)
-    pro_transition = transition_probability(sampler.proposal, pro, state)
-    pro_weights = pro_model .- pro_transition
+    pro_sample = propose(sampler.proposal, old_state.sample, sampler.n_tries)
+    pro_sample = tempered_logdensity_sample(model, pro_sample, new_temp)
+    pro_transition = transition_probability(sampler.proposal, pro_sample, old_state.sample)
+    # TODO correct?
+    pro_weights = logprobability(pro_sample) .- pro_transition
 
     # Select one sample proportional to its importance weight
     selected_index = gumbel_index(rng, pro_weights)
-    selected_variables = select_variables_dim(variables(pro), sampler.proposal, selected_index)
-    selected = Sample(selected_variables, pro_model[selected_index], pro_like[selected_index])
+    selected_variables = select_variables_dim(variables(pro_sample), sampler.proposal, selected_index)
+    selected = Sample(selected_variables, logprobability(pro_sample)[selected_index], loglikelihood(pro_sample)[selected_index])
 
     # Propose N-1 auxiliary variables samples
-    aux = propose(sampler.proposal, selected, sampler.n_tries - 1)
-    aux_model = logdensityof(model, aux)
-    aux_transition = transition_probability(sampler.proposal, aux, selected)
-    aux_weights = aux_model .- aux_transition
+    aux_sample = propose(sampler.proposal, selected, sampler.n_tries - 1)
+    aux_sample = tempered_logdensity_sample(model, aux_sample, new_temp)
+    aux_transition = transition_probability(sampler.proposal, aux_sample, selected)
+    aux_weights = logprobability(aux_sample) .- aux_transition
     # Sample from previous step is the N th auxiliary variables
-    state_weight = logprobability(state) - transition_probability(sampler.proposal, state, selected)
+    state_weight = logprobability(old_state.sample) - transition_probability(sampler.proposal, old_state.sample, selected)
     append!(aux_weights, state_weight)
 
     # acceptance ratio - sum in nominator and denominator
@@ -62,10 +64,10 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     # MetropolisHastings acceptance
     if log(rand(rng)) > α
         # reject
-        return state, state
+        return old_state.sample, MCMCState(old_state.sample, new_temp)
     else
         # accept (always the case if difference positive since log([0,1])->[-inf,0])
-        return selected, selected
+        return selected, MCMCState(selected, new_temp)
     end
 end
 
@@ -73,25 +75,24 @@ end
     step(rng, model, sampler, state)
 Simplification for independent proposals: I-MTM
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, state::Sample)
-    # TODO likelihood tempering
-
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, old_state::Sample)
+    # Schedule the likelihood tempering
+    new_temp = increment_temperature(sampler.temp_schedule, old_state.temperature)
     # Propose one sample via a kind of importance sampling
-    pro = propose(sampler.proposal, state, sampler.n_tries)
-    pro_prior, pro_like = prior_and_likelihood(model, pro)
-    pro_model = add_logdensity(pro_prior, pro_like)
+    pro_sample = propose(sampler.proposal, state, sampler.n_tries)
+    pro_sample = tempered_logdensity_sample(model, pro_sample, new_temp)
     pro_transition = transition_probability(sampler.proposal, pro, state)
-    proposed_weights = pro_model .- pro_transition
+    proposed_weights = logprobability(pro_sample) .- pro_transition
     # First part of acceptance ratio
     α_nominator = logsumexp(proposed_weights)
 
     # Replace a sample according to its weight with the previous sample
     selected_index = gumbel_index(rng, proposed_weights)
     selected_vars = select_variables_dim(variables(pro), sampler.proposal, selected_index)
-    selected = Sample(selected_vars, pro_model[selected_index], pro_like[selected_index])
+    selected = Sample(selected_vars, logprobability(pro_sample)[selected_index], loglikelihood(pro_sample)[selected_index])
 
     # From previous step, IndependentProposal so prev_sample can be anything
-    state_weight = logprobability(state) - transition_probability(sampler.proposal, state, selected)
+    state_weight = logprobability(old_state.sample) - transition_probability(sampler.proposal, old_state.sample, selected)
     proposed_weights[selected_index] = state_weight
     α_denominator = logsumexp(proposed_weights)
 
@@ -100,10 +101,10 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Ind
     # MetropolisHastings acceptance
     if log(rand(rng)) > α
         # reject
-        return state, state
+        return old_state.sample, MCMCState(old_state.sample, new_temp)
     else
         # accept (always the case if difference positive since log([0,1])->[-inf,0])
-        return selected, selected
+        return selected, MCMCState(selected, new_temp)
     end
 end
 

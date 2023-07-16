@@ -7,11 +7,17 @@
     MetropolisHastings
 Different MetropolisHastings samplers only differ by their proposals.   
 """
-struct MetropolisHastings{Q} <: AbstractMCMC.AbstractSampler
+struct MetropolisHastings{Q,S} <: AbstractMCMC.AbstractSampler
     proposal::Q
+    temp_schedule::S
 end
 
 Base.show(io::IO, ::MetropolisHastings) = print(io, "MetropolisHastings")
+
+struct MCMCState{S<:Sample}
+    sample::S
+    temperature::Float64
+end
 
 """
     step(rng, model, sampler)
@@ -22,21 +28,24 @@ function AbstractMCMC.step(::AbstractRNG, model::PosteriorModel, sampler::Metrop
     # rand on PosteriorModel samples from prior in unconstrained domain
     sample = rand(model)
     # initial evaluation of the posterior logdensity
-    sample = logdensity_sample(model, sample)
+    sample = tempered_logdensity_sample(model, sample, 0.0)
     # sample, state are the same for MH
-    sample, sample
+    sample, MCMCState(sample, 0.0)
 end
 
 """
     step(rng, model, sampler, state)
 Implementing the AbstractMCMC interface for steps given a state from the last step.
 """
-function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, state::Sample)
-    proposed = propose(sampler.proposal, state)
-    proposed = logdensity_sample(model, proposed)
-    result = mh_kernel(rng, sampler.proposal, proposed, state)
+function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MetropolisHastings, old_state::MCMCState)
+    # Schedule the likelihood tempering
+    new_temp = increment_temperature(sampler.temp_schedule, old_state.temperature)
+    # Draw new samples using MH kernel
+    proposed = propose(sampler.proposal, old_state.sample)
+    proposed = tempered_logdensity_sample(model, proposed, new_temp)
+    result = mh_kernel(rng, sampler.proposal, proposed, old_state.sample)
     # sample, state
-    result, result
+    result, MCMCState(result, new_temp)
 end
 
 """

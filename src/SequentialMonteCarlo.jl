@@ -8,7 +8,7 @@ Sequential Monte Carlo with systematic resampling and likelihood tempering via p
 """
 struct SequentialMonteCarlo{K,S} <: AbstractMCMC.AbstractSampler
     kernel::K
-    temp_scheduler::S
+    temp_schedule::S
     n_particles::Int64
     # TODO Why not use a constructor and the relative_ess ?
     log_resample_threshold::Float64
@@ -32,7 +32,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     # rand on PosteriorModel samples from prior in unconstrained domain
     sample = rand(model, sampler.n_particles)
     # tempering starts with ϕ₀=0
-    sample = tempered_logdensity_sample(model, sample, 0)
+    sample = tempered_logdensity_sample(model, sample, 0.0)
 
     # ϕ₀=0 → importance distribution = target density → wᵢ=1, normalized:
     normalized_log_weights = fill(-log(sampler.n_particles), sampler.n_particles)
@@ -48,7 +48,7 @@ Generic SMC sampler according to 3.1.1. (Sequential Monte Carol Samplers, Del Mo
 """
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo, old_state::SmcState)
     # Schedule the likelihood tempering
-    new_temp = increment_temperature(sampler.temp_scheduler, old_state.temperature)
+    new_temp = increment_temperature(sampler.temp_schedule, old_state.temperature)
 
     # Draw new particles using the forward kernel
     proposed_sample = propose(sampler.kernel, old_state, sampler.n_particles)
