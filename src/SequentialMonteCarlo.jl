@@ -17,11 +17,10 @@ end
 Base.show(io::IO, s::SequentialMonteCarlo) = print(io, "SequentialMonteCarlo: $(s.kernel)")
 
 
-struct SmcState{S<:Sample,W<:AbstractVector,L<:AbstractVector}
+struct SmcState{S<:Sample,W<:AbstractVector}
     # Contains multiple values for the variables
     sample::S
     log_weights::W
-    log_likelihood::L
     log_evidence::Float64
     temperature::Float64
 end
@@ -31,14 +30,14 @@ logevidence(state::SmcState) = state.log_evidence
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
     # NOTE This is an IS step
     # rand on PosteriorModel samples from prior in unconstrained domain
-    s = rand(model, sampler.n_particles)
+    sample = rand(model, sampler.n_particles)
     # tempering starts with ϕ₀=0
-    s = tempered_logdensity_sample(model, s, 0)
+    sample = tempered_logdensity_sample(model, sample, 0)
 
     # ϕ₀=0 → importance distribution = target density → wᵢ=1, normalized:
     normalized_log_weights = fill(-log(sampler.n_particles), sampler.n_particles)
     # IS normalizing constant: 1/n * ∑ₙ wᵢ = n_particles / n_particles = 1 → log(1) = 0
-    state = SmcState(s, normalized_log_weights, loglikelihood(s), 0.0, 0.0)
+    state = SmcState(sample, normalized_log_weights, 0.0, 0.0)
 
     state.sample, state
 end
@@ -57,12 +56,12 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     new_sample = forward(sampler.kernel, proposed_sample, old_state.sample)
 
     # Update weights using backward kernel
-    incr_weights = incremental_weights(sampler.kernel, new_sample, loglikelihood(new_sample), new_temp, old_state)
+    incr_weights = incremental_weights(sampler.kernel, new_sample, new_temp, old_state)
     new_weights = add_logdensity(old_state.log_weights, incr_weights)
     # Unnormalized new weights from (12) are the elements of (14) in the SMC paper
     new_evidence = old_state.log_evidence + logsumexp(new_weights)
     normalized_weights = normalize_log_weights(new_weights)
-    new_state = SmcState(new_sample, normalized_weights, loglikelihood(new_sample), new_evidence, new_temp)
+    new_state = SmcState(new_sample, normalized_weights, new_evidence, new_temp)
 
     resampled = maybe_resample(rng, new_state, sampler.log_resample_threshold)
     resampled.sample, resampled
@@ -71,7 +70,7 @@ end
 # SmcKernels, must have a `proposal` field. 
 # propose(kernel, old_state, n_particles): propose a new `Sample` using the old `SmcState`
 # forward(kernel, new_sample, old_sample): forward kernel for the proposed sample
-# incremental_weights(kernel, new_sample, new_likelihood, new_temp, old_state::SmcState): calculate the unnormalized incremental weights
+# incremental_weights(kernel, new_sample, new_temp, old_state::SmcState): calculate the unnormalized incremental weights
 
 """
     ForwardProposalKernel(proposal)
@@ -89,11 +88,11 @@ propose(kernel::ForwardProposalKernel, old_state, n_particles) = propose(kernel.
 forward(kernel::ForwardProposalKernel, new_sample, old_sample) = new_sample
 
 """
-    increment_weights(kernel, new_sample, new_likelihood, new_temp, old_state)
+    increment_weights(kernel, new_sample, new_temp, old_state)
 Calculate the unnormalized incremental log using a "forward proposal L-kernel" (Increasing the Efficiency of Sequential Monte Carlo Samplers..., Green 2022).
 The weights are updated similarly to a Metropolis-Hastings acceptance ratio.
 """
-function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState)
+function incremental_weights(kernel::ForwardProposalKernel, new_sample::Sample, new_temp, old_state::SmcState)
     forward = transition_probability(kernel.proposal, new_sample, old_state.sample)
     backward = transition_probability(kernel.proposal, old_state.sample, new_sample)
     logprobability(new_sample) .+ backward .- logprobability(old_state.sample) .- forward
@@ -110,11 +109,11 @@ propose(kernel::MhKernel, old_state, n_particles) = propose(kernel.proposal, old
 forward(kernel::MhKernel, new_sample, old_sample) = mh_kernel(kernel.rng, kernel.proposal, new_sample, old_sample)
 
 """
-    increment_weights(kernel, new_sample, new_likelihood, new_temp, old_state)
+    increment_weights(kernel, new_sample, new_temp, old_state)
 Calculate the unnormalized incremental log using an MCMC Kernel (Sequential Monte Carlo Samplers, Del Moral 2006).
 For a likelihood tempered target γᵢ = p(z|θ)ᵠp(θ) the incremental weight formula simplifies to γ₂/γ₁ = p(z|θ₁)^(ϕ₂ - ϕ₁) (Efficient Sequential Monte-Carlo Samplers for Bayesian Inference, Nguyen 2016)
 """
-incremental_weights(::MhKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* old_state.log_likelihood
+incremental_weights(::MhKernel, new_sample::Sample, new_temp, old_state::SmcState) = (new_temp - old_state.temperature) .* loglikelihood(old_state.sample)
 
 """
     BootstrapKernel(proposal)
@@ -131,11 +130,12 @@ Base.show(io::IO, k::BootstrapKernel) = print(io, "BootstrapKernel, $(k.proposal
 propose(kernel::BootstrapKernel, old_state, n_particles) = propose(kernel.proposal, old_state.sample, n_particles)
 forward(kernel::BootstrapKernel, new_sample, old_sample) = new_sample
 
+# BUG this is not the incremental but the actual weight
 """
-    increment_weights(kernel, new_sample, tempered_likelihood, new_temp, old_state)
+    increment_weights(kernel, new_sample, new_temp, old_state)
 Bootstrap particle filter: tempered likelihood is the weight increment.
 """
-incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = new_likelihood
+incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_temp, old_state::SmcState) = loglikelihood(new_sample)
 
 """
     AdaptiveKernel(kernel)
@@ -157,7 +157,7 @@ end
 
 forward(kernel::AdaptiveKernel, new_sample, old_sample) = forward(kernel.kernel, new_sample, old_sample)
 
-incremental_weights(kernel::AdaptiveKernel, new_sample::Sample, new_likelihood, new_temp, old_state::SmcState) = incremental_weights(kernel.kernel, new_sample, new_likelihood, new_temp, old_state)
+incremental_weights(kernel::AdaptiveKernel, new_sample::Sample, new_temp, old_state::SmcState) = incremental_weights(kernel.kernel, new_sample, new_temp, old_state)
 
 """
     adaptive_mvnormal(proposal::Proposal, state::SmcState; [corrected=true])
@@ -228,7 +228,7 @@ function resample_systematic(rng::AbstractRNG, state::SmcState)
     re_sample = Sample(vars, log_probs, log_likes)
     # Reset weights
     log_weights = fill(-log(length(log_probs)), length(log_probs))
-    SmcState(re_sample, log_weights, state.log_likelihood, state.log_evidence, state.temperature)
+    SmcState(re_sample, log_weights, state.log_evidence, state.temperature)
 end
 
 """
