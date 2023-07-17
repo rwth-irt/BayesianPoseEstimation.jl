@@ -130,12 +130,12 @@ Base.show(io::IO, k::BootstrapKernel) = print(io, "BootstrapKernel, $(k.proposal
 propose(kernel::BootstrapKernel, old_state, n_particles) = propose(kernel.proposal, old_state.sample, n_particles)
 forward(kernel::BootstrapKernel, new_sample, old_sample) = new_sample
 
-# BUG this is not the incremental but the actual weight
 """
     increment_weights(kernel, new_sample, new_temp, old_state)
-Bootstrap particle filter: tempered likelihood is the weight increment.
+Bootstrap particle filter: tempered likelihood is the (non incremental) weight.
 """
-incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_temp, old_state::SmcState) = loglikelihood(new_sample)
+incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_temp, old_state::SmcState) =
+    add_logdensity(loglikelihood(new_sample), -old_state.log_weights)
 
 """
     AdaptiveKernel(kernel)
