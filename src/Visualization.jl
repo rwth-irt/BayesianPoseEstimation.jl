@@ -66,7 +66,7 @@ function plot_depth_img(img; value_to_typemax=0, color_scheme=:viridis, reverse=
         colorbar_title = " \n" * colorbar_title
         kwargs = (; kwargs, right_margin=8Plots.pt)
     end
-    heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+    heatmap(transpose(img); colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:white, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
 end
 
 """
@@ -79,7 +79,7 @@ See also [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
 """
 function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viridis, reverse=true, colorbar_title="depth / m", clims=nothing, alpha=0.5, kwargs...)
     # Plot the image as background
-    img |> transpose |> plot
+    plot(img'; xlabel="x-pixels", ylabel="y-pixels", background_color=:white)
     # Transfer to CPU
     depth_img = depth_img |> Array |> transpose
     color_grad = cgrad(color_scheme; rev=reverse)
@@ -93,10 +93,10 @@ function plot_depth_ontop(img, depth_img; value_to_typemax=0, color_scheme=:viri
     # GR has some overlap of the colorbar_title
     if Plots.backend() == Plots.GRBackend()
         colorbar_title = " \n" * colorbar_title
-        kwargs = (; kwargs, right_margin=8Plots.pt)
+        kwargs = (; kwargs..., right_margin=8Plots.pt)
     end
     # Plot the depth image on top
-    heatmap!(depth_img; alpha=alpha, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, background_color_outside=:transparent, xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+    heatmap!(depth_img; alpha=alpha, colorbar_title=colorbar_title, color=color_grad, clims=clims, aspect_ratio=1, yflip=true, framestyle=:semi, xmirror=true, kwargs...)
 end
 
 """
@@ -125,7 +125,7 @@ function plot_best_pose(sample::Sample, experiment, img, getter=loglikelihood; k
     mesh = first(scene.meshes)
     @reset mesh.pose = to_pose(variables(sample).t[:, ind], variables(sample).r[ind])
     @reset scene.meshes = [mesh]
-    plot_scene_ontop(experiment.gl_context, scene, img)
+    plot_scene_ontop(experiment.gl_context, scene, img; kwargs...)
 end
 
 function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img, getter=loglikelihood; kwargs...)
@@ -134,7 +134,7 @@ function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img, getter
     mesh = first(scene.meshes)
     @reset mesh.pose = to_pose(chain[ind].variables.t, chain[ind].variables.r)
     @reset scene.meshes = [mesh]
-    plot_scene_ontop(experiment.gl_context, scene, img)
+    plot_scene_ontop(experiment.gl_context, scene, img; kwargs...)
 end
 
 
@@ -200,10 +200,10 @@ end
 plot_pose_density(state::SmcState; kwargs...) = plot_pose_density(state.sample; weights=exp.(state.log_weights), kwargs...)
 
 function plot_pose_chain(model_chain, len=50)
-    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(length(model_chain) ÷ len)]", ylabel="Position / m", legend=false)
+    plt_t_chain = plot_variable(model_chain, :t, len; label=["x" "y" "z"], xlabel="Iteration ÷ $(length(model_chain) ÷ len)", ylabel="Position / m", legend=false)
     plt_t_dens = density_variable(model_chain, :t; label=["x" "y" "z"], xlabel="Position / m", ylabel="Density", legend=false, left_margin=5mm)
 
-    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration [÷ $(length(model_chain) ÷ len)]", ylabel="Orientation / rad", legend=false, top_margin=5mm)
+    plt_r_chain = plot_variable(model_chain, :r, len; label=["x" "y" "z"], xlabel="Iteration ÷ $(length(model_chain) ÷ len)", ylabel="Orientation / rad", legend=false, top_margin=5mm)
     plt_r_dens = density_variable(model_chain, :r; label=["x" "y" "z"], xlabel="Orientation / rad", ylabel="Density", legend=false)
 
     plot(
@@ -228,7 +228,7 @@ end
 function scatter_position(chain, len=100; var_name=:t, c_grad=:viridis, kwargs...)
     M = plotable_matrix(chain, var_name, len)
     step = round(last(size(M)) / len; digits=1)
-    scatter_position(M; c_grad=c_grad, label="sample number [÷$(step)]", kwargs...)
+    scatter_position(M; c_grad=c_grad, label="sample number ÷ $(step)", kwargs...)
 end
 
 """
@@ -288,14 +288,14 @@ plot_logprob(logprobs::AbstractVector{<:Number}; kwargs...) = scatter(logprobs; 
     plot_logprob(chains, [len=100]; kwargs...)
 Plot of the logdensity over the samples.
 """
-plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprobability.(chain)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
-plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprobability(final_sample)); xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+plot_logprob(chain::AbstractVector{<:Sample}, len=100; kwargs...) = plot_logprob(step_data(logprobability.(chain)); xlabel="Iteration ÷ $(length(chain) ÷ len)")
+plot_logprob(final_sample::Sample, len=100; kwargs...) = plot_logprob(step_data(logprobability(final_sample)); xlabel="Iteration ÷ $(length(chain) ÷ len)")
 
 """
     plot_logevidence(states, [len=100]; kwargs...)
 Plot of the logdensity of the SMC states.
 """
-plot_logevidence(chain::AbstractVector{<:SmcState}, len=100; kwargs...) = plot_logprob(step_data(logevidence.(chain), len); label="log evidence", xlabel="Iteration [÷ $(length(chain) ÷ len)]")
+plot_logevidence(chain::AbstractVector{<:SmcState}, len=100; kwargs...) = plot_logprob(step_data(logevidence.(chain), len); label="log evidence", xlabel="Iteration ÷ $(length(chain) ÷ len)")
 
 
 """

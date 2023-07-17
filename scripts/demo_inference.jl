@@ -108,21 +108,23 @@ plot_pose_density(final_state.sample; trim=false, legend=true)
 # plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_state.sample, experiment, color_img)
 
-anim = @animate for idx in 1:length(states)
-    plot_best_pose(states[idx].sample, experiment, color_img)
-    plot!(title="Iteration $(idx)")
+step_size = length(states) ÷ 100
+anim = @animate for idx in 1:step_size:length(states)
+    # White background required for accurate axis colors
+    plot_best_pose(states[idx].sample, experiment, color_img; title="Iteration $(idx)", background_color=:white)
 end;
-gif(anim, "anim.gif", fps=20)
+gif(anim, "smc.gif", fps=15)
 
 anim = @animate for i ∈ 0:2:360
-    scatter_position(final_state.sample, 100, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+    # White background required for accurate axis colors
+    scatter_position(final_state.sample, 100; background_color=:white, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
 gif(anim, "anim.gif", fps=20)
 
 
 # MCMC samplers
-# parameters = mh_parameters()
-# sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
+parameters = mh_parameters()
+sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
 parameters = mtm_parameters()
 sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior);
@@ -137,16 +139,17 @@ plot_best_pose(last(chain), experiment, color_img)
 
 step_size = length(chain) ÷ 100
 anim = @animate for idx in 1:step_size:length(chain)
-    plot_best_pose(chain[idx], experiment, color_img)
-    plot!(title="Iteration $(idx)")
+    # White background required for accurate axis colors
+    plot_best_pose(chain[idx], experiment, color_img; title="Iteration $(idx)", background_color=:white)
 end;
-gif(anim, "anim.gif", fps=15)
+gif(anim, "mcmc.gif"; fps=15)
 
 
 # Visualize the maximum posterior
 # TODO also track likelihood - plot maximum likelihood pose
 
 anim = @animate for i ∈ 0:2:360
-    scatter_position(chain; camera=(i, 25), projection_type=:perspective, legend_position=:topright)
+    # White background required for accurate axis colors
+    scatter_position(chain; background_color=:white, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
-gif(anim, "anim_fps15.gif", fps=20)
+gif(anim, "anim.gif", fps=20)
