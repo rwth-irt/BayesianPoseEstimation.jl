@@ -103,6 +103,22 @@ function gt_dataframe(scene_path)
     df
 end
 
+function gt_info_dataframe(scene_path; visib_threshold=0.1)
+    # TODO consider only valid visibilities >= 0.1 from scene_gt_info.json (or less general test_targets_bop19.json) file.
+    gt_info_json = JSON.parsefile(joinpath(scene_path, "scene_gt_info.json"))
+    df = DataFrame(img_id=Int[], gt_id=Int[], visib_fract=Float32[])
+    for (img_id, body) in gt_info_json
+        img_id = parse(Int, img_id)
+        for (gt_id, gt_info) in enumerate(body)
+            visib_fract = gt_info["visib_fract"]
+            if (visib_fract >= visib_threshold)
+                push!(df, (img_id, gt_id, visib_fract))
+            end
+        end
+    end
+    df
+end
+
 """
     object_dataframe(dataset_name)
 Loads the object specific information into a DataFrame with the columns `obj_id, diameter, mesh`.
@@ -134,7 +150,10 @@ function scene_dataframe(dataset_name="lm", subset_name="test", scene_number=1)
     img_cam_df = innerjoin(img_df, cam_df; on=:img_id)
     # Per evaluation
     gt_df = gt_dataframe(path)
-    gt_img_df = leftjoin(gt_df, img_cam_df, on=:img_id)
+    info_df = gt_info_dataframe(path)
+    # info_df might contain less entries as only visib_fract >= 0.1 is considered valid
+    gt_info_df = rightjoin(gt_df, info_df; on=[:img_id, :gt_id])
+    gt_img_df = leftjoin(gt_info_df, img_cam_df, on=:img_id)
     # Per object
     obj_df = object_dataframe(dataset_name)
     leftjoin(gt_img_df, obj_df, on=:obj_id)

@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using Accessors
+using DataFrames
 using FileIO
 using ImageTransformations
 using MCMCDepth
@@ -10,9 +11,10 @@ using Plots
 using SciGL
 
 # Datasets
-# s_df = scene_dataframe("tless", "test_primesense", 1)
+s_df = scene_dataframe("tless", "test_primesense", 1)
+@assert nrow(s_df) == 197
 # s_df = scene_dataframe("itodd", "val", 1)
-s_df = scene_dataframe("lm", "test", 2)
+# s_df = scene_dataframe("lm", "test", 2)
 row = s_df[100, :]
 
 # Plot setup
