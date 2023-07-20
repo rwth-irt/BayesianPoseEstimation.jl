@@ -8,6 +8,7 @@ using CUDA
 using MCMCDepth
 using Random
 using Plots
+using PoseErrors
 using ProgressLogging
 using SciGL
 
@@ -66,20 +67,20 @@ row = s_df[101, :]
 
 # Experiment setup
 camera = crop_camera(row)
-mesh = upload_mesh(gl_context, row.mesh)
+mesh = upload_mesh(gl_context, load_mesh(row))
 @reset mesh.pose = to_pose(row.cam_t_m2c, row.cam_R_m2c)
 # Observation is cropped and resized to match the gl_context and crop_camera
-mask_img = load_mask_image(row, parameters)
+mask_img = load_mask_image(row, parameters.img_size...)
 # TODO Add to Parameters. Quite strong prior is required. However, too strong priors are also bad, since the tail distribution would be neglected.
 prior_o = mask_img .* 0.6f0 .+ 0.2f0 .|> parameters.float_type |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
 fill!(prior_o, 0.5)
 
-depth_img = load_depth_image(row, parameters) |> device_array_type(parameters)
+depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
 experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, row.cam_t_m2c, depth_img)
 
 # Draw result for visual validation
-color_img = load_color_image(row, parameters)
+color_img = load_color_image(row, parameters.img_size...)
 scene = Scene(camera, [mesh])
 plot_scene_ontop(gl_context, scene, color_img)
 

@@ -21,6 +21,7 @@ using Reexport
 # Avoid loading ⊕ and ⊖
 using Rotations: Rotation, QuatRotation, RotMatrix3
 using SciGL
+using StaticArrays
 using StatsBase
 
 @reexport using AbstractMCMC
@@ -45,15 +46,11 @@ include("SequentialMonteCarlo.jl")
 
 # Plumbing together the depth image based pose estimator
 include("Parameters.jl")
-include("Crop.jl")
 include("Visualization.jl")
 include("RenderContext.jl")
 include("Models.jl")
 include("ExperimentModels.jl")
 include("ExperimentSamplers.jl")
-
-# Datasets
-include("BOP.jl")
 
 # Common
 export array_for_rng
@@ -177,13 +174,6 @@ export smc_bootstrap
 export smc_forward
 export smc_inference
 export smc_mh
-
-# Data loading an preprocessing
-export crop_camera
-export load_color_image
-export load_depth_image
-export load_mask_image
-export scene_dataframe
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion

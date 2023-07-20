@@ -188,3 +188,5 @@ Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.float_type.(getfield(p, :σ_t)
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.float_type.(getfield(p, :proposal_σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.float_type.(getfield(p, :proposal_σ_r))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.float_type.(getfield(p, :proposal_σ_r_quat))
+
+Base.getproperty(p::Parameters, ::Val{:img_size}) = (getfield(p, :width), getfield(p, :height))
