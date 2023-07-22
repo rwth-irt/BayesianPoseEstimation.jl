@@ -62,19 +62,32 @@ cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
-s_df = scene_dataframe("lm", "test", 2)
-row = s_df[101, :]
+# Distinct features, no occlusions
+# df = scene_dataframe(joinpath("data", "bop", "lm", "test"), 2)
+# row = df[101, :]
+
+# Buddha is very smooth without distinct features
+df = scene_dataframe(joinpath("data", "bop", "lm", "test"), 1)
+row = df[100, :]
+
+# Box shaped object → multimodal for each flat side
+# df = scene_dataframe(joinpath("data", "bop", "tless", "test_primesense"), 1)
+# row = df[100, :]
+
+# Clutter and occlusions
+# df = scene_dataframe(joinpath("data", "bop", "tless", "test_primesense"), 6)
+# row = df[200, :]
+# @reset parameters.σ_t = fill(0.005, 3)
 
 # Experiment setup
 camera = crop_camera(row)
 mesh = upload_mesh(gl_context, load_mesh(row))
 @reset mesh.pose = to_pose(row.cam_t_m2c, row.cam_R_m2c)
 # Observation is cropped and resized to match the gl_context and crop_camera
-mask_img = load_mask_image(row, parameters.img_size...)
-# TODO Add to Parameters. Quite strong prior is required. However, too strong priors are also bad, since the tail distribution would be neglected.
-prior_o = mask_img .* 0.6f0 .+ 0.2f0 .|> parameters.float_type |> device_array_type(parameters)
+mask_img = load_visib_mask_image(row, parameters.img_size...)
+prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
-fill!(prior_o, 0.5)
+prior_o[mask_img] .= parameters.o_mask_is
 
 depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
 experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, row.cam_t_m2c, depth_img)
@@ -86,11 +99,11 @@ plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
 prior = point_prior(parameters, experiment, cpu_rng)
-# posterior = association_posterior(parameters, experiment, prior, dev_rng)
+posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
 posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
-# posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
+posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters()
@@ -107,7 +120,7 @@ plot_logevidence(states)
 # Plot state which uses the weights
 plot_pose_density(final_state.sample; trim=false, legend=true)
 # plot_prob_img(mean_image(final_sample, :o))
-plot_best_pose(final_state.sample, experiment, color_img)
+plot_best_pose(final_state.sample, experiment, color_img; loglikelihood)
 
 step_size = length(states) ÷ 100
 anim = @animate for idx in 1:step_size:length(states)

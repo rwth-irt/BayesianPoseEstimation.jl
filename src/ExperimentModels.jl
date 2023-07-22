@@ -65,4 +65,3 @@ function smooth_posterior(params, experiment, μ_node, dev_rng)
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     PosteriorModel(z_norm | experiment.depth_image)
 end
-

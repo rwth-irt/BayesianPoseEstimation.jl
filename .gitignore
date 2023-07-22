@@ -2,11 +2,14 @@
 /dev
 .code-worskpace
 .ipynb_checkpoints
-plots
 scratchpad
+datasets
+
+_research
+data
+plots
+notebooks
 
 *.gif
 *.svg
 *.png
-
-datasets

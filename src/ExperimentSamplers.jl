@@ -26,7 +26,7 @@ function mh_sampler(cpu_rng, params, experiment, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([1.0, 1.0, 0.01, 0.01])
+    weights = Weights([params.w_local_move, params.w_local_move, params.w_independent_move, w_independent_move])
     samplers = map(proposals) do proposal
         MetropolisHastings(proposal, temp_schedule)
     end
@@ -47,7 +47,7 @@ function mh_local_sampler(cpu_rng, params, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
     proposals = (t_sym_proposal, r_sym_proposal)
-    weights = Weights([1.0, 1.0])
+    weights = Weights([params.w_t_sym, params.w_r_sym])
     samplers = map(proposals) do proposal
         MetropolisHastings(proposal, temp_schedule)
     end
@@ -73,7 +73,7 @@ function mtm_sampler(cpu_rng, params, experiment, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([1.0, 1.0, 0.1, 0.1])
+    weights = Weights([params.w_t_sym, params.w_r_sym, params.w_t_ind, params.w_r_ind])
     samplers = map(proposals) do proposal
         MultipleTry(proposal, params.n_particles, temp_schedule)
     end
@@ -94,7 +94,7 @@ function mtm_local_sampler(cpu_rng, params, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
     proposals = (t_sym_proposal, r_sym_proposal)
-    weights = Weights([1.0, 1.0])
+    weights = Weights([params.w_t_sym, params.w_r_sym])
     samplers = map(proposals) do proposal
         MultipleTry(proposal, params.n_particles, temp_schedule)
     end
@@ -116,7 +116,7 @@ function smc_forward(cpu_rng, params, posterior)
     r_sym_kernel = ForwardProposalKernel(r_sym_proposal)
 
     kernels = (t_sym_kernel, r_sym_kernel)
-    weights = Weights([1.0, 1.0])
+    weights = Weights([params.w_t_sym, params.w_r_sym])
     samplers = map(kernels) do kernel
         SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end
@@ -139,7 +139,7 @@ function smc_bootstrap(cpu_rng, params, posterior)
     r_sym_kernel = ForwardProposalKernel(r_sym_proposal)
 
     kernels = (t_sym_kernel, r_sym_kernel)
-    weights = Weights([1.0, 1.0])
+    weights = Weights([params.w_t_sym, params.w_r_sym])
     samplers = map(kernels) do kernel
         SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end
@@ -169,13 +169,13 @@ function smc_mh(cpu_rng, params, posterior)
     t_sym_kernel = AdaptiveKernel(cpu_rng, MhKernel(cpu_rng, t_sym_proposal))
     r_sym_kernel = MhKernel(cpu_rng, r_sym_proposal)
 
-    # TODO o needs dev_rng
+    # NOTE o needs dev_rng. Convergence is soooo unlinkely
     # o_sym = BroadcastedNode(:o, CUDA.default_rng(), KernelNormal, 0.0f0, 0.1f0)
     # o_sym_proposal = symmetric_proposal(o_sym, posterior)
 
     # NOTE t_ind should not be required since it is quite local and driven via the adaptive variance
     kernels = (t_sym_kernel, r_sym_kernel, r_ind_kernel)
-    weights = Weights([1.0, 1.0, 0.1])
+    weights = Weights([params.w_t_sym, params.w_r_sym, params.w_r_ind])
     samplers = map(kernels) do kernel
         SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
     end

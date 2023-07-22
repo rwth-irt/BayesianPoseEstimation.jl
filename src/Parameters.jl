@@ -48,7 +48,6 @@ Deliberately not strongly typed because the strongly typed structs are construct
 * `n_normalization_samples` Number of samples to calculate the normalization constant from the expected number of visible pixels.
 
 # Pose Model
-* `mean_t` Mean of the RFID measurement
 * `σ_t` Standard deviation of RFID measurement, assumes independent x,y,z components
 
 # Proposal Model
@@ -68,6 +67,8 @@ Deliberately not strongly typed because the strongly typed structs are construct
 * `n_thinning` Record only every n_thinning sample to the chain
 * `n_particles` For particle / multiple try algorithms
 * `relative_ess` Relative effective sample size threshold ∈ (0,1)
+* `w_t_sym`, `w_r_sym` Weight of using a local move proposal for t and r.
+* `w_t_ind`, `w_r_ind` Weight of using an independent move proposal for t and r.
 """
 Base.@kwdef struct Parameters
     # Render context
@@ -80,21 +81,23 @@ Base.@kwdef struct Parameters
     # Depth pixel model
     pixel_σ = 0.01
     pixel_θ = 1
-    mix_exponential = 0.8
     # Pixel association
-    association_σ = 0.1
+    association_σ = 0.01
     proposal_σ_o = 0.01
     # Image Model
     normalize_img = true
     n_normalization_samples = 20_000
-    normalization_constant = 15
+    normalization_constant = 20
 
     # Pose Model
-    mean_t = [0.0, 0.0, 2.0]
     σ_t = fill(0.03, 3)
+    # Association model
+    o_mask_is = 0.9
+    o_mask_not = 0.1
     # Proposal Model
     proposal_σ_t = fill(0.01, 3)
     proposal_σ_r = fill(0.1, 3)
+
     # Inference
     float_type = Float32
     device = :CUDA
@@ -102,8 +105,12 @@ Base.@kwdef struct Parameters
     n_steps = 3_000
     n_burn_in = 1_000
     n_thinning = 0
-    n_particles = 100
-    relative_ess = 0.8
+    n_particles = 50
+    relative_ess = 0.5
+    w_r_ind = 0.1
+    w_t_ind = 0.1
+    w_r_sym = 0.9
+    w_t_sym = 0.9
 end
 
 # Automatically convert to correct precision
@@ -181,12 +188,14 @@ Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.float_type.(
 Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.float_type.(getfield(p, :pixel_σ))
 Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.float_type.(getfield(p, :association_σ))
 Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.float_type.(getfield(p, :pixel_θ))
-Base.getproperty(p::Parameters, ::Val{:mix_exponential}) = p.float_type.(getfield(p, :mix_exponential))
 
-Base.getproperty(p::Parameters, ::Val{:mean_t}) = p.float_type.(getfield(p, :mean_t))
 Base.getproperty(p::Parameters, ::Val{:σ_t}) = p.float_type.(getfield(p, :σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_t}) = p.float_type.(getfield(p, :proposal_σ_t))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r}) = p.float_type.(getfield(p, :proposal_σ_r))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_r_quat}) = p.float_type.(getfield(p, :proposal_σ_r_quat))
+Base.getproperty(p::Parameters, ::Val{:w_t_sym}) = p.float_type.(getfield(p, :w_t_sym))
+Base.getproperty(p::Parameters, ::Val{:w_r_sym}) = p.float_type.(getfield(p, :w_r_sym))
+Base.getproperty(p::Parameters, ::Val{:w_t_ind}) = p.float_type.(getfield(p, :w_t_ind))
+Base.getproperty(p::Parameters, ::Val{:w_r_ind}) = p.float_type.(getfield(p, :w_r_ind))
 
 Base.getproperty(p::Parameters, ::Val{:img_size}) = (getfield(p, :width), getfield(p, :height))
