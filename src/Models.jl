@@ -76,6 +76,7 @@ Use it in a modifier node to normalize the loglikelihood of the image to make it
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
     normalization_constant::T
     μ::M
+    o::M
 end
 
 ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
@@ -83,9 +84,12 @@ ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
 using DensityInterface
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
+    # Avoid encouraging small number of visible pixels by including pixels expected to be visible from prior
+    union = @. model.μ != 0 || model.o > 0.5
     # Images are always 2D
-    n_pixel = sum_and_dropdims(model.μ .!= 0, (1, 2))
+    n_pixel = sum_and_dropdims(union, (1, 2))
     logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
+    # ℓ * 100 / (size(model.μ, 1) * size(model.μ, 2))
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
 logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
