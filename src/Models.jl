@@ -84,7 +84,8 @@ ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
 using DensityInterface
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
-    # Avoid encouraging small number of visible pixels by including pixels expected to be visible from prior
+    # Avoid encouraging a small number of visible pixels by including pixels expected to be visible from the prior. E.g. the smallest area of a box is most likely in front or the algorithm might diverge to the edges for non-distinct geometries.
+    # Pixel association does not modify the prior in regions where nothing is rendered.
     union = @. model.μ != 0 || model.o > 0.5
     # Images are always 2D
     n_pixel = sum_and_dropdims(union, (1, 2))
