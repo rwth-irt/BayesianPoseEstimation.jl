@@ -36,7 +36,7 @@ function smc_parameters()
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
     # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
-    @reset parameters.n_steps = 200
+    @reset parameters.n_steps = 250
     @reset parameters.n_particles = 50
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
@@ -75,9 +75,9 @@ row = df[100, :]
 # row = df[100, :]
 
 # Clutter and occlusions
+# NOTE better crop → better result if using union in ℓ normalization
 # df = scene_dataframe(joinpath("data", "bop", "tless", "test_primesense"), 6)
 # row = df[200, :]
-# @reset parameters.σ_t = fill(0.005, 3)
 
 # Experiment setup
 camera = crop_camera(row)
@@ -101,9 +101,9 @@ plot_scene_ontop(gl_context, scene, color_img)
 prior = point_prior(parameters, experiment, cpu_rng)
 posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
-posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
-posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
+# posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters()
@@ -114,7 +114,7 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # NOTE Benchmark results for smc_mh association & simple ≈ 4.28sec, smooth ≈ 4.74sec
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
-states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
+@time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 # TODO evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
 plot_logevidence(states)
 # Plot state which uses the weights

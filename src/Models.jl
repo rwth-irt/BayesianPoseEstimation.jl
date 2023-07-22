@@ -89,7 +89,6 @@ function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     # Images are always 2D
     n_pixel = sum_and_dropdims(union, (1, 2))
     logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
-    # ℓ * 100 / (size(model.μ, 1) * size(model.μ, 2))
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
 logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
@@ -127,8 +126,8 @@ The mixture is weighted by the association o for the normal and 1-o for the tail
 """
 function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
     normal = KernelNormal(μ, σ)
-    # NOTE Exponential in pixel_tail does not seem beneficial
-    tail = TailUniform(min_depth, max_depth)
+    # NOTE Exponential in pixel_tail does actually seems to be beneficial under heavy occlusions
+    tail = pixel_tail(min_depth, max_depth, θ, σ, μ)
     BinaryMixture(normal, tail, o, one(o) - o)
 end
 
@@ -136,7 +135,7 @@ pixel_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where
 
 function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
     # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth. Here, a smooth Exponential is beneficial which avoids 0.
-    exponential = KernelExponential()
+    exponential = KernelExponential(θ)
     uniform = TailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
     BinaryMixture(exponential, uniform, one(T), one(T))
@@ -242,8 +241,7 @@ Uses:
 """
 function pixel_association_fn(params)
     dist_is = pixel_valid_normal | params.association_σ
-    # NOTE Seems like dist_not should not contain exponential term to avoid favouring close objects
-    dist_not = pixel_valid_uniform | (params.min_depth, params.max_depth)
+    dist_not = pixel_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
     marginalized_association | (dist_is, dist_not)
 end
 
