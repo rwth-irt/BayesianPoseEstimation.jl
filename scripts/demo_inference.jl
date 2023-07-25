@@ -36,8 +36,8 @@ function smc_parameters()
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
     # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
-    @reset parameters.n_steps = 250
-    @reset parameters.n_particles = 50
+    @reset parameters.n_steps = 150
+    @reset parameters.n_particles = 200
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
     # TODO tempering in MCMC?
@@ -62,35 +62,36 @@ cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
-# Distinct features, no occlusions
-# df = scene_dataframe(joinpath("data", "bop", "lm", "test"), 2)
+# Vice has distinct features, no occlusions
+# df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
 # row = df[101, :]
 
 # Buddha is very smooth without distinct features
-df = scene_dataframe(joinpath("data", "bop", "lm", "test"), 1)
+df = gt_targets(joinpath("data", "bop", "lm", "test"), 1)
 row = df[100, :]
 
 # Box shaped object → multimodal for each flat side
-# df = scene_dataframe(joinpath("data", "bop", "tless", "test_primesense"), 1)
+# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 1)
 # row = df[100, :]
 
 # Clutter and occlusions
 # NOTE better crop → better result if using union in ℓ normalization
-# df = scene_dataframe(joinpath("data", "bop", "tless", "test_primesense"), 6)
-# row = df[200, :]
+# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 15)
+# row = df[10, :]
 
 # Experiment setup
 camera = crop_camera(row)
 mesh = upload_mesh(gl_context, load_mesh(row))
-@reset mesh.pose = to_pose(row.cam_t_m2c, row.cam_R_m2c)
+@reset mesh.pose = to_pose(row.gt_t, row.gt_R)
 # Observation is cropped and resized to match the gl_context and crop_camera
-mask_img = load_visib_mask_image(row, parameters.img_size...)
+mask_img = load_mask_image(row, parameters.img_size...)
 prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
 prior_o[mask_img] .= parameters.o_mask_is
 
 depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
-experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, row.cam_t_m2c, depth_img)
+# TODO do not use row.gt_t but the estimated object center from the mask_img .* depth_img
+experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, row.gt_t, depth_img)
 
 # Draw result for visual validation
 color_img = load_color_image(row, parameters.img_size...)
@@ -99,9 +100,9 @@ plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
 prior = point_prior(parameters, experiment, cpu_rng)
-posterior = association_posterior(parameters, experiment, prior, dev_rng)
+# posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
-# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 

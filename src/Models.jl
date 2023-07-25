@@ -2,6 +2,9 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
+using DensityInterface
+using LinearAlgebra
+
 """
 # ObservationModel
 Model to compare rendered and observed depth images.
@@ -71,7 +74,7 @@ Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 
 """
     ImageLikelihoodNormalizer
-Use it in a modifier node to normalize the loglikelihood of the image to make it independent from the number of visible pixels in μ. 
+Use it in a modifier node to normalize the loglikelihood of the image to make it less independent from the number of visible pixels in μ. 
 """
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
     normalization_constant::T
@@ -82,17 +85,38 @@ end
 ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
-using DensityInterface
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     # Avoid encouraging a small number of visible pixels by including pixels expected to be visible from the prior. E.g. the smallest area of a box is most likely in front or the algorithm might diverge to the edges for non-distinct geometries.
     # Pixel association does not modify the prior in regions where nothing is rendered.
-    union = @. model.μ != 0 || model.o > 0.5
-    # Images are always 2D
-    n_pixel = sum_and_dropdims(union, (1, 2))
-    logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
+    # NOTE This regularization incentives a minimization of the visible pixels, e.g. fitting the silhouette into the prior mask. - loglikelihood grows more than linear with the number of pixels?
+    # union = @. model.μ != 0 || model.o > 0.5
+    # # Images are always 2D
+    # n_pixel = sum_and_dropdims(union, (1, 2))
+    # logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
+
+    # NOTE this is more stable than the above and should still capture the varying number of pixels.
+    # NOTE seems to perform better when association is modeled
+    n_μ = sum_and_dropdims(model.μ != 0, (1, 2))
+    n_o = sum_and_dropdims(model.o .> 0.5, (1, 2))
+    n_pixel = n_μ .+ n_o
+    logdensity_npixel.(ℓ, 2 * model.normalization_constant, n_pixel)
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
 logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
+
+# TODO evaluate this in diss. Isn't it in Probabilistic Robotics? :D Introduce Hyperparameter like in the more complex one?
+"""
+    SimpleImageRegularization
+Use it in a modifier node to regularize the loglikelihood of the image to make it less dominant compared to the prior.
+"""
+struct SimpleImageRegularization end
+SimpleImageRegularization(_, _...) = SimpleImageRegularization()
+
+Base.rand(::AbstractRNG, ::SimpleImageRegularization, value) = value
+function DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ)
+    # NOTE one could estimate the expected number of visible pixels for a given image size. Is there a good explanation 
+    ℓ / norm(size(z))
+end
 
 """
     expected_pixel_count(rng, prior_model, render_context, scene, parameters)
