@@ -95,7 +95,6 @@ function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     # logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
 
     # NOTE this is more stable than the above and should still capture the varying number of pixels.
-    # NOTE seems to perform better when association is modeled
     n_μ = sum_and_dropdims(model.μ != 0, (1, 2))
     n_o = sum_and_dropdims(model.o .> 0.5, (1, 2))
     n_pixel = n_μ .+ n_o

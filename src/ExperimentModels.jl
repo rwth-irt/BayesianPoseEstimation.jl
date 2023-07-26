@@ -2,18 +2,40 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO Does it make more sense to return (;t=t,r=r) and reuse it in samplers where the prior is sampled?
+# TODO Include prior_o in functions - assume either RFID or mask to be available - finally both?
 
 """
     point_prior(params, experiment, cpu_rng)
 Returns a BayesNet for μ(t,r) for an approximately known position and unknown orientation.
 """
-function point_prior(params, experiment, cpu_rng)
+function point_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG)
     t = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
 
     μ_fn = render_fn | (experiment.gl_context, experiment.scene)
     DeterministicNode(:μ, μ_fn, (t, r))
+end
+
+# TODO move arguments to Experiment
+# TODO add to Diss
+function segmentation_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG, mask_img, bbox, cv_camera)
+    # u & v are the center of the bounding box
+    left, right, top, bottom = bbox
+    u, v = (left + right, top + bottom) ./ 2
+    # Assumption: Most pixels belong to the object.
+    masked = experiment.depth_image[mask_img.>0]
+    mean_z = mean(masked)
+    reproject_3D(u, v, mean_z, cv_camera)
+
+    # When dividing masked by some amount, the mean also changes the same way
+    # NOTE scaling is an arbitrary Hyperparameter -> parameters
+    scaling = 0.1
+    σ_z = std(masked .* scaling, mean=mean_z * scaling)
+    σ_t = copy(params.σ_t)
+    σ_t[3] = σ_z
+    @reset params.σ_t = σ_z
+
+    point_prior(params, experiment, cpu_rng)
 end
 
 """
@@ -27,7 +49,8 @@ function simple_posterior(params, experiment, μ_node, dev_rng)
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
-    # TODO keep it simple? Always?
+    # NOTE seems to work better if mask is available
+    # z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization)
     PosteriorModel(z_norm | experiment.depth_image)
 end
@@ -45,8 +68,7 @@ function association_posterior(params, experiment, μ_node, dev_rng)
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
-    # TODO keep it simple? Always?
-    z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization)
+    # NOTE seems to perform better with ImageLikelihoodNormalizer if prior is known for o. Also seems to perform worse than the simple_posterior if SimpleImageRegularization is used.
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     PosteriorModel(z_norm | experiment.depth_image)
 end

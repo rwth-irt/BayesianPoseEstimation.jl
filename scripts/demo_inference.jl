@@ -36,8 +36,8 @@ function smc_parameters()
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
     # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
-    @reset parameters.n_steps = 150
-    @reset parameters.n_particles = 200
+    @reset parameters.n_steps = 200
+    @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
     # TODO tempering in MCMC?
@@ -76,8 +76,8 @@ row = df[100, :]
 
 # Clutter and occlusions
 # NOTE better crop → better result if using union in ℓ normalization
-# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 15)
-# row = df[10, :]
+# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+# row = df[298, :]
 
 # Experiment setup
 camera = crop_camera(row)
@@ -99,10 +99,11 @@ scene = Scene(camera, [mesh])
 plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
-prior = point_prior(parameters, experiment, cpu_rng)
-# posterior = association_posterior(parameters, experiment, prior, dev_rng)
+# TODO prior = point_prior(parameters, experiment, cpu_rng)
+prior = segmentation_prior(parameters, experiment, cpu_rng, mask_img, row.bbox, row.cv_camera)
+posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
-posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
