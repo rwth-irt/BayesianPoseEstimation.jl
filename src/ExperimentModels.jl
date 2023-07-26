@@ -42,7 +42,7 @@ function simple_posterior(params, experiment, μ_node, dev_rng)
     # ValidPixel diverges without normalization
     z_i = pixel_valid_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
-    # NOTE seems to work better if mask is available
+    # NOTE Here, the SimpleImageRegularization seems to perform better
     # z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.normalization_constant)
     z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization)
     PosteriorModel(z_norm | experiment.depth_image)

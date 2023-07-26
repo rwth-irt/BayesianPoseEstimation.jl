@@ -79,6 +79,7 @@ Use it in a modifier node to normalize the loglikelihood of the image to make it
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
     normalization_constant::T
     μ::M
+    # NOTE using the mask image instead of the estimated o is worse
     o::M
 end
 
@@ -99,6 +100,8 @@ function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     n_o = sum_and_dropdims(model.o .> 0.5, (1, 2))
     n_pixel = n_μ .+ n_o
     logdensity_npixel.(ℓ, 2 * model.normalization_constant, n_pixel)
+    # TODO the estimated o seems to be the special sauce. Why does averaging it and μ perform better than each on its own?
+    # logdensity_npixel.(ℓ, model.normalization_constant, n_o)
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
 logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
