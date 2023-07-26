@@ -40,7 +40,6 @@ function smc_parameters()
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
-    # TODO tempering in MCMC?
 end
 
 function mh_parameters()
@@ -67,8 +66,8 @@ gl_context = render_context(parameters)
 # row = df[101, :]
 
 # Buddha is very smooth without distinct features
-df = gt_targets(joinpath("data", "bop", "lm", "test"), 1)
-row = df[100, :]
+# df = gt_targets(joinpath("data", "bop", "lm", "test"), 1)
+# row = df[100, :]
 
 # Box shaped object → multimodal for each flat side
 # df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 1)
@@ -76,22 +75,24 @@ row = df[100, :]
 
 # Clutter and occlusions
 # NOTE better crop → better result if using union in ℓ normalization
-# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-# row = df[298, :]
+df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+row = df[298, :]
 
 # Experiment setup
 camera = crop_camera(row)
 mesh = upload_mesh(gl_context, load_mesh(row))
 @reset mesh.pose = to_pose(row.gt_t, row.gt_R)
 # Observation is cropped and resized to match the gl_context and crop_camera
-mask_img = load_mask_image(row, parameters.img_size...)
+depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
+mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
 prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
 prior_o[mask_img] .= parameters.o_mask_is
-
-depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
-# TODO do not use row.gt_t but the estimated object center from the mask_img .* depth_img
-experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, row.gt_t, depth_img)
+prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
+# For RFID scenario
+# prior_t = row.gt_t + rand(cpu_rng, KernelNormal(0, 0.01f0), 3)
+# prior_o .= 0.5
+experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
 # Draw result for visual validation
 color_img = load_color_image(row, parameters.img_size...)
@@ -99,8 +100,7 @@ scene = Scene(camera, [mesh])
 plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
-# TODO prior = point_prior(parameters, experiment, cpu_rng)
-prior = segmentation_prior(parameters, experiment, cpu_rng, mask_img, row.bbox, row.cv_camera)
+prior = point_prior(parameters, experiment, cpu_rng)
 posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
 # posterior = simple_posterior(parameters, experiment, prior, dev_rng)
@@ -117,7 +117,7 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
 @time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
-# TODO evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
+# NOTE evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
 plot_logevidence(states)
 # Plot state which uses the weights
 plot_pose_density(final_state.sample; trim=false, legend=true)

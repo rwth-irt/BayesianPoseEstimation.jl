@@ -2,8 +2,6 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO Include prior_o in functions - assume either RFID or mask to be available - finally both?
-
 """
     point_prior(params, experiment, cpu_rng)
 Returns a BayesNet for μ(t,r) for an approximately known position and unknown orientation.
@@ -16,26 +14,21 @@ function point_prior(params::Parameters, experiment::Experiment, cpu_rng::Abstra
     DeterministicNode(:μ, μ_fn, (t, r))
 end
 
-# TODO move arguments to Experiment
 # TODO add to Diss
-function segmentation_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG, mask_img, bbox, cv_camera)
+"""
+    segmentation_to_point(bounding_box, depth_image, mask_img, cv_camera)
+Calculates a 3D point which can be used for `prior_t` in the `Experiment` with x and y at the center of the bounding box and z as the mean of the masked depth image.
+The `bounding_box` should contain the mask at its center.  
+"""
+function point_from_segmentation(bounding_box, depth_image, mask_img, cv_camera)
     # u & v are the center of the bounding box
-    left, right, top, bottom = bbox
+    left, right, top, bottom = bounding_box
     u, v = (left + right, top + bottom) ./ 2
     # Assumption: Most pixels belong to the object.
-    masked = experiment.depth_image[mask_img.>0]
-    mean_z = mean(masked)
-    reproject_3D(u, v, mean_z, cv_camera)
-
-    # When dividing masked by some amount, the mean also changes the same way
-    # NOTE scaling is an arbitrary Hyperparameter -> parameters
-    scaling = 0.1
-    σ_z = std(masked .* scaling, mean=mean_z * scaling)
-    σ_t = copy(params.σ_t)
-    σ_t[3] = σ_z
-    @reset params.σ_t = σ_z
-
-    point_prior(params, experiment, cpu_rng)
+    masked = depth_image[mask_img.>=0]
+    z = median(masked)
+    x, y = reproject_3D(u, v, z, cv_camera)
+    [x, y, z]
 end
 
 """

@@ -161,7 +161,7 @@ export sphere_scatter
 
 # Experiment models & samplers
 export association_posterior
-export segmentation_prior
+export point_from_segmentation
 export point_prior
 export simple_posterior
 export smooth_posterior
