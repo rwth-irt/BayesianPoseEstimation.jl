@@ -18,8 +18,8 @@ MCMCDepth.diss_defaults()
 
 function mtm_parameters()
     parameters = Parameters()
-    # NOTE optimal parameter values of pixel_σ and normalization_constant seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-    @reset parameters.normalization_constant = 20
+    # NOTE optimal parameter values of pixel_σ and c_reg seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
+    @reset parameters.c_reg = 20
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 500
@@ -30,8 +30,8 @@ end
 
 function smc_parameters()
     parameters = Parameters()
-    # NOTE SMC: tempering is essential. More steps (MCMC) allows higher normalization_constant than more particles (FP, Bootstrap), 15-30 seems to be a good range
-    @reset parameters.normalization_constant = 20
+    # NOTE SMC: tempering is essential. More steps (MCMC) allows higher c_reg than more particles (FP, Bootstrap), 15-30 seems to be a good range
+    @reset parameters.c_reg = 20
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
@@ -44,7 +44,7 @@ end
 
 function mh_parameters()
     parameters = Parameters()
-    @reset parameters.normalization_constant = 25
+    @reset parameters.c_reg = 25
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 10_000
@@ -103,6 +103,7 @@ plot_scene_ontop(gl_context, scene, color_img)
 prior = point_prior(parameters, experiment, cpu_rng)
 posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE no association → prior_o has strong influence
+# @reset parameters.c_reg = 1 / 500
 # posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
@@ -139,8 +140,8 @@ gif(anim, "anim.gif", fps=20)
 
 
 # MCMC samplers
-parameters = mh_parameters()
-sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
+# parameters = mh_parameters()
+# sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
 parameters = mtm_parameters()
 sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior);

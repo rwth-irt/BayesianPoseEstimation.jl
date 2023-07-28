@@ -16,12 +16,12 @@ Therefore, the image logdensity for the measurement `z` is calculated by summing
 Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
 
 # Normalization
-If a normalization_constant is provided, `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
+If `c_reg` is provided, `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
 This effectively changes the number of data points evaluated in the sum of the image loglikelihood for different views.
 Thus, the algorithm might prefer (incorrect) poses further or closer to the object, which depends if the pixel loglikelihood is positive or negative.
 
 To remove the sensitivity to the number of valid expected pixels, the images is normalized by diving the sum of the pixel loglikelihood by the number of valid pixels.
-The `normalization_constant` is multiplied afterwards, a reasonable constant is the expected number of visible pixels for the views from the prior.
+The `c_reg` is multiplied afterwards.
 
 # Alternatives to Normalization
 * proper preprocessing by cropping or segmenting the image
@@ -77,28 +77,28 @@ Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 Use it in a modifier node to normalize the loglikelihood of the image to make it less independent from the number of visible pixels in μ. 
 """
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
-    normalization_constant::T
+    c_reg::T
     μ::M
     # NOTE using the prior_o instead of the estimated o is worse
     o::M
 end
 
-ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(normalization_constant, μ)
+ImageLikelihoodNormalizer(c_reg::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(c_reg, μ)
 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     # NOTE This incentives poses where only a handful of pixels is visible at the edges of the image which perfectly fit the measured depth. Especially for non distinct features.
     # n_μ = model.μ != 0
-    # logdensity_npixel.(ℓ,  model.normalization_constant, n_μ)
+    # logdensity_npixel.(ℓ,  model.c_reg, n_μ)
 
     # NOTE This regularization incentives a minimization of the visible pixels, e.g. fitting the silhouette into the prior mask. - loglikelihood grows more than linear with the number of pixels? Pixel association does not modify the prior in regions where nothing is rendered.
     # union = @. model.μ != 0 || model.o > 0.5
     # n_pixel = sum_and_dropdims(union, (1, 2))
-    # logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
+    # logdensity_npixel.(ℓ, model.c_reg, n_pixel)
 
     # NOTE this is more stable than the above and should still capture the varying number of pixels. It fuses the information form the prior and the observation so it is the best guess of pixels which actually contribute information on the pose.
     n_o = sum_and_dropdims(model.o .>= 0.5, (1, 2))
-    logdensity_npixel.(ℓ, model.normalization_constant, n_o)
+    logdensity_npixel.(ℓ, model.c_reg, n_o)
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
 logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
@@ -107,14 +107,17 @@ logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ *
 """
     SimpleImageRegularization
 Use it in a modifier node to regularize the loglikelihood of the image to make it less dominant compared to the prior.
+Tunable Hyperparameter: c_reg is the regularization constant
 """
-struct SimpleImageRegularization end
-SimpleImageRegularization(_, _...) = SimpleImageRegularization()
+struct SimpleImageRegularization
+    c_reg
+end
+SimpleImageRegularization(c_reg, _...) = SimpleImageRegularization(c_reg)
 
 Base.rand(::AbstractRNG, ::SimpleImageRegularization, value) = value
 function DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ)
     # NOTE one could estimate the expected number of visible pixels for a given image size. Is there a good explanation 
-    ℓ / norm(size(z))
+    model.c_reg * ℓ
 end
 
 """

@@ -45,7 +45,7 @@ Deliberately not strongly typed because the strongly typed structs are construct
 
 ## Image Model
 * `normalize_img` Normalize the likelihood of an image using the number of rendered pixels. Uses the ValidPixel wrapper.
-* `n_normalization_samples` Number of samples to calculate the normalization constant from the expected number of visible pixels.
+* `c_reg` Regularization constant for the image likelihood regularization.
 
 # Pose Model
 * `σ_t` Standard deviation of RFID measurement, assumes independent x,y,z components
@@ -86,8 +86,7 @@ Base.@kwdef struct Parameters
     proposal_σ_o = 0.01
     # Image Model
     normalize_img = true
-    n_normalization_samples = 20_000
-    normalization_constant = 20
+    c_reg = 20
 
     # Pose Model
     σ_t = fill(0.03, 3)
@@ -184,7 +183,7 @@ Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.float_type.(getfield(p, :
 
 Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.float_type.(getfield(p, :prior_o))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.float_type.(getfield(p, :proposal_σ_o))
-Base.getproperty(p::Parameters, ::Val{:normalization_constant}) = p.float_type.(getfield(p, :normalization_constant))
+Base.getproperty(p::Parameters, ::Val{:c_reg}) = p.float_type.(getfield(p, :c_reg))
 Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.float_type.(getfield(p, :pixel_σ))
 Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.float_type.(getfield(p, :association_σ))
 Base.getproperty(p::Parameters, ::Val{:pixel_θ}) = p.float_type.(getfield(p, :pixel_θ))
