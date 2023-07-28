@@ -26,7 +26,7 @@ function mh_sampler(cpu_rng, params, experiment, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
     proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([params.w_local_move, params.w_local_move, params.w_independent_move, w_independent_move])
+    weights = Weights([params.w_t_sym, params.w_r_sym, params.w_t_ind, params.w_r_ind])
     samplers = map(proposals) do proposal
         MetropolisHastings(proposal, temp_schedule)
     end
