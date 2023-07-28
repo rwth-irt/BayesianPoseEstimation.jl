@@ -79,7 +79,7 @@ Use it in a modifier node to normalize the loglikelihood of the image to make it
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
     normalization_constant::T
     μ::M
-    # NOTE using the mask image instead of the estimated o is worse
+    # NOTE using the prior_o instead of the estimated o is worse
     o::M
 end
 
@@ -87,21 +87,18 @@ ImageLikelihoodNormalizer(normalization_constant::T, μ::M, _...) where {T,M} = 
 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
-    # Avoid encouraging a small number of visible pixels by including pixels expected to be visible from the prior. E.g. the smallest area of a box is most likely in front or the algorithm might diverge to the edges for non-distinct geometries.
-    # Pixel association does not modify the prior in regions where nothing is rendered.
-    # NOTE This regularization incentives a minimization of the visible pixels, e.g. fitting the silhouette into the prior mask. - loglikelihood grows more than linear with the number of pixels?
+    # NOTE This incentives poses where only a handful of pixels is visible at the edges of the image which perfectly fit the measured depth. Especially for non distinct features.
+    # n_μ = model.μ != 0
+    # logdensity_npixel.(ℓ,  model.normalization_constant, n_μ)
+
+    # NOTE This regularization incentives a minimization of the visible pixels, e.g. fitting the silhouette into the prior mask. - loglikelihood grows more than linear with the number of pixels? Pixel association does not modify the prior in regions where nothing is rendered.
     # union = @. model.μ != 0 || model.o > 0.5
-    # # Images are always 2D
     # n_pixel = sum_and_dropdims(union, (1, 2))
     # logdensity_npixel.(ℓ, model.normalization_constant, n_pixel)
 
-    # NOTE this is more stable than the above and should still capture the varying number of pixels.
-    n_μ = sum_and_dropdims(model.μ != 0, (1, 2))
-    n_o = sum_and_dropdims(model.o .> 0.5, (1, 2))
-    n_pixel = n_μ .+ n_o
-    logdensity_npixel.(ℓ, 2 * model.normalization_constant, n_pixel)
-    # TODO the estimated o seems to be the special sauce. Why does averaging it and μ perform better than each on its own?
-    # logdensity_npixel.(ℓ, model.normalization_constant, n_o)
+    # NOTE this is more stable than the above and should still capture the varying number of pixels. It fuses the information form the prior and the observation so it is the best guess of pixels which actually contribute information on the pose.
+    n_o = sum_and_dropdims(model.o .>= 0.5, (1, 2))
+    logdensity_npixel.(ℓ, model.normalization_constant, n_o)
 end
 # (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
 logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
