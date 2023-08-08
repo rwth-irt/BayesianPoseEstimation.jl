@@ -44,7 +44,6 @@ Deliberately not strongly typed because the strongly typed structs are construct
 * `proposal_σ_o` Random walk proposals for the association
 
 ## Image Model
-* `normalize_img` Normalize the likelihood of an image using the number of rendered pixels. Uses the ValidPixel wrapper.
 * `c_reg` Regularization constant for the image likelihood regularization.
 
 # Pose Model
@@ -85,7 +84,6 @@ Base.@kwdef struct Parameters
     association_σ = 0.01
     proposal_σ_o = 0.01
     # Image Model
-    normalize_img = true
     c_reg = 20
 
     # Pose Model
@@ -102,7 +100,7 @@ Base.@kwdef struct Parameters
     device = :CUDA
     seed = 8418387917544508114
     n_steps = 3_000
-    n_burn_in = 1_000
+    n_burn_in = 0
     n_thinning = 0
     n_particles = 50
     relative_ess = 0.5
