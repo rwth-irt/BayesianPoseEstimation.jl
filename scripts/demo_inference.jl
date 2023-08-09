@@ -9,7 +9,6 @@ using MCMCDepth
 using Random
 using Plots
 using PoseErrors
-using ProgressLogging
 using SciGL
 
 CUDA.allowscalar(false)

@@ -192,9 +192,8 @@ function smc_inference(cpu_rng, posterior, sampler, params::Parameters; collect_
     states = Vector{SmcState}(undef, params.n_steps)
     _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
     states[1] = collect_variables(state, collect_vars)
-    @progress for idx in 2:params.n_steps
+    for idx in 2:params.n_steps
         _, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
-        collect_state = @set state.sample.variables = state.sample.variables[collect_vars]
         states[idx] = collect_variables(state, collect_vars)
     end
     states, state

@@ -14,7 +14,6 @@ using LinearAlgebra: isposdef
 using LogExpFunctions
 using Logging
 using PoseErrors
-using ProgressLogging
 using Quaternions
 using Random
 using Reexport
