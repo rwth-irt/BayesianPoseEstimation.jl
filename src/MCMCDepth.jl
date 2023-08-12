@@ -115,6 +115,7 @@ export BootstrapKernel
 export ForwardProposalKernel
 export MhKernel
 export SequentialMonteCarlo
+export SmcState
 export smc_step
 
 # Models

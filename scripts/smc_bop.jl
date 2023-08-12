@@ -11,43 +11,39 @@ using CUDA
 using DataFrames
 using MCMCDepth
 using PoseErrors
-using Random
+using Logging
 using SciGL
 
+using ProgressLogging
+using TerminalLoggers
+
+# Context
 CUDA.allowscalar(false)
 # Avoid timing the compilation
 first_run = true
-
-# Context
 parameters = Parameters()
 @reset parameters.n_steps = 200
 @reset parameters.n_particles = 100
-
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
-# Dataset
+# Dataset → DataFrames
 begin
     bop_subset = ("tless", "test_primesense")
     bop_subset_dir = datadir("bop", bop_subset...)
     scene_ids = bop_scene_ids(bop_subset_dir)
     # TODO run inference and save results on a per-scene basis
     scene_id = 1
-    df = gt_targets(bop_subset_dir, scene_ids[scene_id])
-    # Experiment setup
-    df_row = df[100, :]
-    # TODO incrementally write the dataframe to disk?
-    result_df = select(df, :scene_id, :img_id, :obj_id)
-    insertcols!(result_df, :R => fill(Quaternion(parameters.float_type(1)), nrow(result_df)))
-    insertcols!(result_df, :t => fill(parameters.float_type[0, 0, 0], nrow(result_df)))
+    scene_df = test_targets(bop_subset_dir, scene_ids[scene_id])
 end
 
-# Load experiment data
-begin
+
+function load_img_mesh(df_row, parameters, gl_context)
     depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
     mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
     mesh = upload_mesh(gl_context, load_mesh(df_row))
+    depth_img, mask_img, mesh
 end
 
 # Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded
@@ -82,13 +78,46 @@ function run_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row
     t, r, score, final_state, states
 end
 
-if first_run
-    run_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
-    first_run = false
+# Avoid timing the pre-compilation
+df_row = first(scene_df)
+depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+t, R, score, final_state, states = run_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+
+# Save results per image & object group
+groups = groupby(scene_df, [:img_id, :obj_id])
+@progress for group in groups
+    # TODO wrap in function and call it DrWatson style as an experiment which allows to check whether it has been run before.
+    result_df = select(group, :scene_id, :img_id, :obj_id)
+    result_df.score = Vector{typeof(score)}(undef, nrow(result_df))
+    result_df.R = Vector{typeof(R)}(undef, nrow(result_df))
+    result_df.t = Vector{typeof(t)}(undef, nrow(result_df))
+    result_df.time = Vector{Float64}(undef, nrow(result_df))
+    result_df.final_state = Vector{typeof(final_state)}(undef, nrow(result_df))
+    result_df.states = Vector{typeof(states)}(undef, nrow(result_df))
+    for (idx, df_row) in enumerate(eachrow(group))
+        # Image crops differ per object
+        depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
+        mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
+        mesh = upload_mesh(gl_context, load_mesh(df_row))
+        # wrap in begin ... end to access inference results 
+        time = @elapsed begin
+            t, R, score, final_state, states = run_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        end
+        result_df[idx, :].score = score
+        result_df[idx, :].R = R
+        result_df[idx, :].t = t
+        result_df[idx, :].time = time
+        result_df[idx, :].final_state = final_state
+        result_df[idx, :].states = states
+        # TODO Save full and BOP subset 
+
+    end
 end
-time = @elapsed begin
-    t, r, score, final_state = run_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
-end
+
+# TODO incrementally write the dataframe to disk?
+
+
+
 
 begin
     color_img = load_color_image(df_row, parameters.width, parameters.height)
@@ -105,3 +134,5 @@ result_root = datadir("exp_raw", bop_subset..., "smc")
 
 # TODO How to organize save-files? Per scene might be risky if something interrupts the computation. Per image seems reasonable.
 
+# WARN when calculating the score for a dataset: test_targets does not contain all instances since some detections are missing. Use the gt_targets instead
+gt_df = gt_targets(bop_subset_dir, 19)
