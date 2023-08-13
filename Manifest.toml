@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "b6c8e97a3e1b1d049633a87df8c7d27faad54631"
+project_hash = "bf620dbc90e55082ef716528f53c42218021a2c8"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -1166,11 +1166,11 @@ version = "1.4.2"
 
 [[deps.PoseErrors]]
 deps = ["Accessors", "CUDA", "CoordinateTransformations", "DataFrames", "Distances", "FileIO", "GLAbstraction", "GeometryBasics", "ImageCore", "ImageIO", "ImageTransformations", "Interpolations", "JSON", "JSONTables", "LinearAlgebra", "NearestNeighbors", "Rotations", "SciGL", "StaticArrays", "Statistics"]
-git-tree-sha1 = "f7084eaa21d1de1ed2a6df61fa26543447dacad6"
+git-tree-sha1 = "1bc672072ae0c2bf33769f9a96378f31f5583622"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/poseerrors.jl.git"
 uuid = "0e048aec-5af0-406a-9f6c-fdc882ab1032"
-version = "0.2.6"
+version = "0.2.8"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]

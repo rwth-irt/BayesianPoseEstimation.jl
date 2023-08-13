@@ -18,17 +18,9 @@ using SciGL
 using ProgressLogging
 using TerminalLoggers
 
-# Context
 CUDA.allowscalar(false)
-# Avoid timing the compilation
-first_run = true
-parameters = Parameters()
-@reset parameters.n_steps = 200
-@reset parameters.n_particles = 100
-cpu_rng = Random.default_rng(parameters)
-dev_rng = device_rng(parameters)
-gl_context = render_context(parameters)
 
+# Load the depth image, mask image, and object mesh
 function load_img_mesh(df_row, parameters, gl_context)
     depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
     mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
@@ -38,6 +30,10 @@ end
 
 # Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded
 function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
+    # Context
+    cpu_rng = Random.default_rng(parameters)
+    dev_rng = device_rng(parameters)
+
     time = @elapsed begin
         # Setup experiment
         camera = crop_camera(df_row)
@@ -70,18 +66,20 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
     t, r, score, final_state, states, time
 end
 
-# Save results per scene
-# TODO wrap in function and call it DrWatson style as an experiment which allows to check whether it has been run before.
+# Save results per scene via DrWatson's produce_or_load
 function scene_inference(config)
-    # Extract config
-    @unpack sceneid, dataset, sampler = config
+    # Extract config and load dataset
+    @unpack scene_id, dataset, testset, sampler = config
     sampler = eval(sampler)
-    bop_subset_dir = datadir("bop", dataset)
+    bop_full_path = datadir("bop", dataset, testset)
+    scene_df = test_targets(bop_full_path, scene_id)
 
-    # TODO run inference and save results on a per-scene basis
-    scene_df = test_targets(bop_subset_dir, scene_id)
+    # Setup parameters
+    parameters = Parameters()
+    @reset parameters.n_steps = 200
+    @reset parameters.n_particles = 100
 
-    # TODO generate: scene_df, parameters, gl_context
+    # Store result in DataFrame
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)
     result_df.score = Vector{parameters.float_type}(undef, nrow(result_df))
     result_df.R = Vector{Quaternion{parameters.float_type}}(undef, nrow(result_df))
@@ -90,58 +88,48 @@ function scene_inference(config)
     result_df.final_state = Vector{SmcState}(undef, nrow(result_df))
     result_df.states = Vector{Vector{SmcState}}(undef, nrow(result_df))
 
+    # Make sure the context is destroyed to avoid undefined behavior
+    gl_context = render_context(parameters)
+    try
+        # Avoid timing the pre-compilation
+        df_row = first(scene_df)
+        depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+        timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
 
-    # Avoid timing the pre-compilation
-    df_row = first(scene_df)
-    depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-    timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
-
-    @progress for (idx, df_row) in enumerate(eachrow(scene_df))
-        # Image crops differ per object
-        depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-        mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-        mesh = upload_mesh(gl_context, load_mesh(df_row))
-        # Run and collect results
-        t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
-        result_df[idx, :].score = score
-        result_df[idx, :].R = R
-        result_df[idx, :].t = t
-        result_df[idx, :].time = time
-        result_df[idx, :].final_state = final_state
-        result_df[idx, :].states = states
+        # Run inference per detection
+        for (idx, df_row) in enumerate(eachrow(scene_df))
+            # Image crops differ per object
+            depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+            # Run and collect results
+            t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
+            result_df[idx, :].score = score
+            result_df[idx, :].R = R
+            result_df[idx, :].t = t
+            result_df[idx, :].time = time
+            result_df[idx, :].final_state = final_state
+            result_df[idx, :].states = states
+            break
+        end
+        # Return result
+        Dict("parameters" => parameters, "results" => result_df)
+    finally
+        destroy_context(gl_context)
     end
-    # Return result
-    result_df
 end
 
-# TODO iterate over scenes
-# Dataset → DataFrames
-bop_dataset = joinpath("tless", "test_primesense")
-bop_subset_dir = datadir("bop", test_dir)
-scene_ids = bop_scene_ids(bop_subset_dir)
-config = Dict("dataset" => bop_dataset, "sceneid" => scene_ids, "sampler" => :smc_mh)
-dicts = dict_list(config)
+bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
+@progress for bop_dataset in bop_datasets
+    # DrWatson configuration
+    dataset, testset = bop_dataset
+    bop_full_path = datadir("bop", bop_dataset...)
+    scene_id = bop_scene_ids(bop_full_path)
+    sampler = [:smc_mh, :smc_forward]
+    config = @dict dataset testset scene_id sampler
+    dicts = dict_list(config)
 
-scene_inference(dicts[1])
-
-produce_or_load(dicts[1])
-
-
-# TODO incrementally write the dataframe to disk?
-begin
-    color_img = load_color_image(df_row, parameters.width, parameters.height)
-    camera = crop_camera(df_row)
-    @reset mesh.pose = to_pose(t, r)
-    plot_scene_ontop(gl_context, Scene(camera, [mesh]), color_img)
+    # Run and save results
+    result_path = datadir("exp_raw")
+    for d in dicts
+        produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
+    end
 end
-
-# TODO DrWatson would save each run in a different file and then collect the results in a single DataFrame. However, they would run a simulation per parameter and not per data label.
-result_data = Dict("parameters" => parameters, "data" => result_df)
-result_root = datadir("exp_raw", bop_subset..., "smc")
-@tagsave(datadir(result_root, "sim_1.jld2"), result_data)
-# TODO how to read the tags? Probably a tag in the dictionary which is saved via JLD2
-
-# TODO How to organize save-files? Per scene might be risky if something interrupts the computation. Per image seems reasonable.
-
-# WARN when calculating the score for a dataset: test_targets does not contain all instances since some detections are missing. Use the gt_targets instead
-gt_df = gt_targets(bop_subset_dir, 19)
