@@ -103,7 +103,7 @@ function scene_inference(config)
         timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
 
         # Run inference per detection
-        for (idx, df_row) in enumerate(eachrow(scene_df))
+        @progress for (idx, df_row) in enumerate(eachrow(scene_df))
             # Image crops differ per object
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             # Run and collect results
@@ -123,7 +123,7 @@ function scene_inference(config)
 end
 
 bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
-@progress for bop_dataset in bop_datasets
+for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset
     bop_full_path = datadir("bop", bop_dataset...)
