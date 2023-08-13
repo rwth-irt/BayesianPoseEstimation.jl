@@ -2,6 +2,8 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# TODO create my own smaller training dataset using BlenderProc - the datasets from the website are too large
+
 using DrWatson
 @quickactivate("MCMCDepth")
 
@@ -43,7 +45,7 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
         prior_o[mask_img] .= parameters.o_mask_is
 
         prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
-        # TODO bias position prior by a fixed distance: recall / bias curve
+        # TODO If using point prior: bias position prior by a fixed distance: recall / bias curve
         # pos_bias = parameters.bias_t * normalize(randn(cpu_rng, 3)) .|> parameters.float_type
         experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
@@ -72,7 +74,11 @@ function scene_inference(config)
     @unpack scene_id, dataset, testset, sampler = config
     sampler = eval(sampler)
     bop_full_path = datadir("bop", dataset, testset)
-    scene_df = test_targets(bop_full_path, scene_id)
+    if occursin("test", testset)
+        scene_df = test_targets(bop_full_path, scene_id)
+    elseif occursin("train", testset) || occursin("val", testset)
+        scene_df = train_targets(bop_full_path, scene_id)
+    end
 
     # Setup parameters
     parameters = Parameters()
@@ -108,7 +114,6 @@ function scene_inference(config)
             result_df[idx, :].time = time
             result_df[idx, :].final_state = final_state
             result_df[idx, :].states = states
-            break
         end
         # Return result
         Dict("parameters" => parameters, "results" => result_df)
@@ -128,7 +133,7 @@ bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
     dicts = dict_list(config)
 
     # Run and save results
-    result_path = datadir("exp_raw")
+    result_path = datadir("exp_raw", "baseline")
     for d in dicts
         produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end

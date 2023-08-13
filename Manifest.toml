@@ -116,10 +116,10 @@ uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 version = "1.3.2"
 
 [[deps.Bijectors]]
-deps = ["ArgCheck", "ChainRulesCore", "ChangesOfVariables", "Compat", "Distributions", "Functors", "InverseFunctions", "IrrationalConstants", "LinearAlgebra", "LogExpFunctions", "MappedArrays", "Random", "Reexport", "Requires", "Roots", "SparseArrays", "Statistics"]
-git-tree-sha1 = "d08e8d07072fc4f4dcce762bec1f74398645546a"
+deps = ["ArgCheck", "ChainRules", "ChainRulesCore", "ChangesOfVariables", "Compat", "Distributions", "Functors", "InverseFunctions", "IrrationalConstants", "LinearAlgebra", "LogExpFunctions", "MappedArrays", "Random", "Reexport", "Requires", "Roots", "SparseArrays", "Statistics"]
+git-tree-sha1 = "24e7a4c497ca88581443fd919b0525dc39dc887d"
 uuid = "76274a88-744f-5084-9051-94815aaf08c4"
-version = "0.13.3"
+version = "0.13.4"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "43b1a4a8f797c1cddadf60499a8a077d4af2cd2d"
@@ -172,6 +172,12 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "f641eb0a4f00c343bbc32346e1217b86f3ce9dad"
 uuid = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
 version = "0.5.1"
+
+[[deps.ChainRules]]
+deps = ["Adapt", "ChainRulesCore", "Compat", "Distributed", "GPUArraysCore", "IrrationalConstants", "LinearAlgebra", "Random", "RealDot", "SparseArrays", "Statistics", "StructArrays"]
+git-tree-sha1 = "f98ae934cd677d51d2941088849f0bf2f59e6f6e"
+uuid = "082447d4-558c-5d27-93f4-14fc19e9eca2"
+version = "1.53.0"
 
 [[deps.ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
@@ -1166,11 +1172,11 @@ version = "1.4.2"
 
 [[deps.PoseErrors]]
 deps = ["Accessors", "CUDA", "CoordinateTransformations", "DataFrames", "Distances", "FileIO", "GLAbstraction", "GeometryBasics", "ImageCore", "ImageIO", "ImageTransformations", "Interpolations", "JSON", "JSONTables", "LinearAlgebra", "NearestNeighbors", "Rotations", "SciGL", "StaticArrays", "Statistics"]
-git-tree-sha1 = "1bc672072ae0c2bf33769f9a96378f31f5583622"
+git-tree-sha1 = "00d13344cbf449f680e8051ecaceb53d968917a8"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/poseerrors.jl.git"
 uuid = "0e048aec-5af0-406a-9f6c-fdc882ab1032"
-version = "0.2.8"
+version = "0.2.9"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -1314,9 +1320,9 @@ version = "0.4.0+0"
 
 [[deps.Roots]]
 deps = ["ChainRulesCore", "CommonSolve", "Printf", "Setfield"]
-git-tree-sha1 = "de432823e8aab4dd1a985be4be768f95acf152d4"
+git-tree-sha1 = "59f5b44bce19cee49fe02a75c10225046276084f"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "2.0.17"
+version = "2.0.18"
 
 [[deps.Rotations]]
 deps = ["LinearAlgebra", "Quaternions", "Random", "StaticArrays"]
