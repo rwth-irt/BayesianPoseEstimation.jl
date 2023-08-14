@@ -125,7 +125,7 @@ function scene_inference(config)
 end
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
-bop_datasets = [("itodd", "val")]
+bop_datasets = [("lmo", "train_pbr")]
 for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset
