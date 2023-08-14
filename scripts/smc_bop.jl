@@ -108,6 +108,8 @@ function scene_inference(config)
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             # Run and collect results
             t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
+            # Avoid out of GPU errors
+            @reset final_state.sample = to_cpu(final_state.sample)
             result_df[idx, :].score = score
             result_df[idx, :].R = R
             result_df[idx, :].t = t
@@ -122,7 +124,8 @@ function scene_inference(config)
     end
 end
 
-bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
+# bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
+bop_datasets = [("itodd", "val")]
 for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset

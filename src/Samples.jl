@@ -55,6 +55,8 @@ Returns a named tuple of the raw variables ∈ ℝⁿ.
 """
 variables(s::Sample) = s.variables
 
+to_cpu(s::Sample) = @set s.variables = map(to_cpu, variables(s))
+
 """
     to_model_domain(sample, bijectors)
 Transforms the sample to the model domain by using the inverse transform of the provided bijectors.

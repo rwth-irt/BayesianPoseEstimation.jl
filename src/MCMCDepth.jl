@@ -57,6 +57,7 @@ export map_intersect
 export norm_dims, normalize_dims!, normalize_dims
 export sum_and_dropdims
 export to_rotation, to_translation, to_pose
+export to_cpu
 
 # Samples
 export Sample
