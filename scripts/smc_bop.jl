@@ -7,6 +7,7 @@
 using DrWatson
 @quickactivate("MCMCDepth")
 
+@info "Loading packages"
 using Accessors
 using BenchmarkTools
 using CUDA
@@ -85,14 +86,14 @@ function scene_inference(config)
     @reset parameters.n_steps = 200
     @reset parameters.n_particles = 100
 
-    # Store result in DataFrame
+    # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)
-    result_df.score = Vector{parameters.float_type}(undef, nrow(result_df))
-    result_df.R = Vector{Quaternion{parameters.float_type}}(undef, nrow(result_df))
-    result_df.t = Vector{Vector{parameters.float_type}}(undef, nrow(result_df))
-    result_df.time = Vector{Float64}(undef, nrow(result_df))
+    result_df.score = Vector{Float32}(undef, nrow(result_df))
+    result_df.R = Vector{Quaternion{Float32}}(undef, nrow(result_df))
+    result_df.t = Vector{Vector{Float32}}(undef, nrow(result_df))
+    result_df.time = Vector{Float32}(undef, nrow(result_df))
     result_df.final_state = Vector{SmcState}(undef, nrow(result_df))
-    result_df.states = Vector{Vector{SmcState}}(undef, nrow(result_df))
+    result_df.log_evidence = Vector{Vector{Float32}}(undef, nrow(result_df))
 
     # Make sure the context is destroyed to avoid undefined behavior
     gl_context = render_context(parameters)
@@ -108,6 +109,8 @@ function scene_inference(config)
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             # Run and collect results
             t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
+            # Avoid too large files by only saving t, r, and the logevidence not the sequence of states
+            final_state = MCMCDepth.collect_variables(final_state, (:t, :r))
             # Avoid out of GPU errors
             @reset final_state.sample = to_cpu(final_state.sample)
             result_df[idx, :].score = score
@@ -115,7 +118,7 @@ function scene_inference(config)
             result_df[idx, :].t = t
             result_df[idx, :].time = time
             result_df[idx, :].final_state = final_state
-            result_df[idx, :].states = states
+            result_df[idx, :].log_evidence = logevidence.(states)
         end
         # Return result
         Dict("parameters" => parameters, "results" => result_df)
@@ -126,6 +129,7 @@ end
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
 bop_datasets = [("lmo", "train_pbr")]
+@info "Run smc on datasets $bop_datasets"
 for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset

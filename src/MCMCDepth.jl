@@ -115,8 +115,10 @@ export AdaptiveKernel
 export BootstrapKernel
 export ForwardProposalKernel
 export MhKernel
+
 export SequentialMonteCarlo
 export SmcState
+export logevidence
 export smc_step
 
 # Models
