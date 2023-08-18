@@ -20,6 +20,8 @@ using SciGL
 
 using ProgressLogging
 using TerminalLoggers
+using Logging: global_logger
+global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
@@ -104,7 +106,7 @@ function scene_inference(config)
         timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
 
         # Run inference per detection
-        @progress for (idx, df_row) in enumerate(eachrow(scene_df))
+        @progress "scenes" for (idx, df_row) in enumerate(eachrow(scene_df))
             # Image crops differ per object
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             # Run and collect results
@@ -128,20 +130,20 @@ function scene_inference(config)
 end
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
-bop_datasets = [("lmo", "train_pbr")]
+bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_pbr")]
 @info "Run smc on datasets $bop_datasets"
-for bop_dataset in bop_datasets
+@progress "datasets" for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset
     bop_full_path = datadir("bop", bop_dataset...)
     scene_id = bop_scene_ids(bop_full_path)
-    sampler = [:smc_mh, :smc_forward]
+    sampler = [:smc_mh, :smc_forward, :smc_bootstrap]
     config = @dict dataset testset scene_id sampler
     dicts = dict_list(config)
 
     # Run and save results
-    result_path = datadir("exp_raw", "baseline")
-    for d in dicts
+    result_path = datadir("exp_raw", "baseline_simple")
+    @progress "$bop_dataset" for d in dicts
         produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end
 end
