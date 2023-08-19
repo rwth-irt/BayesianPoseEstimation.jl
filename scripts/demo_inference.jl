@@ -19,7 +19,6 @@ function mtm_parameters()
     parameters = Parameters()
     # NOTE optimal parameter values of pixel_σ and c_reg seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
     @reset parameters.c_reg = 20
-    # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 500
     @reset parameters.n_burn_in = 0
@@ -31,10 +30,9 @@ function smc_parameters()
     parameters = Parameters()
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher c_reg than more particles (FP, Bootstrap), 15-30 seems to be a good range
     @reset parameters.c_reg = 20
-    # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE FP & Bootstrap do not allow independent moves so they profit from a large number of particles. They are also resampling dominated instead of acceptance.
-    # TODO Why is MTM so much worse?
+    # NOTE Why is MTM so much worse? One reason might have been that tempering was not implemented.
     @reset parameters.n_steps = 200
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
@@ -44,7 +42,6 @@ end
 function mh_parameters()
     parameters = Parameters()
     @reset parameters.c_reg = 25
-    # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 10_000
     # NOTE burn in not required/even harmful if maximum likelihood/posteriori is the goal

@@ -47,7 +47,7 @@ function parameter_and_sampler(sampler)
         @reset parameters.n_thinning = 5
     elseif sampler == :mtm_sampler
         @reset parameters.n_particles = 20
-        @reset parameters.n_particles = 300
+        @reset parameters.n_steps = 300
     end
     parameters, eval(sampler)
 end
