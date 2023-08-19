@@ -33,8 +33,8 @@ function smc_parameters()
     @reset parameters.c_reg = 20
     # TODO same seed for experiments
     @reset parameters.seed = rand(RandomDevice(), UInt32)
-    # NOTE resampling dominated like FP & Bootstrap kernels typically perform better with more samples (1_000,100) while MCMC kernels tend to perform better with more steps (2_000,50)
-    # TODO Is it really that good? Why all the sudden? Why is MTM so much worse?
+    # NOTE FP & Bootstrap do not allow independent moves so they profit from a large number of particles. They are also resampling dominated instead of acceptance.
+    # TODO Why is MTM so much worse?
     @reset parameters.n_steps = 200
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler

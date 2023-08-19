@@ -2,6 +2,17 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+"""
+Run different SMC algorithms on the synthetic BOP datasets:
+* MCMC
+* Forward Proposals
+* Bootstrap
+
+Model setup for segmentation:
+* Segmentation prior for position `t` and pixel association `o`
+* Simple likelihood function with mixture model for the pixels, a simple regularization, and without modeling the association,
+"""
+
 using DrWatson
 @quickactivate("MCMCDepth")
 
@@ -23,7 +34,31 @@ global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
-# Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded
+"""
+    parameter_and_sampler(sampler)
+Parameters are hand-tuned for good results at ~0.5s per inference.
+
+Returns (parameters, eval(sampler))
+"""
+function parameter_and_sampler(sampler)
+    parameters = Parameters()
+    if sampler == :smc_bootstrap
+        @reset parameters.n_particles = 250
+        @reset parameters.n_particles = 150
+    elseif sampler == :smc_forward
+        @reset parameters.n_particles = 250
+        @reset parameters.n_particles = 150
+    elseif sampler == :smc_mh
+        @reset parameters.n_particles = 100
+        @reset parameters.n_steps = 200
+    end
+    parameters, eval(sampler)
+end
+
+"""
+    timed_inference
+Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded.
+"""
 function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
     # Context
     cpu_rng = Random.default_rng(parameters)
@@ -32,23 +67,16 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
     time = @elapsed begin
         # Setup experiment
         camera = crop_camera(df_row)
-
         prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
-        # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
         prior_o[mask_img] .= parameters.o_mask_is
-
         prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
-        # TODO If using point prior: bias position prior by a fixed distance: recall / bias curve
-        # pos_bias = parameters.bias_t * normalize(randn(cpu_rng, 3)) .|> parameters.float_type
         experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
-        # Setup model
+        # Model
         prior = point_prior(parameters, experiment, cpu_rng)
-        # posterior = association_posterior(parameters, experiment, prior, dev_rng)
-        # NOTE no association → prior_o has strong influence
         posterior = simple_posterior(parameters, experiment, prior, dev_rng)
-        # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
+        # Sampler
         sampler = sampler(cpu_rng, parameters, posterior)
         states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters)
 
@@ -61,22 +89,15 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
     t, r, score, final_state, states, time
 end
 
-# Save results per scene via DrWatson's produce_or_load
+"""
+scene_inference(config)
+    Save results per scene via DrWatson's produce_or_load for the `config`
+"""
 function scene_inference(config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset, sampler = config
-    sampler = eval(sampler)
-    bop_full_path = datadir("bop", dataset, testset)
-    if occursin("test", testset)
-        scene_df = test_targets(bop_full_path, scene_id)
-    elseif occursin("train", testset) || occursin("val", testset)
-        scene_df = train_targets(bop_full_path, scene_id)
-    end
-
-    # Setup parameters
-    parameters = Parameters()
-    @reset parameters.n_steps = 200
-    @reset parameters.n_particles = 100
+    scene_df = bop_test_or_train(dataset, testset, scene_id)
+    parameters, sampler = parameter_and_sampler(sampler)
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)
@@ -102,7 +123,7 @@ function scene_inference(config)
             # Run and collect results
             t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
             # Avoid too large files by only saving t, r, and the logevidence not the sequence of states
-            final_state = MCMCDepth.collect_variables(final_state, (:t, :r))
+            final_state = collect_variables(final_state, (:t, :r))
             # Avoid out of GPU errors
             @reset final_state.sample = to_cpu(final_state.sample)
             result_df[idx, :].score = score
@@ -121,7 +142,7 @@ end
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
 bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_pbr")]
-@info "Run smc on datasets $bop_datasets"
+@info "Run SMC on datasets $bop_datasets"
 @progress "datasets" for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset
@@ -132,7 +153,7 @@ bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_p
     dicts = dict_list(config)
 
     # Run and save results
-    result_path = datadir("exp_raw", "baseline_simple")
+    result_path = datadir("exp_raw", "baseline")
     @progress "$bop_dataset" for d in dicts
         produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end

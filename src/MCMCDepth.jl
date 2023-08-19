@@ -48,6 +48,8 @@ include("Parameters.jl")
 include("Visualization.jl")
 include("RenderContext.jl")
 include("Models.jl")
+
+include("ExperimentUtils.jl")
 include("ExperimentModels.jl")
 include("ExperimentSamplers.jl")
 
@@ -162,13 +164,19 @@ export scatter_position
 export sphere_density
 export sphere_scatter
 
-# Experiment models & samplers
+# Experiment utils
+export bop_test_or_train
+export load_img_mesh
+export collect_variables
+
+# Experiment models
 export association_posterior
 export point_from_segmentation
 export point_prior
 export simple_posterior
 export smooth_posterior
 
+# Experiment sampler
 export mh_local_sampler
 export mh_sampler
 export mtm_local_sampler
