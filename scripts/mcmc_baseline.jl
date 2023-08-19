@@ -147,6 +147,6 @@ bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_p
     # Run and save results
     result_path = datadir("exp_raw", "baseline")
     @progress "$bop_dataset" for d in dicts
-        produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
+        @produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end
 end
