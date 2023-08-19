@@ -74,7 +74,7 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
         posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 
         # Sampler
-        sampler = sampler(cpu_rng, parameters, experiment, posterior)
+        sampler = sampler(cpu_rng, parameters, posterior)
         chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning, progress=false)
 
         # Extract best pose and score
