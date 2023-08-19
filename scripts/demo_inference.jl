@@ -140,10 +140,10 @@ gif(anim, "anim.gif", fps=20)
 
 # MCMC samplers
 # parameters = mh_parameters()
-# sampler = mh_sampler(cpu_rng, parameters, experiment, posterior)
+# sampler = mh_sampler(cpu_rng, parameters, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
 parameters = mtm_parameters()
-sampler = mtm_sampler(cpu_rng, parameters, experiment, posterior);
+sampler = mtm_sampler(cpu_rng, parameters, posterior);
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);

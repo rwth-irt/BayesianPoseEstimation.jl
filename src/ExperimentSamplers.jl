@@ -8,16 +8,14 @@ import Distributions
 DensityInterface.logdensityof(d::Distributions.MvNormal, x::AbstractMatrix) = Distributions.logpdf(d, x)
 
 """
-    mh_sampler(cpu_rng, params, experiment, posterior)
+    mh_sampler(cpu_rng, params, posterior)
 Component-wise sampling of the position and orientation via Metropolis-Hastings.
 With a low probability (~1%) the sample is drawn independently from the prior a to avoid local minima.
 """
-function mh_sampler(cpu_rng, params, experiment, posterior)
+function mh_sampler(cpu_rng, params, posterior)
     temp_schedule = LinearSchedule(params.n_steps)
 
-    t_ind = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.σ_t)
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
-    t_ind_proposal = independent_proposal(t_ind, posterior)
     r_ind_proposal = independent_proposal(r_ind, posterior)
 
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
@@ -25,8 +23,8 @@ function mh_sampler(cpu_rng, params, experiment, posterior)
     t_sym_proposal = symmetric_proposal(t_sym, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
 
-    proposals = (t_sym_proposal, r_sym_proposal, t_ind_proposal, r_ind_proposal)
-    weights = Weights([params.w_t_sym, params.w_r_sym, params.w_t_ind, params.w_r_ind])
+    proposals = (t_sym_proposal, r_sym_proposal, r_ind_proposal)
+    weights = Weights([params.w_t_sym, params.w_r_sym, params.w_r_ind])
     samplers = map(proposals) do proposal
         MetropolisHastings(proposal, temp_schedule)
     end
