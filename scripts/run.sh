@@ -4,5 +4,5 @@
 
 # Run this script from the project root, i.e. mcmc-depth-images folder
 # Execute the script in a background tmux session to avoid stopping it when disconnecting SSH
-tmux new-session -s julia 'julia_remote_nvidia.sh scripts/mcmc_baseline.jl'
-tmux new-session -s julia 'julia_remote_nvidia.sh scripts/smc_baseline.jl'
+julia_remote_nvidia.sh scripts/mcmc_baseline.jl
+julia_remote_nvidia.sh scripts/smc_baseline.jl
