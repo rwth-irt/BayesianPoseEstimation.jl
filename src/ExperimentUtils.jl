@@ -4,6 +4,8 @@
 
 using DrWatson
 
+
+# TODO move this logic to PoseErrors which should check whether the gt files exist.
 """
     bop_test_or_train(dataset, testset, scene_id)
 Either loads `test_targets` or `train_targets` depending on the testset name.
@@ -11,9 +13,9 @@ Either loads `test_targets` or `train_targets` depending on the testset name.
 """
 function bop_test_or_train(dataset, testset, scene_id)
     bop_full_path = datadir("bop", dataset, testset)
-    if occursin("test", testset)
+    if contains(testset, "test")
         scene_df = test_targets(bop_full_path, scene_id)
-    elseif occursin("train", testset) || occursin("val", testset)
+    elseif contains(testset, "train") || contains(testset, "val")
         scene_df = train_targets(bop_full_path, scene_id)
     end
 end

@@ -44,10 +44,10 @@ function parameter_and_sampler(sampler)
     parameters = Parameters()
     if sampler == :smc_bootstrap
         @reset parameters.n_particles = 250
-        @reset parameters.n_particles = 150
+        @reset parameters.n_steps = 150
     elseif sampler == :smc_forward
         @reset parameters.n_particles = 250
-        @reset parameters.n_particles = 150
+        @reset parameters.n_steps = 150
     elseif sampler == :smc_mh
         @reset parameters.n_particles = 100
         @reset parameters.n_steps = 200

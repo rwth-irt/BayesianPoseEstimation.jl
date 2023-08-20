@@ -41,7 +41,7 @@ set_loglikelihood(sample::Sample, log_like) = @set sample.log_like = log_like
     names(sample)
 Returns a tuple of the variable names.
 """
-names(::Sample{<:NamedTuple{T}}) where {T} = T
+Base.names(::Sample{<:NamedTuple{T}}) where {T} = T
 
 """
     types(sample)

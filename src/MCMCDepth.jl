@@ -66,7 +66,6 @@ export Sample
 export loglikelihood
 export logprobability
 export merge
-export names
 export to_model_domain
 export to_unconstrained_domain
 export types
