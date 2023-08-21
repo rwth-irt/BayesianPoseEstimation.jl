@@ -1,7 +1,7 @@
 name = "MCMCDepth"
 uuid = "ea9e20e3-5ec9-4a18-b9a5-f98be19e20e6"
 authors = ["Tim Redick <t.redick@irt.rwth-aachen.de>"]
-version = "0.1.1"
+version = "0.2.0"
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"

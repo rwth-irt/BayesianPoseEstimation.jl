@@ -28,7 +28,8 @@ experiment_dir = datadir("exp_raw", "baseline")
 files = readdir(experiment_dir)
 
 # Inference results
-experiment_file = files[70]
+# TODO 0.0 recall for MCMC seems way to low - rerun
+experiment_file = files[68]
 experiment_dict = load(joinpath(experiment_dir, experiment_file))
 experiment_df = experiment_dict["results"]
 # Keep only relevant columns
@@ -51,6 +52,9 @@ end
 
 # Match estimates to ground truths
 joined = outerjoin(gt_df, experiment_df; on=[:scene_id, :img_id, :obj_id])
+# gt_df already filtered visib_fract
+# estimates without ground truth are not relevant for recall
+filter!(:gt_t => (x -> !ismissing(x)), joined)
 
 # ADDS
 es_pose(df_row) = to_pose(df_row.t, df_row.R)
@@ -60,9 +64,6 @@ function adds_row(row)
     if ismissing(row.t)
         # No prediction -> always wrong -> ∞ error
         Inf32
-    elseif ismissing(row.gt_t)
-        # No ground truth -> ignore for recall
-        missing
     else
         mesh_eval = load_mesh_eval(row)
         points = mesh_eval.position
@@ -85,9 +86,6 @@ function vsd_row(row, dist_context, δ)
     if ismissing(row.t)
         # No prediction -> always wrong -> ∞ error
         Inf32
-    elseif ismissing(row.gt_t)
-        # No ground truth -> ignore for recall
-        missing
     else
         mesh = load_mesh_eval(row)
         gt = gt_pose(row)
@@ -99,17 +97,12 @@ function vsd_row(row, dist_context, δ)
         vsd_error(dist_context, cv_camera, mesh, dist_img, es, gt; δ=δ)
     end
 end
-# WARN do not parallelize using ThreadsX, OpenGL is sequential. 
 
-
-# TODO VSDBOP
+# VSDBOP
 function vsdbop_row(row, dist_context, δ)
     if ismissing(row.t)
         # No prediction -> always wrong -> ∞ error
         return fill(Inf32, length(BOP19_THRESHOLDS))
-    elseif ismissing(row.gt_t)
-        # No ground truth -> ignore for recall
-        return missing
     else
         mesh = load_mesh_eval(row)
         gt = gt_pose(row)
@@ -132,38 +125,36 @@ result_df = joined[!, [:scene_id, :img_id, :obj_id, :gt_R, :gt_t, :R, :t, :score
     @logprogress 2 // 3
     result_df.vsd_bop = map(row -> vsdbop_row(row, dist_context, vsd_δ), eachrow(joined))
 end;
-# Filter out missing gt data, not relevant for recall
-filter!(:adds => x -> !ismissing(x), result_df)
 
-# TODO weird that mcmc methods are that bad - rerun experiments?
-println(sum(result_df.vsd .< 0.3))
-println(sum(result_df.adds .< 0.1))
+sum(result_df.vsd .< 0.3)
+sum(result_df.adds .< 0.1)
 
 destroy_context(dist_context)
 
 # TODO remember when matching: multiple errors are reported for vsdbop due to multiple τ
 
-# TODO match per object
+# TODO naming of the variables and functions not clear
 errors_per_obj = groupby(result_df, [:scene_id, :img_id, :obj_id])
 
-# TODO loop groups
-group = last(errors_per_gt)
-group.adds
-
-# TODO I think this is wrong - am I actually evaluating [[error(est, gt) for est in estimates] for gt in annotations]?
-errors_per_gt = groupby(group, :gt_t)
-function combine_per_gt(group)
-    sort!(group, :score)
-    (adds=[group.adds], score=[group.score])
+function combine_per_est(group)
+    # Order of ground truth must be the same
+    sorted = sort(group, :gt_t)
+    # TODO can I assume that the order of the gt is the same in the groups?
+    (adds=[sorted.adds], score=[sorted.score], gt_t=[sorted.gt_t])
 end
-combined_errors = combine(errors_per_gt, combine_per_gt)
-println(combined_errors.score)
-println(combined_errors.adds)
 
-match_errors(Float32.(first(combined_errors.score)), combined_errors.adds)
+function combine_per_obj(group)
+    errors_per_est = groupby(group, :t)
+    combined_errors = combine(errors_per_est, combine_per_est)
+    combined_errors.adds
+    combined_scores = first.(combined_errors.score)
+    (; m_adds=match_errors(combined_scores, combined_errors.adds))
+end
 
-adds_errors = group.adds
+matched_err_df = combine(combine_per_obj, errors_per_obj)
+@assert nrow(matched_err_df) == nrow(gt_df)
 
-first(groups).vsd_bop
+thresholded = threshold_errors(matched_err_df.m_adds, 0.1)
+scene_adds_recall = recall(thresholded)
 
-# TODO is ADDS recall suspiciously better than VSD
+# TODO is recall of ADDS suspiciously better than VSD?
