@@ -87,10 +87,10 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
 end
 
 """
-scene_inference(config)
+scene_inference(gl_context, config)
     Save results per scene via DrWatson's produce_or_load for the `config`
 """
-function scene_inference(config)
+function scene_inference(gl_context, config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset, sampler = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
@@ -104,39 +104,37 @@ function scene_inference(config)
     result_df.time = Vector{Float32}(undef, nrow(result_df))
     result_df.chain = Vector{Vector{Sample}}(undef, nrow(result_df))
 
-    # Make sure the context is destroyed to avoid undefined behavior
-    gl_context = render_context(parameters)
-    try
-        # Avoid timing the pre-compilation
-        df_row = first(scene_df)
-        depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-        timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
+    # Avoid timing the pre-compilation
+    df_row = first(scene_df)
+    depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+    timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
 
-        # Run inference per detection
-        @progress "scenes" for (idx, df_row) in enumerate(eachrow(scene_df))
-            # Image crops differ per object
-            depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-            # Run and collect results
-            t, R, score, chain, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
-            # Avoid out of GPU errors and save storage by not storing μ and o
-            chain = collect_variables(chain, (:t, :r))
-            result_df[idx, :].score = score
-            result_df[idx, :].R = R
-            result_df[idx, :].t = t
-            result_df[idx, :].time = time
-            result_df[idx, :].chain = chain
-        end
-        # Return result
-        Dict("parameters" => parameters, "results" => result_df)
-    finally
-        destroy_context(gl_context)
+    # Run inference per detection
+    @progress "sampler: $sampler, scene_id: $scene_id" for (idx, df_row) in enumerate(eachrow(scene_df))
+        # Image crops differ per object
+        depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+        # Run and collect results
+        t, R, score, chain, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler)
+        # Avoid out of GPU errors and save storage by not storing μ and o
+        chain = collect_variables(chain, (:t, :r))
+        result_df[idx, :].score = score
+        result_df[idx, :].R = R
+        result_df[idx, :].t = t
+        result_df[idx, :].time = time
+        result_df[idx, :].chain = chain
     end
+    # Return result
+    Dict("parameters" => parameters, "results" => result_df)
 end
+
+gl_context = render_context(Parameters())
+# Avoid recreating the context in scene_inference by conditioning on it / closure
+gl_scene_inference = scene_inference | gl_context
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
 bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_pbr")]
 @info "Run MCMC on datasets $bop_datasets"
-@progress "datasets" for bop_dataset in bop_datasets
+@progress "MCMC baseline" for bop_dataset in bop_datasets
     # DrWatson configuration
     dataset, testset = bop_dataset
     bop_full_path = datadir("bop", bop_dataset...)
@@ -147,7 +145,7 @@ bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_p
 
     # Run and save results
     result_path = datadir("exp_raw", "baseline")
-    @progress "$bop_dataset" for d in dicts
+    @progress "dataset: $bop_dataset" for d in dicts
         @produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end
 end

@@ -34,7 +34,7 @@ end
 """
     simple_posterior(params, experiment, μ_node, dev_rng)
 A simple posterior model which does not calculate the pixel association probability `o` but uses a fixed prior via `params.o`.
-The pixel tail distribution is a mixture of an exponential and uniform distribution and checks for invalid values of `μ` via `ValidPixel`.
+The pixel tail distribution is a mixture of an exponential and uniform distribution.
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function simple_posterior(params, experiment, μ_node, dev_rng)
@@ -50,7 +50,7 @@ end
 """
     association_posterior(params, experiment, μ_node, dev_rng)
 A posterior model which does calculate the pixel association probability `o`.
-The pixel tail distribution is a mixture of an exponential and uniform distribution and checks for invalid values of `μ` via `ValidPixel`.
+The pixel tail distribution is a mixture of an exponential and uniform distribution.
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function association_posterior(params, experiment, μ_node, dev_rng)
@@ -68,7 +68,7 @@ end
 """
     smooth_posterior(params, experiment, μ_node, dev_rng)
 A posterior model which does calculate the pixel association probability `o`.
-The pixel tail distribution is a mixture of smoothed exponential and uniform distribution and checks for invalid values of `μ` via `ValidPixel`.
+The pixel tail distribution is a mixture of a smoothed exponential and uniform distribution.
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function smooth_posterior(params, experiment, μ_node, dev_rng)
