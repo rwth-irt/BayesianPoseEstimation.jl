@@ -10,7 +10,6 @@ Load the results from disk, evaluate pose error metrics, and calculate the avera
 using DrWatson
 @quickactivate("MCMCDepth")
 
-using CUDA
 using DataFrames
 using MCMCDepth
 using PoseErrors
@@ -29,7 +28,7 @@ files = readdir(experiment_dir)
 
 # Inference results
 # TODO 0.0 recall for MCMC seems way to low - rerun
-experiment_file = files[68]
+experiment_file = files[40]
 experiment_dict = load(joinpath(experiment_dir, experiment_file))
 experiment_df = experiment_dict["results"]
 # Keep only relevant columns
@@ -73,14 +72,6 @@ function adds_row(row)
     end
 end
 
-# TODO create only once
-# TODO does the size of the context matter? Kind off - probably scaling & interpolation
-WIDTH = HEIGHT = 100
-DEPTH = 50
-dist_context = distance_offscreen_context(WIDTH, HEIGHT, DEPTH, CuArray)
-# different δ for ITODD & steri
-vsd_δ = contains(config["dataset"], "itodd") || contains(config["dataset"], "steri") ? 5e-3 : BOP_δ |> Float32
-
 # VSD
 function vsd_row(row, dist_context, δ)
     if ismissing(row.t)
@@ -92,7 +83,7 @@ function vsd_row(row, dist_context, δ)
         es = es_pose(row)
         cv_camera = row.cv_camera
         depth_img = load_depth_image(row, WIDTH, HEIGHT)
-        dist_img = depth_to_distance(depth_img, cv_camera) |> CuArray
+        dist_img = depth_to_distance(depth_img, cv_camera)
         # BOP19 and later use normalized version with multiple τ
         vsd_error(dist_context, cv_camera, mesh, dist_img, es, gt; δ=δ)
     end
@@ -109,11 +100,19 @@ function vsdbop_row(row, dist_context, δ)
         es = es_pose(row)
         cv_camera = row.cv_camera
         depth_img = load_depth_image(row, WIDTH, HEIGHT)
-        dist_img = depth_to_distance(depth_img, cv_camera) |> CuArray
+        dist_img = depth_to_distance(depth_img, cv_camera)
         # BOP19 and later use normalized version with multiple τ
         normalized_vsd_error(dist_context, cv_camera, mesh, dist_img, es, gt, row.diameter; δ=δ, τ=BOP19_THRESHOLDS)
     end
 end
+
+# TODO create only once
+# TODO does the size of the context matter? Kind off - probably scaling & interpolation
+WIDTH = HEIGHT = 100
+DEPTH = 50
+dist_context = distance_offscreen_context(WIDTH, HEIGHT, DEPTH)
+# different δ for ITODD & steri
+vsd_δ = contains(config["dataset"], "itodd") || contains(config["dataset"], "steri") ? 5e-3 : BOP_δ |> Float32
 
 # append results
 result_df = joined[!, [:scene_id, :img_id, :obj_id, :gt_R, :gt_t, :R, :t, :score, :time, :visib_fract]]

@@ -149,3 +149,4 @@ bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_p
         @produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end
 end
+destroy_context(gl_context)
