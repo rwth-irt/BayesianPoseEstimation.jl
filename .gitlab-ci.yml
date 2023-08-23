@@ -3,7 +3,7 @@
 # All rights reserved.
 
 default:
-  image: julia:latest
+  image: julia:1.9-bullseye
   before_script:
     - apt update && apt install -y xvfb
     # Add repo dependencies
