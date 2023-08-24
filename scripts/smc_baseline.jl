@@ -132,7 +132,7 @@ function scene_inference(gl_context, config)
         result_df[idx, :].log_evidence = logevidence.(states)
     end
     # Return result
-    Dict("parameters" => parameters, "results" => result_df)
+    @strdict parameters result_df
 end
 
 gl_context = render_context(Parameters())

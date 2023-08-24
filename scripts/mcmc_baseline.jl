@@ -124,7 +124,7 @@ function scene_inference(gl_context, config)
         result_df[idx, :].chain = chain
     end
     # Return result
-    Dict("parameters" => parameters, "results" => result_df)
+    @strdict parameters result_df
 end
 
 gl_context = render_context(Parameters())
@@ -146,7 +146,7 @@ bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_p
     # Run and save results
     result_path = datadir("exp_raw", "baseline")
     @progress "dataset: $bop_dataset" for d in dicts
-        @produce_or_load(scene_inference, d, result_path; filename=c -> savename(c; connector=","))
+        @produce_or_load(gl_scene_inference, d, result_path; filename=c -> savename(c; connector=","))
     end
 end
 destroy_context(gl_context)
