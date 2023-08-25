@@ -26,11 +26,11 @@ end
 transform!(results, :path => ByRow(parse_config) => [:sampler, :dataset, :scene_id])
 
 # Threshold the errors
-transform!(results, :adds => ByRow(x -> threshold_errors(x, 0.1)) => :adds_thresh)
-transform!(results, :vsd => ByRow(x -> threshold_errors(x, 0.3)) => :vsd_thresh)
+transform!(results, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
+transform!(results, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
 transform!(results, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
 
-# Recall by sampler & dataset
+# Recall by sampler and/or dataset
 groups = groupby(results, [:sampler])
 # groups = groupby(results, [:sampler, :dataset])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)

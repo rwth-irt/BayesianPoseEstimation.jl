@@ -53,6 +53,9 @@ include("ExperimentUtils.jl")
 include("ExperimentModels.jl")
 include("ExperimentSamplers.jl")
 
+# Evaluation and tuning
+include("Evaluation.jl")
+
 # Common
 export array_for_rng
 export map_intersect
@@ -185,6 +188,14 @@ export smc_bootstrap
 export smc_forward
 export smc_inference
 export smc_mh
+
+# Evaluation
+export adds_row
+export vsd_row
+export vsdbop_row
+
+export combine_estimates
+export match_obj_errors
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion
