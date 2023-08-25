@@ -3,10 +3,9 @@
 # All rights reserved. 
 
 """
-Run different SMC algorithms on the synthetic BOP datasets:
-* MCMC
-* Forward Proposals
-* Bootstrap
+Run different MCMC algorithms on the synthetic BOP datasets:
+* Metropolis Hastings
+* Multiple Try Metropolis
 
 Model setup for segmentation:
 * Segmentation prior for position `t` and pixel association `o`
