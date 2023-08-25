@@ -149,6 +149,7 @@ export pixel_valid_tail
 
 # Visualization
 export density_variable
+export diss_defaults
 export histogram_variable
 export mean_image
 export plot_best_pose

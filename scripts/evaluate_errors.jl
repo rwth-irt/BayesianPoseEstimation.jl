@@ -82,7 +82,6 @@ function calc_n_match_errors(dist_context, experiment_name, config)
     Dict("vsd" => matched_df.vsd, "vsdbop" => matched_df.vsdbop, "adds" => matched_df.adds)
 end
 
-# TODO iterate over directorie in exp_ra
 exp_raw = datadir("exp_raw")
 experiments = readdir(exp_raw)
 @progress "evaluating errors" for experiment_name in experiments

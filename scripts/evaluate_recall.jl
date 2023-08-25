@@ -36,5 +36,4 @@ groups = groupby(results, [:sampler])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 combine(groups,)
 
-# TODO yeah something seems to be wrong with mtm & mh. They cannot be that much worse
 print(recalls)
