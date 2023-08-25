@@ -20,10 +20,20 @@ function mtm_parameters()
     # NOTE optimal parameter values of pixel_σ and c_reg seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
     @reset parameters.c_reg = 20
     @reset parameters.seed = rand(RandomDevice(), UInt32)
-    @reset parameters.n_steps = 500
+    @reset parameters.n_steps = 300
     @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 1
-    @reset parameters.n_particles = 50
+    @reset parameters.n_particles = 20
+end
+
+function mh_parameters()
+    parameters = Parameters()
+    @reset parameters.c_reg = 20
+    @reset parameters.seed = rand(RandomDevice(), UInt32)
+    @reset parameters.n_steps = 250
+    # NOTE burn in not required/even harmful if maximum likelihood/posteriori is the goal
+    @reset parameters.n_burn_in = 0
+    @reset parameters.n_thinning = 5
 end
 
 function smc_parameters()
@@ -37,16 +47,6 @@ function smc_parameters()
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.relative_ess = 0.5
-end
-
-function mh_parameters()
-    parameters = Parameters()
-    @reset parameters.c_reg = 25
-    @reset parameters.seed = rand(RandomDevice(), UInt32)
-    @reset parameters.n_steps = 10_000
-    # NOTE burn in not required/even harmful if maximum likelihood/posteriori is the goal
-    @reset parameters.n_burn_in = 0
-    @reset parameters.n_thinning = 1
 end
 
 parameters = smc_parameters()
@@ -97,11 +97,12 @@ plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
 prior = point_prior(parameters, experiment, cpu_rng)
-posterior = association_posterior(parameters, experiment, prior, dev_rng)
+
 # NOTE no association → prior_o has strong influence
 # @reset parameters.c_reg = 1 / 500
 # posterior = simple_posterior(parameters, experiment, prior, dev_rng)
-# BUG julia 1.9 https://github.com/JuliaGPU/GPUCompiler.jl/issues/384
+
+posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
@@ -143,12 +144,12 @@ parameters = mtm_parameters()
 sampler = mtm_sampler(cpu_rng, parameters, posterior);
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
-chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
+@time chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
 # NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(chain, 50)
 # plot_logprob(chain, 50)
 # plot_prob_img(mean_image(chain, :o))
-plot_best_pose(last(chain), experiment, color_img)
+plot_best_pose(chain, experiment, color_img)
 
 step_size = length(chain) ÷ 100
 anim = @animate for idx in 1:step_size:length(chain)
