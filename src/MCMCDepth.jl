@@ -193,5 +193,4 @@ export smc_mh
 @reexport import SciGL: OffscreenContext, Scale, Scene, destroy_context
 @reexport import StatsBase: Weights
 
-# Distributions
 end # module

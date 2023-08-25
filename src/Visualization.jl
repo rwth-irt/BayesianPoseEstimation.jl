@@ -113,9 +113,9 @@ function plot_scene_ontop(gl_context, scene, img; kwargs...)
 end
 
 """
-    plot_best_pose(chain, experiment, img; [getter=loglike, kwargs...])
+    plot_best_pose(chain, experiment, img; [getter=loglikelihood, kwargs...])
 Plot the best pose of a chain/sample as depth image on top of another image.
-Use the `getter` parameter to specify whether `loglike` or `logprob` should be used.
+Use the `getter` parameter to specify whether `loglikelihood` or `logprobability` should be used.
 
 See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref).
 """

@@ -42,8 +42,10 @@ Returns (parameters, eval(sampler))
 """
 function parameter_and_sampler(sampler)
     parameters = Parameters()
+    # For simple_posterior
+    @reset parameters.c_reg = 1 / 500
     if sampler == :mh_sampler
-        @reset parameters.n_steps = 300
+        @reset parameters.n_steps = 250
         @reset parameters.n_thinning = 5
     elseif sampler == :mtm_sampler
         @reset parameters.n_particles = 20
@@ -132,7 +134,7 @@ gl_context = render_context(Parameters())
 gl_scene_inference = scene_inference | gl_context
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
-bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_pbr")]
+bop_datasets = [("itodd", "train_pbr"), ("lm", "train_pbr"), ("tless", "train_pbr")]
 @info "Run MCMC on datasets $bop_datasets"
 @progress "MCMC baseline" for bop_dataset in bop_datasets
     # DrWatson configuration

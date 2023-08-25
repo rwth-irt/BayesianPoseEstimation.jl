@@ -42,6 +42,7 @@ Returns (parameters, eval(sampler))
 """
 function parameter_and_sampler(sampler)
     parameters = Parameters()
+    # For simple_posterior
     if sampler == :smc_bootstrap
         @reset parameters.n_particles = 250
         @reset parameters.n_steps = 150
@@ -140,7 +141,7 @@ gl_context = render_context(Parameters())
 gl_scene_inference = scene_inference | gl_context
 
 # bop_datasets = [("lmo", "test"), ("tless", "test_primesense"), ("itodd", "val")]
-bop_datasets = [("itodd", "train_pbr"), ("lmo", "train_pbr"), ("tless", "train_pbr")]
+bop_datasets = [("itodd", "train_pbr"), ("lm", "train_pbr"), ("tless", "train_pbr")]
 @info "Run SMC on datasets $bop_datasets"
 @progress "SMC baseline" for bop_dataset in bop_datasets
     # DrWatson configuration
