@@ -43,6 +43,7 @@ Returns (parameters, eval(sampler))
 function parameter_and_sampler(sampler)
     parameters = Parameters()
     # For simple_posterior
+    @reset parameters.c_reg = 1 / 500
     if sampler == :smc_bootstrap
         @reset parameters.n_particles = 250
         @reset parameters.n_steps = 150
@@ -132,7 +133,7 @@ function scene_inference(gl_context, config)
         result_df[idx, :].final_state = final_state
         result_df[idx, :].log_evidence = logevidence.(states)
     end
-    # Return result
+
     @strdict parameters result_df
 end
 
