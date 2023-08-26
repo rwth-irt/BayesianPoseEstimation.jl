@@ -28,7 +28,7 @@ function load_df(directory, file)
     dict = load(joinpath(directory, file))
     experiment_df = dict["result_df"]
     # Keep only relevant columns
-    experiment_df = experiment_df[!, [:scene_id, :img_id, :obj_id, :t, :R, :score, :time]]
+    experiment_df = experiment_df[!, [:scene_id, :img_id, :obj_id, :t, :R, :score]]
 
     # Load corresponding gt data
     _, config = parse_savename(file; connector=",")

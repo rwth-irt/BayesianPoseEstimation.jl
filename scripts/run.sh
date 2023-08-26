@@ -7,4 +7,4 @@
 julia_remote_nvidia.sh scripts/mcmc_baseline.jl
 julia_remote_nvidia.sh scripts/smc_baseline.jl
 julia_remote_nvidia.sh scripts/evaluate_errors.jl
-julia_remote_nvidia.sh scripts/mh_recall_n_steps.jl
+julia_remote_nvidia.sh scripts/recall_n_steps.jl

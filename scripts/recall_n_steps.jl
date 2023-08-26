@@ -72,15 +72,14 @@ scene_inference(gl_context, config)
 """
 function scene_inference(gl_context, config)
     # Extract config and load dataset
-    @unpack dataset, n_steps = config
+    @unpack dataset, testset, scene_id, n_steps = config
     parameters = Parameters()
     @reset parameters.c_reg = 1 / 500
     @reset parameters.n_steps = n_steps
 
-    scene_id = 0
-    result_df = bop_test_or_train(dataset, "train_pbr", scene_id)
+    result_df = bop_test_or_train(dataset, testset, scene_id)
     # Add gt_R & gt_t for testset
-    datasubset_path = datadir("bop", dataset, "train_pbr")
+    datasubset_path = datadir("bop", dataset, testset)
     if !("gt_t" in names(result_df))
         leftjoin!(gt_df, PoseErrors.gt_dataframe(datasubset_path, scene_id)
             ; on=[:scene_id, :img_id, :gt_id])
@@ -93,7 +92,7 @@ function scene_inference(gl_context, config)
     result_df.score = Vector{Float32}(undef, nrow(result_df))
     result_df.R = Vector{Quaternion{Float32}}(undef, nrow(result_df))
     result_df.t = Vector{Vector{Float32}}(undef, nrow(result_df))
-    result_df.time = Vector{Float32}(undef, nrow(result_df))
+    time = Vector{Float32}(undef, nrow(result_df))
 
     # Avoid timing the pre-compilation
     df_row = first(result_df)
@@ -105,27 +104,14 @@ function scene_inference(gl_context, config)
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
-        t, R, score, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        t, R, score, timed = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
         result_df[idx, :].score = score
         result_df[idx, :].R = R
         result_df[idx, :].t = t
-        result_df[idx, :].time = time
+        time[idx] = timed
     end
 
-    # Calculate ADDS errors since VSD would require an OpenGL context to render distance images. Moreover parallel ADDS is the fastest.
-    result_df.adds = ThreadsX.map(adds_row, eachrow(result_df))
-    # Greedily match of the ground truths to  estimates
-    errors_per_obj = groupby(result_df, [:img_id, :obj_id])
-    matched_df = combine(match_obj_errors, errors_per_obj)
-    transform!(matched_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
-
-    # BUG in TLESS? must be the number of ground truth annotations
-    # @assert nrow(matched_df) == nrow(unique(result_df, :gt_t))
-
-    # assemble results
-    adds_thresh = sum(matched_df.adds_thresh)
-    mean_time = mean(result_df.time)
-    @strdict adds_thresh mean_time
+    @strdict parameters result_df time
 end
 
 gl_context = render_context(Parameters())
@@ -134,30 +120,53 @@ gl_scene_inference = scene_inference | gl_context
 
 # TODO include more dataset?
 dataset = ["lm", "tless"]
-n_steps = [50:50:1_000...]
-configs = dict_list(@dict dataset n_steps)
-result_dir = datadir("exp_raw", "recall_n_stepss")
-@progress "MH ADDS true positives for n_steps" for config in configs
+testset = "train_pbr"
+scene_id = 0
+n_steps = [50:50:2_000...]
+configs = dict_list(@dict dataset testset scene_id n_steps)
+experiment_name = "recall_n_steps"
+result_dir = datadir("exp_raw", experiment_name)
+@progress "MH inference" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
 
 destroy_context(gl_context)
 
+# Calculate errors
+include("evaluate_errors.jl")
+
 # Combine results by n_steps & dataset
-results = collect_results(result_dir)
+result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
 function parse_config(path)
     _, config = parse_savename(path; connector=",")
     @unpack n_steps, dataset = config
     n_steps, dataset
 end
-transform!(results, :path => ByRow(parse_config) => [:n_steps, :dataset])
+transform!(result_df, :path => ByRow(parse_config) => [:n_steps, :dataset])
 
 # Recall & time by n_steps
-groups = groupby(results, [:n_steps])
-combined = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :mean_time => (x -> mean(x)) => :time)
+groups = groupby(result_df, [:n_steps])
+transform!(result_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
+transform!(result_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
+transform!(result_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
+
+# Recall by n_steps
+groups = groupby(result_df, :n_steps)
+recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
+
+# Mean inference time
+raw_df = collect_results(result_dir)
+transform!(raw_df, :path => ByRow(parse_config) => [:n_steps, :dataset])
+groups = groupby(raw_df, [:n_steps])
+times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
 
 using Plots
 diss_defaults()
-sort!(combined, :n_steps)
-plot(combined.n_steps, combined.time)
-plot(combined.n_steps, combined.adds_recall)
+sort!(recalls, :n_steps)
+sort!(times, :n_steps)
+
+plot(recalls.n_steps, recalls.adds_recall; label="ADDS", xlabel="iterations", ylabel="recall", ylims=[0, 1], linewidth=1.5)
+plot!(twiny(), times.mean_time, recalls.adds_recall; color=:transparent, xlabel="runtime / s", legend=false)
+plot!(recalls.n_steps, recalls.vsd_recall; label="VSD", linewidth=1.5)
+plot!(recalls.n_steps, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
+
