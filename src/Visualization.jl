@@ -23,10 +23,13 @@ Install fonts for matplotlib
 apt install ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
 fc-cache
 rm -rf ~/.cache/matplotlib
-julia> fonts = PyPlot.matplotlib.font_manager.FontManager().get_font_names()
+julia> fonts = PythonPlot.matplotlib.font_manager.FontManager().get_font_names()
 ```
 """
-diss_defaults(; size=(148.4789, 83.5193), fontsize=11, fontfamily="Helvetica", kwargs...) = Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(0.8 * fontsize), colorbar_tickfontsize=correct_fontsize(0.8 * fontsize), annotationfontsize=correct_fontsize(fontsize), size=correct_size(size), fontfamily=fontfamily, colorbar_tickfontfamily=fontfamily, markersize=2, markerstrokewidth=0.5, kwargs...)
+function diss_defaults(; size=(148.4789, 83.5193), fontsize=11, fontfamily="Arial", kwargs...)
+    theme(:default)
+    Plots.default(; titlefontsize=correct_fontsize(fontsize), legendfontsize=correct_fontsize(fontsize), guidefontsize=correct_fontsize(fontsize), tickfontsize=correct_fontsize(0.8 * fontsize), colorbar_tickfontsize=correct_fontsize(0.8 * fontsize), annotationfontsize=correct_fontsize(fontsize), size=correct_size(size), fontfamily=fontfamily, colorbar_tickfontfamily=fontfamily, markersize=2, markerstrokewidth=0.5, kwargs...)
+end
 
 correct_fontsize(font_size) = correct_fontsize(Plots.backend(), font_size)
 correct_fontsize(::Plots.AbstractBackend, font_size) = font_size |> round

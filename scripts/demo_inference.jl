@@ -20,10 +20,10 @@ function mtm_parameters()
     # NOTE optimal parameter values of pixel_σ and c_reg seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
     @reset parameters.c_reg = 20
     @reset parameters.seed = rand(RandomDevice(), UInt32)
-    @reset parameters.n_steps = 300
+    @reset parameters.n_steps = 500
     @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 1
-    @reset parameters.n_particles = 20
+    @reset parameters.n_particles = 10
 end
 
 function mh_parameters()
@@ -158,10 +158,7 @@ anim = @animate for idx in 1:step_size:length(chain)
 end;
 gif(anim, "mcmc.gif"; fps=15)
 
-
 # Visualize the maximum posterior
-# TODO also track likelihood - plot maximum likelihood pose
-
 anim = @animate for i ∈ 0:2:360
     # White background required for accurate axis colors
     scatter_position(chain; background_color=:white, camera=(i, 25), projection_type=:perspective, legend_position=:topright)

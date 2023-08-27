@@ -34,12 +34,12 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 """
-    parameter_and_sampler(sampler)
+    parameters_and_sampler(sampler)
 Parameters are hand-tuned for good results at ~0.5s per inference.
 
 Returns (parameters, eval(sampler))
 """
-function parameter_and_sampler(sampler)
+function parameters_and_sampler(sampler)
     parameters = Parameters()
     # For simple_posterior
     @reset parameters.c_reg = 1 / 500
@@ -47,8 +47,8 @@ function parameter_and_sampler(sampler)
         @reset parameters.n_steps = 250
         @reset parameters.n_thinning = 5
     elseif sampler == :mtm_sampler
-        @reset parameters.n_particles = 20
-        @reset parameters.n_steps = 300
+        @reset parameters.n_particles = 10
+        @reset parameters.n_steps = 500
     end
     parameters, eval(sampler)
 end
@@ -79,10 +79,8 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
         sampler = sampler(cpu_rng, parameters, posterior)
         chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning, progress=false)
 
-        # Extract best pose and score
         score, idx = findmax(loglikelihood.(chain))
-        t = variables(chain[idx]).t
-        r = variables(chain[idx]).r
+
     end
     t, r, score, chain, time
 end
@@ -95,7 +93,7 @@ function scene_inference(gl_context, config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset, sampler = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
-    parameters, sampler = parameter_and_sampler(sampler)
+    parameters, sampler = parameters_and_sampler(sampler)
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)

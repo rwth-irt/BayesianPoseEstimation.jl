@@ -1,14 +1,15 @@
 # ENOENT: no such file or directory, open '/workspaces/genscigl.jl/copyright_template.txt'
 /dev
-.code-worskpace
-.ipynb_checkpoints
-scratchpad
-datasets
+.code-worskpace/
+.ipynb_checkpoints/
+scratchpad/
+datasets/
 
-_research
-data
-plots
-notebooks
+_research/
+data/
+plots/
+notebooks/
+.CondaPkg/
 
 *.gif
 *.svg
