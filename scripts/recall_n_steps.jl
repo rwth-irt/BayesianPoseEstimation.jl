@@ -164,9 +164,11 @@ diss_defaults()
 sort!(recalls, :n_steps)
 sort!(times, :n_steps)
 
-plot(times.mean_time, recalls.adds_recall; label="ADDS", xlabel="runtime / s", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomright)
+p = plot(times.mean_time, recalls.adds_recall; label="ADDS", xlabel="runtime / s", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomright)
 plot!(twiny(), recalls.n_steps, recalls.adds_recall; color=:transparent, xlabel="iterations", legend=false)
 plot!(times.mean_time, recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(times.mean_time, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
 vline
 vline!([0.5]; label=nothing, color=:black, linestyle=:dash)
+
+savefig(p, joinpath("plots", "recall_n_steps_mh.svg"))

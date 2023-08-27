@@ -4,9 +4,10 @@
 
 """
 Run different Metropolis Hastings MCMC on  the synthetic BOP datasets.
-TODO: Only the first scene of each dataset is evaluated because of the computation time.
-WARN: Results vary based on sampler configuration
-TODO: plot recall over n_samples / n_particle as 2D heatmap
+    Only the first scene of each dataset is evaluated because of the computation time.
+    WARN: Results vary based on sampler configuration
+    NOTE: Inference time grows linearly with n_hypotheses = n_particles * n_steps
+    NOTE: smc_bootstrap & smc_forward mainly benefit from n_particles not n_steps
 """
 
 using DrWatson
@@ -67,10 +68,10 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
             # Only MCMC or SMC style algorithms
             _, final_state = smc_inference(cpu_rng, posterior, smc_sampler, parameters)
             # Extract best pose and score
-            sample = final_state.sample
-            score, idx = findmax(loglikelihood(sample))
-            t = variables(sample).t[:, idx]
-            r = variables(sample).r[idx]
+            final_sample = final_state.sample
+            score, idx = findmax(loglikelihood(final_sample))
+            t = variables(final_sample).t[:, idx]
+            r = variables(final_sample).r[idx]
         end
     end
     t, r, score, time
@@ -134,22 +135,30 @@ testset = "train_pbr"
 scene_id = 0
 
 # MTM
-n_steps = [50, 100, 200, 400, 800, 1_600]
-n_particles = [5:5:25...]
 sampler = [:mtm_sampler]
-configs = dict_list(@dict dataset testset scene_id n_steps n_particles sampler)
+n_particles = [5, 10, 20, 40]
+# Maximum of 10_000 n_hypotheses (n_particles * n_steps) ~ 1.5 sec per inference
+n_hypotheses = [500, 1_000, 1_500, 2_000, 3_000, 5_000, 10_000]
+configs = dict_list(@dict dataset testset scene_id n_particles sampler)
 result_dir = datadir("exp_raw", experiment_name)
-@progress "MTM: inference n_steps and n_particles" for config in configs
-    @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+@progress "MTM n_steps and n_particles" for config in configs
+    @progress "MTM for $(config[:n_particles]) particles" for n_hyp in n_hypotheses
+        config[:n_steps] = n_hyp ÷ config[:n_particles]
+        @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+    end
 end
 
 # SMC
 sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
-n_steps = [50, 100, 200, 400]
-n_particles = [10, 50, 100, 200]
-configs = dict_list(@dict dataset testset scene_id n_steps n_particles sampler)
-@progress "SMC: inference n_steps and n_particles" for config in configs
-    @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+n_particles = [10, 25, 50, 100]
+# Maximum of 25_000 n_hypotheses (n_particles * n_steps) ~ 1.5 sec per inference
+n_hypotheses = [500, 1_000, 2_000, 3_000, 5_000, 15_000, 25_000]
+configs = dict_list(@dict dataset testset scene_id n_particles sampler)
+@progress "SMC n_steps and n_particles" for config in configs
+    @progress "SMC for $(config[:n_particles]) particles" for n_hyp in n_hypotheses
+        config[:n_steps] = n_hyp ÷ config[:n_particles]
+        @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+    end
 end
 
 destroy_context(gl_context)
@@ -157,64 +166,79 @@ destroy_context(gl_context)
 # Calculate errors
 include("evaluate_errors.jl")
 
-# Combine results by n_steps & dataset
-result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
+# Plot
+using Plots
+pythonplot()
+diss_defaults()
+
 function parse_config(path)
     _, config = parse_savename(path; connector=",")
     @unpack n_steps, n_particles, dataset, sampler = config
     n_steps, n_particles, dataset, sampler
 end
-transform!(result_df, :path => ByRow(parse_config) => [:n_steps, :n_particles, :dataset, :sampler])
 
-# Threshold errors
-transform!(result_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
-transform!(result_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
-transform!(result_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
+all_pro = collect_results(datadir("exp_pro", experiment_name, "errors"))
+transform!(all_pro, :path => ByRow(parse_config) => [:n_steps, :n_particles, :dataset, :sampler])
 
-# Recall & time by n_steps & n_particle
-groups = groupby(result_df, [:n_steps, :n_particles])
-recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
+all_raw = collect_results(result_dir)
+transform!(all_raw, :path => ByRow(parse_config) => [:n_steps, :n_particles, :dataset, :sampler])
 
-# Mean inference time
-raw_df = collect_results(result_dir)
-transform!(raw_df, :path => ByRow(parse_config) => [:n_steps, :n_particles, :dataset, :sampler])
-groups = groupby(raw_df, [:n_steps, :n_particles])
-times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
+# Load and filter data per sampler: 
+for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
+    pro_df = filter(x -> x.sampler == sampler_name, all_pro)
+    raw_df = filter(x -> x.sampler == sampler_name, all_raw)
 
-# Visualize
-using Plots
-pythonplot()
-diss_defaults()
-sort!(recalls, [:n_particles, :n_steps])
-sort!(times, [:n_particles, :n_steps])
+    # Threshold errors
+    transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
+    transform!(pro_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
+    transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
 
-recall_groups = groupby(recalls, :n_particles)
+    # Recall & time by n_steps & n_particle
+    groups = groupby(pro_df, [:n_steps, :n_particles])
+    recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 
-# Recall over n_steps & n_particles
-x = vcat([first(group.n_particles) for group in recall_groups]...)
-y = first(recall_groups).n_steps
-z_recall = hcat([group.vsd_recall for group in recall_groups]...)
-# string to avoid scaling
-h1 = heatmap(string.(x), string.(y), z_recall; xlabel="particles", ylabel="iterations", colorbar_title="VSD recall")
+    # Mean inference time
+    groups = groupby(raw_df, [:n_steps, :n_particles])
+    times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
 
-# Normalized recall
-time_groups = groupby(times, :n_particles)
-z_time = hcat([group.mean_time for group in time_groups]...)
-z_norm = z_recall ./ z_time
-h1 = heatmap(string.(x), string.(y), z_norm; xlabel="particles", ylabel="iterations", colorbar_title="VSD recall / s")
+    # Visualize per n_particles
+    sort!(recalls, [:n_particles, :n_steps])
+    sort!(times, [:n_particles, :n_steps])
 
+    recall_groups = groupby(recalls, :n_particles)
+    time_groups = groupby(times, :n_particles)
 
-MAX_TIME = 0.5
-p1 = plot()
-for (rec, tim) in zip(recall_groups, time_groups)
-    plot!(tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles", xlabel="time / s", ylabel="VSD recall", ylims=[0, 1], legend=:bottomright)
+    # Lines
+    MAX_TIME = 0.5
+    p1 = plot()
+    for (rec, tim) in zip(recall_groups, time_groups)
+        plot!(tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles", xlabel="time / s", ylabel="VSD recall", ylims=[0, 1], legend=false)
+    end
+    vline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
+
+    p2 = plot()
+    for (rec, tim) in zip(recall_groups, time_groups)
+        plot!(rec.n_steps * first(rec.n_particles), tim.mean_time; label="$(rec.n_particles |> first)", legend=:topleft, xlabel="hypotheses", ylabel="time / s")
+    end
+    hline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
+
+    l = @layout [a; b]
+    p = plot(p1, p2; layout=l)
+    display(p)
+    savefig(p, joinpath("plots", "recall_n_steps_particles_" * sampler_name * ".svg"))
 end
-vline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
 
-p2 = plot()
-for (rec, tim) in zip(recall_groups, time_groups)
-    plot!(rec.n_steps, tim.mean_time; label="$(rec.n_particles |> first)", legend=false, xlabel="iterations", ylabel="time / s", xlims=[0, 900], ylims=[0, 1.5])
-end
-hline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
+# TODO Number of evaluated hypotheses / second does not grow linearly with the number of particles. Probably due to the overhead of starting the kernels. Plot this and then let each algorithm run for the same time [sec] since I only care about the compute TIME
 
-plot(p1, p2; layout=@layout [a; b])
+# # Recall over n_steps & n_particles
+# x = vcat([first(group.n_particles) for group in recall_groups]...)
+# y = first(recall_groups).n_steps
+# z_recall = hcat([group.vsd_recall for group in recall_groups]...)
+# # string to avoid scaling
+# h1 = heatmap(string.(x), string.(y), z_recall; xlabel="particles", ylabel="iterations", colorbar_title="VSD recall")
+
+# # Normalized recall
+# time_groups = groupby(times, :n_particles)
+# z_time = hcat([group.mean_time for group in time_groups]...)
+# z_norm = z_recall ./ z_time
+# h1 = heatmap(string.(x), string.(y), z_norm; xlabel="particles", ylabel="iterations", colorbar_title="VSD recall / s")
