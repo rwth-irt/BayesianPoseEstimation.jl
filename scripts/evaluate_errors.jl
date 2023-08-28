@@ -15,9 +15,9 @@ using PoseErrors
 using SciGL
 using ThreadsX
 
+using Logging
 using ProgressLogging
 using TerminalLoggers
-using Logging: global_logger
 global_logger(TerminalLogger(right_justify=120))
 
 """
@@ -83,7 +83,8 @@ function calc_n_match_errors(dist_context, experiment_name, config)
 end
 
 exp_raw = datadir("exp_raw")
-experiments = readdir(exp_raw)
+# TODO enable command line args?
+experiments = ["baseline", "recall_n_steps", "recall_n_steps_particles"]
 @progress "evaluating errors" for experiment_name in experiments
     # Collect the results per experiment / scene
     directory = datadir("exp_raw", experiment_name)

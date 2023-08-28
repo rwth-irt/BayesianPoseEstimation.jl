@@ -166,16 +166,6 @@ function device_array_type(p::Parameters)
 end
 device_array(p::Parameters, dims...) = device_array_type(p){p.float_type}(undef, dims...)
 
-"""
-    Scene(gl_context, parameters)
-Create a scene for inference given the parameters.
-"""
-function SciGL.Scene(gl_context, p::Parameters)
-    object = upload_mesh(gl_context, p.mesh)
-    camera = Camera(p.cv_camera)
-    Scene(camera, [object])
-end
-
 Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.float_type.(getfield(p, :min_depth))
 Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.float_type.(getfield(p, :max_depth))
 

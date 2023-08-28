@@ -15,19 +15,16 @@ using DrWatson
 
 @info "Loading packages"
 using Accessors
-using BenchmarkTools
 using CUDA
 using DataFrames
 using MCMCDepth
 using PoseErrors
-using Logging
 using Random
 using SciGL
-using ThreadsX
 
+using Logging
 using ProgressLogging
 using TerminalLoggers
-using Logging: global_logger
 global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
