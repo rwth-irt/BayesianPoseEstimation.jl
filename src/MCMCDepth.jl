@@ -196,6 +196,7 @@ export vsdbop_row
 
 export combine_estimates
 export match_obj_errors
+export step_time_100px, step_time_200px
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion

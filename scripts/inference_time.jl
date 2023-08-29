@@ -108,13 +108,12 @@ for (s, l) in zip(samplers, labels)
     plot!(row.n_particles, mean_sec; xlabel="number of particles", ylabel="mean step time / s", label=l)
 
     # Fit a linear function to data ∈ [0,280] particles
-    upper = findfirst(x -> x >= 280, n_part)
+    upper = findfirst(x -> x >= 280, row.n_particles)
     regression_df = DataFrame(:mean_time => mean_sec[1:upper], :n_particles => row.n_particles[1:upper])
     res = lm(@formula(mean_time ~ n_particles), regression_df)
     intersect, slope = res.model.pp.beta0
     println("$s step_time = $slope * n_particles + $intersect")
 end
 lens!([0, 50], [0, 0.003]; inset=(1, bbox(0.15, 0.4, 0.2, 0.3, :left)))
-
 display(p)
 savefig(p, joinpath("plots", "inference_time.svg"))

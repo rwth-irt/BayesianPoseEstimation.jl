@@ -15,7 +15,6 @@ using DrWatson
 
 @info "Loading packages"
 using Accessors
-using BenchmarkTools
 using CUDA
 using DataFrames
 using MCMCDepth
@@ -23,7 +22,7 @@ using PoseErrors
 using Logging
 using Random
 using SciGL
-using ThreadsX
+using StatsBase
 
 using ProgressLogging
 using TerminalLoggers
@@ -66,6 +65,7 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
         else
             smc_sampler = eval(sampler)(cpu_rng, parameters, posterior)
             # Only MCMC or SMC style algorithms
+
             _, final_state = smc_inference(cpu_rng, posterior, smc_sampler, parameters)
             # Extract best pose and score
             final_sample = final_state.sample
@@ -106,6 +106,7 @@ function scene_inference(gl_context, config)
     result_df.t = Vector{Vector{Float32}}(undef, nrow(result_df))
     time = Vector{Float32}(undef, nrow(result_df))
 
+    # TODO I think this is where it fails since the sampler is assembled during timing which will measure some precompilation :/
     # Avoid timing the pre-compilation
     df_row = first(result_df)
     depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
@@ -130,33 +131,34 @@ gl_context = render_context(Parameters())
 gl_scene_inference = scene_inference | gl_context
 
 experiment_name = "recall_n_steps_particles"
-dataset = ["lm", "tless", "itodd"]
+result_dir = datadir("exp_raw", experiment_name)
+# TODO dataset = ["lm", "tless", "itodd"]
+dataset = ["lm"]
 testset = "train_pbr"
 scene_id = 0
 
 # MTM
 sampler = [:mtm_sampler]
-n_particles = [5, 10, 20, 40]
+n_particles = [5, 10, 20, 40, 250]
+times = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9, 1.5, 3.0]
 # Maximum of 10_000 n_hypotheses (n_particles * n_steps) ~ 1.5 sec per inference
 n_hypotheses = [500, 1_000, 1_500, 2_000, 3_000, 5_000, 10_000]
 configs = dict_list(@dict dataset testset scene_id n_particles sampler)
-result_dir = datadir("exp_raw", experiment_name)
 @progress "MTM n_steps and n_particles" for config in configs
-    @progress "MTM for $(config[:n_particles]) particles" for n_hyp in n_hypotheses
-        config[:n_steps] = n_hyp ÷ config[:n_particles]
+    @progress "MTM for $(config[:n_particles]) particles" for tim in times
+        config[:n_steps] = floor(Int, tim / step_time_100px(config[:sampler], config[:n_particles]))
         @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
     end
 end
 
 # SMC
 sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
-n_particles = [10, 25, 50, 100]
-# Maximum of 25_000 n_hypotheses (n_particles * n_steps) ~ 1.5 sec per inference
-n_hypotheses = [500, 1_000, 2_000, 3_000, 5_000, 15_000, 25_000]
+n_particles = [10, 25, 50, 100, 250]
+times = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
 configs = dict_list(@dict dataset testset scene_id n_particles sampler)
 @progress "SMC n_steps and n_particles" for config in configs
-    @progress "SMC for $(config[:n_particles]) particles" for n_hyp in n_hypotheses
-        config[:n_steps] = n_hyp ÷ config[:n_particles]
+    @progress "SMC for $(config[:n_particles]) particles" for tim in times
+        config[:n_steps] = floor(Int, tim / step_time_100px(config[:sampler], config[:n_particles]))
         @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
     end
 end
@@ -173,20 +175,22 @@ diss_defaults()
 
 function parse_config(path)
     _, config = parse_savename(path; connector=",")
-    @unpack n_steps, n_particles, dataset, sampler = config
-    n_steps, n_particles, dataset, sampler
+    @unpack n_steps, n_particles, sampler = config
+    n_steps, n_particles, sampler
 end
 
 all_pro = collect_results(datadir("exp_pro", experiment_name, "errors"))
-transform!(all_pro, :path => ByRow(parse_config) => [:n_steps, :n_particles, :dataset, :sampler])
+transform!(all_pro, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
 
 all_raw = collect_results(result_dir)
-transform!(all_raw, :path => ByRow(parse_config) => [:n_steps, :n_particles, :dataset, :sampler])
+transform!(all_raw, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
 
 # Load and filter data per sampler: 
 for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
     pro_df = filter(x -> x.sampler == sampler_name, all_pro)
     raw_df = filter(x -> x.sampler == sampler_name, all_raw)
+    filter!(x -> x.n_particles > 1, pro_df)
+    filter!(x -> x.n_particles > 1, raw_df)
 
     # Threshold errors
     transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
@@ -210,35 +214,15 @@ for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
 
     # Lines
     MAX_TIME = 0.5
-    p1 = plot()
+    if sampler_name == "smc_mh"
+        p1 = plot(; legend=:right)
+    else
+        p1 = plot(; legend=:topleft)
+    end
     for (rec, tim) in zip(recall_groups, time_groups)
-        plot!(tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles", xlabel="time / s", ylabel="VSD recall", ylims=[0, 1], legend=false)
+        plot!(tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles", xlabel="pose inference time / s", ylabel="VSD recall", ylims=[0, 1])
     end
     vline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
-
-    p2 = plot()
-    for (rec, tim) in zip(recall_groups, time_groups)
-        plot!(rec.n_steps * first(rec.n_particles), tim.mean_time; label="$(rec.n_particles |> first)", legend=:topleft, xlabel="hypotheses", ylabel="time / s")
-    end
-    hline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
-
-    l = @layout [a; b]
-    p = plot(p1, p2; layout=l)
-    display(p)
-    savefig(p, joinpath("plots", "recall_n_steps_particles_" * sampler_name * ".svg"))
+    display(p1)
+    savefig(p1, joinpath("plots", "recall_n_steps_particles_" * sampler_name * ".svg"))
 end
-
-# TODO Number of evaluated hypotheses / second does not grow linearly with the number of particles. Probably due to the overhead of starting the kernels. Plot this and then let each algorithm run for the same time [sec] since I only care about the compute TIME
-
-# # Recall over n_steps & n_particles
-# x = vcat([first(group.n_particles) for group in recall_groups]...)
-# y = first(recall_groups).n_steps
-# z_recall = hcat([group.vsd_recall for group in recall_groups]...)
-# # string to avoid scaling
-# h1 = heatmap(string.(x), string.(y), z_recall; xlabel="particles", ylabel="iterations", colorbar_title="VSD recall")
-
-# # Normalized recall
-# time_groups = groupby(times, :n_particles)
-# z_time = hcat([group.mean_time for group in time_groups]...)
-# z_norm = z_recall ./ z_time
-# h1 = heatmap(string.(x), string.(y), z_norm; xlabel="particles", ylabel="iterations", colorbar_title="VSD recall / s")

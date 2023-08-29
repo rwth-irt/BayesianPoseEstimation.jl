@@ -161,7 +161,7 @@ diss_defaults()
 sort!(recalls, :n_steps)
 sort!(times, :n_steps)
 
-p = plot(times.mean_time, recalls.adds_recall; label="ADDS", xlabel="runtime / s", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomright)
+p = plot(times.mean_time, recalls.adds_recall; label="ADDS", xlabel="pose inference time / s", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomright)
 plot!(twiny(), recalls.n_steps, recalls.adds_recall; color=:transparent, xlabel="iterations", legend=false)
 plot!(times.mean_time, recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(times.mean_time, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)

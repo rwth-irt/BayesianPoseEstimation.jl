@@ -126,3 +126,45 @@ function match_obj_errors(df_group)
     end
     result
 end
+
+"""
+    step_time(sampler, n_particles)
+Calculate the time of one inference step for image crops of 100x100px.
+The model is only valid from 1-300 particles, as fit in scripts/inference_time.jl
+"""
+function step_time_100px(sampler, n_particles)
+    if n_particles > 300
+        throw(DomainError(n_particles, "Model is only valid for less than 300 particles"))
+    end
+    sampler = Symbol(sampler)
+    if sampler == :mtm_sampler
+        2.4781265620925468e-5 * n_particles + 0.0009598904099028099
+    elseif sampler == :smc_bootstrap
+        1.6031883148057658e-5 * n_particles + 0.00027986676376778245
+    elseif sampler == :smc_forward
+        1.7253126309976732e-5 * n_particles + 0.00017138252305029782
+    elseif sampler == :smc_mh
+        1.7047674417855697e-5 * n_particles + 0.0003577247193901481
+    end
+end
+
+"""
+    step_time(sampler, n_particles)
+Calculate the time of one inference step for image crops of 200x200px.
+The model is only valid from 1-300 particles, as fit in scripts/inference_time.jl
+"""
+function step_time_200px(sampler, n_particles)
+    if n_particles > 300
+        throw(DomainError(n_particles, "Model is only valid for less than 300 particles"))
+    end
+    sampler = Symbol(sampler)
+    if sampler == :mtm_sampler
+        3.358793461389047e-5 * n_particles + 0.0011953777978809662
+    elseif sampler == :smc_bootstrap
+        2.7837442412543013e-5 * n_particles + 0.000529211676299128
+    elseif sampler == :smc_forward
+        2.848400666323068e-5 * n_particles + 0.0004996932224506247
+    elseif sampler == :smc_mh
+        3.231163631325969e-5 * n_particles + 0.0006430482848355838
+    end
+end
