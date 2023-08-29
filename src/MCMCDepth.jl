@@ -66,7 +66,6 @@ export to_cpu
 
 # Samples
 export Sample
-export loglikelihood
 export logprobability
 export merge
 export to_model_domain
@@ -203,6 +202,6 @@ export match_obj_errors
 @reexport import Rotations: QuatRotation, RotXYZ
 @reexport import CoordinateTransformations: Translation
 @reexport import SciGL: OffscreenContext, Scale, Scene, destroy_context
-@reexport import StatsBase: Weights
+@reexport import StatsBase: loglikelihood, Weights
 
 end # module

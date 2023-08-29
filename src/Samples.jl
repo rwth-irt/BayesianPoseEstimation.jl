@@ -90,7 +90,7 @@ logprobability(sample::Sample) = sample.log_prob
     loglikelihood(sample)
 (Logjac corrected) posterior log likelihood of the sample.
 """
-loglikelihood(sample::Sample) = sample.log_like
+StatsBase.loglikelihood(sample::Sample) = sample.log_like
 
 """
     getindex(sample, idx)
