@@ -17,6 +17,7 @@ using Accessors
 using BenchmarkTools
 using CUDA
 using DataFrames
+using GLM
 using MCMCDepth
 using Plots
 using Plots.PlotMeasures
@@ -42,8 +43,8 @@ parameters = Parameters()
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 
-@reset parameters.width = 200
-@reset parameters.height = 200
+@reset parameters.width = 100
+@reset parameters.height = 100
 @reset parameters.depth = 500
 @reset parameters.device = :CUDA
 gl_context = render_context(parameters)
@@ -102,19 +103,18 @@ for (s, l) in zip(samplers, labels)
     df = collect_results(result_dir, rinclude=[Regex(s)])
     mean_seconds(trial) = mean(trial).time * 1e-9
     row = first(df)
+    mean_sec = mean_seconds.(row.trials)
     # NOTE at ≈350 particles, the time per step triples. For 100x100 and 200x200 images. So it seems that CUDA or OpenGL struggles with textures of larger depth.
-    plot!(row.n_particles, mean_seconds.(row.trials); xlabel="number of particles", ylabel="mean step time / s", label=l)
-end
+    plot!(row.n_particles, mean_sec; xlabel="number of particles", ylabel="mean step time / s", label=l)
 
-plot!(; yticks=false, legend=false, inset=(1, bbox(2mm, 0.4, 0.35, 0.35, :left)), subplot=2)
-for (s, l) in zip(samplers, labels)
-    # s, l = first(samplers), first(labels)
-    df = collect_results(result_dir, rinclude=[Regex(s)])
-    mean_seconds(trial) = mean(trial).time * 1e-9
-    row = first(df)
-    # NOTE at ≈350 particles, the time per step triples. For 100x100 and 200x200 images. So it seems that CUDA or OpenGL struggles with textures of larger depth.
-    # plot!(p, row.n_particles[1:5], mean_seconds.(row.trials)[1:5]; legend=false, tickfontcolor=:transparent, inset=(1, bbox(0, 0, 0.3, 0.3, :bottom, :right)), subplot=1)
-    plot!(p[2], row.n_particles[1:4], mean_seconds.(row.trials)[1:4])
+    # Fit a linear function to data ∈ [0,280] particles
+    upper = findfirst(x -> x >= 280, n_part)
+    regression_df = DataFrame(:mean_time => mean_sec[1:upper], :n_particles => row.n_particles[1:upper])
+    res = lm(@formula(mean_time ~ n_particles), regression_df)
+    intersect, slope = res.model.pp.beta0
+    println("$s step_time = $slope * n_particles + $intersect")
 end
+lens!([0, 50], [0, 0.003]; inset=(1, bbox(0.15, 0.4, 0.2, 0.3, :left)))
+
 display(p)
 savefig(p, joinpath("plots", "inference_time.svg"))
