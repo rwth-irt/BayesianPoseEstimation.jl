@@ -170,7 +170,7 @@ include("evaluate_errors.jl")
 
 # Plot
 using Plots
-pythonplot()
+gr()
 diss_defaults()
 
 function parse_config(path)
@@ -179,50 +179,58 @@ function parse_config(path)
     n_steps, n_particles, sampler
 end
 
-all_pro = collect_results(datadir("exp_pro", experiment_name, "errors"))
-transform!(all_pro, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
+# Calculate recalls
+pro_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
+transform!(pro_df, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
+filter!(x -> x.n_particles > 1, pro_df)
+# Threshold errors
+transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
+transform!(pro_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
+transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
+groups = groupby(pro_df, [:sampler, :n_steps, :n_particles])
+recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 
-all_raw = collect_results(result_dir)
-transform!(all_raw, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
+# Calculate mean pose inference times
+raw_df = collect_results(result_dir)
+transform!(raw_df, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
+filter!(x -> x.n_particles > 1, raw_df)
+groups = groupby(raw_df, [:sampler, :n_steps, :n_particles])
+times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
 
-# Load and filter data per sampler: 
-for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
-    pro_df = filter(x -> x.sampler == sampler_name, all_pro)
-    raw_df = filter(x -> x.sampler == sampler_name, all_raw)
-    filter!(x -> x.n_particles > 1, pro_df)
-    filter!(x -> x.n_particles > 1, raw_df)
-
-    # Threshold errors
-    transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
-    transform!(pro_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
-    transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
-
-    # Recall & time by n_steps & n_particle
-    groups = groupby(pro_df, [:n_steps, :n_particles])
-    recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
-
-    # Mean inference time
-    groups = groupby(raw_df, [:n_steps, :n_particles])
-    times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
-
+# Actually plot it
+function plot_sampler(sampler_name, recalls, times)
+    recalls_filtered = filter(x -> x.sampler == sampler_name, recalls)
+    times_filtered = filter(x -> x.sampler == sampler_name, times)
+    sort!(recalls_filtered, [:n_particles, :n_steps])
+    sort!(times_filtered, [:n_particles, :n_steps])
     # Visualize per n_particles
-    sort!(recalls, [:n_particles, :n_steps])
-    sort!(times, [:n_particles, :n_steps])
-
-    recall_groups = groupby(recalls, :n_particles)
-    time_groups = groupby(times, :n_particles)
-
-    # Lines
-    MAX_TIME = 0.5
-    if sampler_name == "smc_mh"
-        p1 = plot(; legend=:right)
-    else
-        p1 = plot(; legend=:topleft)
-    end
+    recall_groups = groupby(recalls_filtered, :n_particles)
+    time_groups = groupby(times_filtered, :n_particles)
+    # Lines   
+    p_adds = plot(; xlabel="pose inference time / s", ylabel="ADDS recall", ylims=[0, 1], linewidth=1.5)
     for (rec, tim) in zip(recall_groups, time_groups)
-        plot!(tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles", xlabel="pose inference time / s", ylabel="VSD recall", ylims=[0, 1])
+        plot!(p_adds, tim.mean_time, rec.adds_recall; legend=false)
     end
-    vline!([MAX_TIME]; label=nothing, color=:black, linestyle=:dash)
-    display(p1)
-    savefig(p1, joinpath("plots", "recall_n_steps_particles_" * sampler_name * ".svg"))
+    vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+
+    p_vsd = plot(; xlabel="pose inference time / s", ylabel="VSD recall", ylims=[0, 1], linewidth=1.5)
+    for (rec, tim) in zip(recall_groups, time_groups)
+        plot!(p_vsd, tim.mean_time, rec.vsd_recall; legend=false)
+    end
+    vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+
+    p_vsdbop = plot(; xlabel="pose inference time / s", ylabel="VSDBOP recall", ylims=[0, 1], linewidth=1.5)
+    for (rec, tim) in zip(recall_groups, time_groups)
+        plot!(p_vsdbop, tim.mean_time, rec.vsdbop_recall; legend=:outerright, label="$(rec.n_particles |> first) particles")
+    end
+    vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+
+    lay = @layout [a; b c]
+    p = plot(p_vsdbop, p_adds, p_vsd; layout=lay)
+    display(p)
+    savefig(p, joinpath("plots", "recall_n_steps_particles_" * sampler_name * ".pdf"))
+end
+
+for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
+    plot_sampler(sampler_name, recalls, times)
 end

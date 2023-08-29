@@ -37,7 +37,7 @@ configs = dict_list(@dict sampler)
 # Context
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 1
 CUDA.allowscalar(false)
-pythonplot()
+gr()
 diss_defaults()
 parameters = Parameters()
 cpu_rng = Random.default_rng(parameters)
@@ -98,14 +98,14 @@ destroy_context(gl_context)
 samplers = ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
 labels = ["MTM", "SMC bootstrap", "SMC forward", "SMC MH"]
 
-p = plot(; legend=:topleft)
+p = plot(; legend=:top, xlabel="number of particles", ylabel="mean step time / s", linewidth=1.5)
 for (s, l) in zip(samplers, labels)
     df = collect_results(result_dir, rinclude=[Regex(s)])
     mean_seconds(trial) = mean(trial).time * 1e-9
     row = first(df)
     mean_sec = mean_seconds.(row.trials)
     # NOTE at ≈350 particles, the time per step triples. For 100x100 and 200x200 images. So it seems that CUDA or OpenGL struggles with textures of larger depth.
-    plot!(row.n_particles, mean_sec; xlabel="number of particles", ylabel="mean step time / s", label=l)
+    plot!(row.n_particles, mean_sec; label=l)
 
     # Fit a linear function to data ∈ [0,280] particles
     upper = findfirst(x -> x >= 280, row.n_particles)
@@ -114,6 +114,6 @@ for (s, l) in zip(samplers, labels)
     intersect, slope = res.model.pp.beta0
     println("$s step_time = $slope * n_particles + $intersect")
 end
-lens!([0, 50], [0, 0.003]; inset=(1, bbox(0.15, 0.4, 0.2, 0.3, :left)))
+lens!([0, 50], [0, 0.003]; inset=(1, bbox(0.1, 0.3, 0.22, 0.3, :left)))
 display(p)
-savefig(p, joinpath("plots", "inference_time.svg"))
+savefig(p, joinpath("plots", "inference_time_$(parameters.width).pdf"))
