@@ -36,10 +36,11 @@ CUDA.allowscalar(false)
 
 experiment_name = "smc_mh_resolution"
 result_dir = datadir("exp_raw", experiment_name)
-dataset = ["lm", "tless", "itodd"]
+# TODO? dataset = ["lm", "tless", "itodd"]
+dataset = ["tless"]
 testset = "train_pbr"
 scene_id = [0:4...]
-resolution = [10:10:200]
+resolution = [10:10:200...]
 configs = dict_list(@dict dataset testset scene_id resolution)
 
 
