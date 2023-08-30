@@ -30,7 +30,7 @@ using TerminalLoggers
 global_logger(TerminalLogger(right_justify=120))
 
 # Experiment setup
-experiment_name = "inference_time_200"
+experiment_name = "inference_time_100"
 sampler = [:mtm_sampler, :smc_bootstrap, :smc_forward, :smc_mh]
 configs = dict_list(@dict sampler)
 
@@ -43,8 +43,8 @@ parameters = Parameters()
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 
-@reset parameters.width = 200
-@reset parameters.height = 200
+@reset parameters.width = 100
+@reset parameters.height = 100
 @reset parameters.depth = 500
 @reset parameters.device = :CUDA
 gl_context = render_context(parameters)
