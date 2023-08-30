@@ -39,7 +39,7 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = [0:4...]
-resolution = [10, 20, 30]
+resolution = [10:10:200]
 configs = dict_list(@dict dataset testset scene_id resolution)
 
 
@@ -173,11 +173,39 @@ end
 # Calculate errors
 evaluate_errors(experiment_name)
 
-# Combine results by n_steps & dataset
+# Combine results per resolution
 result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
 function parse_config(path)
-    _, config = my_parse_savename(path)
-    @unpack n_steps, dataset = config
-    n_steps, dataset
+    config = my_parse_savename(path)
+    @unpack resolution = config
+    resolution
 end
-transform!(result_df, :path => ByRow(parse_config) => [:n_steps, :dataset])
+transform!(result_df, :path => ByRow(parse_config) => [:resolution])
+
+# Threshold errors
+transform!(result_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
+transform!(result_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
+transform!(result_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
+
+# Recalls by resolution
+groups = groupby(result_df, :resolution)
+recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
+
+# Visualize
+using Plots
+gr()
+diss_defaults()
+sort!(recalls, :resolution)
+p = plot(recalls.resolution, recalls.adds_recall; label="ADDS", xlabel="resolution / px x px", ylabel="recall", ylims=[0, 1], linewidth=1.5)
+plot!(recalls.resolution, recalls.vsd_recall; label="VSD", linewidth=1.5)
+plot!(recalls.resolution, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
+display(p)
+savefig(p, joinpath("plots", "$experiment_name.pdf"))
+
+# Sanity check of mean inference time
+raw_results = collect_results(result_dir)
+transform!(raw_results, :path => ByRow(parse_config) => [:resolution])
+groups = groupby(raw_results, [:resolution])
+# NOTE nice :) actually all quite close to the target of 0.5 sec. Maybe quick benchmark is the way to go
+times = combine(groups, :result_df => (rdf -> mean(vcat(getproperty.(rdf, :time)...))) => :mean_time)
+display(times)
