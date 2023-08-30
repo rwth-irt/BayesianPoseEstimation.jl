@@ -3,6 +3,8 @@
 # All rights reserved. 
 
 using DataFrames
+using ProgressLogging
+using ThreadsX
 
 """
     es_pose(df_row)
@@ -80,13 +82,13 @@ function vsdbop_row(df_row, dist_context, δ)
 end
 
 """
-    combine_estimates(df_group)
+    combine_est_errors(df_group)
 Combines the df_group by sorting the errors by the ground truth for the use in `match_errors`.
 Moreover, the score for the estimate is stored.
 
 `df_group` must be grouped by the estimates, e.g via `:t`.
 """
-function combine_estimates(df_group)
+function combine_est_errors(df_group)
     # Order of ground truth must be the same
     sorted = sort(df_group, :gt_t)
     result = (; score=[sorted.score], gt_t=[sorted.gt_t])
@@ -111,7 +113,7 @@ If no estimate is available for a ground truth, Inf set as error.
 """
 function match_obj_errors(df_group)
     estimate_groups = groupby(df_group, :t)
-    errors_per_estimate = combine(combine_estimates, estimate_groups)
+    errors_per_estimate = combine(combine_est_errors, estimate_groups)
     score_per_estimate = first.(errors_per_estimate.score)
     # Returns Inf for each gt where no estimate is available.
     result = (;)
@@ -126,6 +128,90 @@ function match_obj_errors(df_group)
     end
     result
 end
+
+"""
+    evaluate_errors(experiment_name)
+Evaluate the errors of the pose estimates in `exp_raw/experiment_name`.
+The VSD error is evaluated with a context using 100x100px crops.
+"""
+function evaluate_errors(experiment_name)
+    dir = datadir("exp_raw", experiment_name)
+    files = readdir(dir)
+    configs = my_parse_savename.(files)
+    parameters = load(joinpath(dir, first(files)))["parameters"]
+    dist_context = distance_offscreen_context(100, 100, parameters.depth)
+    calc_n_match_closure = calc_n_match_errors | (dist_context, experiment_name)
+    try
+        @progress "evaluating error metrics, experiment: $experiment_name" for config in configs
+            @produce_or_load(calc_n_match_closure, config, datadir("exp_pro", experiment_name, "errors"); filename=my_savename)
+        end
+    finally
+        destroy_context(dist_context)
+    end
+end
+
+"""
+    calc_n_match_errors(dist_context, experiment_name, config)
+Calculate and match the errors for each ground truth - estimate combination (per scene_id, img_id, obj_id).
+"""
+function calc_n_match_errors(dist_context, experiment_name, config)
+    @unpack dataset, testset, scene_id = config
+
+    # Load the estimates for the scene
+    est_directory = datadir("exp_raw", experiment_name)
+    est_dict = load(joinpath(est_directory, my_savename(config, "jld2")))
+    est_df = est_dict["result_df"]
+    est_df = est_df[!, [:scene_id, :img_id, :obj_id, :t, :R, :score]]
+
+    # Add gt_R & gt_t for testset
+    gt_df = bop_test_or_train(dataset, testset, scene_id)
+    datasubset_path = datadir("bop", dataset, testset)
+    if !("gt_t" in names(gt_df))
+        leftjoin!(gt_df, PoseErrors.gt_dataframe(datasubset_path, scene_id)
+            ; on=[:scene_id, :img_id, :gt_id])
+    end
+    if !("visib_fract" in names(gt_df))
+        leftjoin!(gt_df, PoseErrors.gt_info_dataframe(datasubset_path, scene_id); on=[:scene_id, :img_id, :gt_id])
+    end
+    df = outerjoin(gt_df, est_df; on=[:scene_id, :img_id, :obj_id])
+
+    # Keep only visibility fraction >= 0.1
+    filter!(:visib_fract => (x -> x >= 0.1), df)
+    # Only estimates for which a ground truth exists are relevant for the recall
+    filter!(:gt_t => (x -> !ismissing(x)), df)
+
+    # Calculate different error metrics
+    # Different VSD δ for visible surface in ITODD & steri
+    vsd_δ = contains(dataset, "itodd") || contains(dataset, "steri") ? ITODD_δ : BOP_δ |> Float32
+    # WARN do not parallelize using ThreadsX, OpenGL is sequential
+    df.vsd = map(row -> vsd_row(row, dist_context, vsd_δ), eachrow(df))
+    df.vsdbop = map(row -> vsdbop_row(row, dist_context, vsd_δ), eachrow(df))
+    # This is ~10x faster using ThreadsX
+    df.adds = ThreadsX.map(adds_row, eachrow(df))
+
+    # Greedy matching of the ground truth to the estimates
+    errors_per_obj = groupby(df, [:scene_id, :img_id, :obj_id])
+    matched_df = combine(match_obj_errors, errors_per_obj; threads=false)
+    # must be the number of ground truth annotations
+    @assert nrow(matched_df) == nrow(unique(df, :gt_t))
+
+    Dict("vsd" => matched_df.vsd, "vsdbop" => matched_df.vsdbop, "adds" => matched_df.adds)
+end
+
+"""
+    my_parse_savename(file [;connector=","])
+Broadcastable version of `DrWatson.parse_savename` which returns the config *without* prefix and suffix.
+"""
+function my_parse_savename(file; connector=",")
+    _, config, _ = parse_savename(file; connector=connector)
+    config
+end
+
+"""
+    my_savename(config [, suffix="" ;connector=","])
+Uses default connector ",".
+"""
+my_savename(config, suffix=""; connector=",") = savename(config, suffix; connector=connector)
 
 """
     step_time_50px(sampler, n_particles)

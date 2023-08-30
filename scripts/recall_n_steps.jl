@@ -21,6 +21,7 @@ using MCMCDepth
 using PoseErrors
 using Random
 using SciGL
+using Statistics
 
 using Logging
 using ProgressLogging
@@ -122,18 +123,18 @@ configs = dict_list(@dict dataset testset scene_id n_steps)
 experiment_name = "recall_n_steps"
 result_dir = datadir("exp_raw", experiment_name)
 @progress "Inference n_steps MH" for config in configs
-    @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+    @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)
 end
 
 destroy_context(gl_context)
 
 # Calculate errors
-include("evaluate_errors.jl")
+evaluate_errors(experiment_name)
 
 # Combine results by n_steps & dataset
 result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
 function parse_config(path)
-    _, config = parse_savename(path; connector=",")
+    config = my_parse_savename(path)
     @unpack n_steps, dataset = config
     n_steps, dataset
 end

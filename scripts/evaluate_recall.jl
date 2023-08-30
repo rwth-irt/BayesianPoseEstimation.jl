@@ -12,6 +12,7 @@ using DrWatson
 @quickactivate("MCMCDepth")
 
 using DataFrames
+using MCMCDepth
 using PoseErrors
 
 # Combine results by sampler & dataset
@@ -19,7 +20,7 @@ experiment_name = "baseline"
 directory = datadir("exp_pro", experiment_name, "errors")
 results = collect_results(directory)
 function parse_config(path)
-    _, config = parse_savename(path; connector=",")
+    config = my_parse_savename(path)
     @unpack sampler, dataset, scene_id = config
     sampler, dataset, scene_id
 end

@@ -167,5 +167,17 @@ function scene_inference(config)
 end
 
 @progress "SMC-MH resolution" for config in configs
-    @produce_or_load(scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+    @produce_or_load(scene_inference, config, result_dir; filename=my_savename)
 end
+
+# Calculate errors
+evaluate_errors(experiment_name)
+
+# Combine results by n_steps & dataset
+result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
+function parse_config(path)
+    _, config = my_parse_savename(path)
+    @unpack n_steps, dataset = config
+    n_steps, dataset
+end
+transform!(result_df, :path => ByRow(parse_config) => [:n_steps, :dataset])

@@ -22,7 +22,7 @@ using PoseErrors
 using Logging
 using Random
 using SciGL
-using StatsBase
+using Statistics
 
 using ProgressLogging
 using TerminalLoggers
@@ -158,14 +158,14 @@ configs = dict_list(@dict dataset testset scene_id n_particles sampler)
 @progress "SMC n_steps and n_particles" for config in configs
     @progress "SMC for $(config[:n_particles]) particles" for tim in times
         config[:n_steps] = floor(Int, tim / step_time_100px(config[:sampler], config[:n_particles]))
-        @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
+        @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)
     end
 end
 
 destroy_context(gl_context)
 
 # Calculate errors
-include("evaluate_errors.jl")
+evaluate_errors(experiment_name)
 
 # Plot
 using Plots
@@ -173,7 +173,7 @@ gr()
 diss_defaults()
 
 function parse_config(path)
-    _, config = parse_savename(path; connector=",")
+    config = my_parse_savename(path)
     @unpack n_steps, n_particles, sampler = config
     n_steps, n_particles, sampler
 end

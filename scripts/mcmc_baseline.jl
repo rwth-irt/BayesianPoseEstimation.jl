@@ -124,6 +124,7 @@ function scene_inference(gl_context, config)
     @strdict parameters result_df
 end
 
+experiment_name = "baseline"
 gl_context = render_context(Parameters())
 # Avoid recreating the context in scene_inference by conditioning on it / closure
 gl_scene_inference = scene_inference | gl_context
@@ -141,9 +142,12 @@ bop_datasets = [("itodd", "train_pbr"), ("lm", "train_pbr"), ("tless", "train_pb
     dicts = dict_list(config)
 
     # Run and save results
-    result_path = datadir("exp_raw", "baseline")
+    result_path = datadir("exp_raw", experiment_name)
     @progress "dataset: $bop_dataset" for d in dicts
-        @produce_or_load(gl_scene_inference, d, result_path; filename=c -> savename(c; connector=","))
+        @produce_or_load(gl_scene_inference, d, result_path; filename=my_savename)
     end
 end
 destroy_context(gl_context)
+
+# Calculate errors
+experiment_name = "baseline"

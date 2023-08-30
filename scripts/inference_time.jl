@@ -92,7 +92,7 @@ for img_size in img_sizes
     result_dir = datadir("exp_raw", experiment_name)
     run_closure = run_experiment | (posterior, parameters)
     @progress "inference time for image size $img_size" for config in configs
-        @produce_or_load(run_closure, config, result_dir; filename=c -> savename(c; connector=","))
+        @produce_or_load(run_closure, config, result_dir; filename=my_savename)
     end
     destroy_context(gl_context)
 
