@@ -72,7 +72,6 @@ function scene_inference(gl_context, config)
     # Extract config and load dataset
     @unpack dataset, testset, scene_id, n_steps = config
     parameters = Parameters()
-    @reset parameters.c_reg = 1 / 500
     @reset parameters.n_steps = n_steps
 
     result_df = bop_test_or_train(dataset, testset, scene_id)

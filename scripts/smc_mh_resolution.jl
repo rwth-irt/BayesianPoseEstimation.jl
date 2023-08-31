@@ -116,8 +116,6 @@ function scene_inference(config)
     @unpack dataset, testset, scene_id, resolution, mode = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
-    # For simple_posterior
-    @reset parameters.c_reg = 1 / 500
 
     # Sampling parameters & OpenGL context
     @reset parameters.n_particles = 100
@@ -128,7 +126,6 @@ function scene_inference(config)
     gl_context = render_context(parameters)
     # Finally destroy gl_context
     try
-        # TODO Approximately same inference time for all configurations - does it make sense?
         if mode == :time
             df_row = first(scene_df)
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
@@ -148,7 +145,7 @@ function scene_inference(config)
         result_df.log_evidence = Vector{Vector{Float32}}(undef, nrow(result_df))
 
         # Run inference per detection
-        @progress "dataset: $dataset, scene_id: $scene_id, resolution: $resolution" for (idx, df_row) in enumerate(eachrow(scene_df))
+        @progress "dataset: $dataset, scene_id: $scene_id, resolution: $resolution, mode: $mode" for (idx, df_row) in enumerate(eachrow(scene_df))
             # Image crops differ per object
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             # Run and collect results
@@ -179,42 +176,60 @@ end
 evaluate_errors(experiment_name)
 
 # Combine results per resolution and mode
-result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
 function parse_config(path)
     config = my_parse_savename(path)
     @unpack resolution, mode = config
     resolution, mode
 end
-transform!(result_df, :path => ByRow(parse_config) => [:resolution, :mode])
+pro_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
+transform!(pro_df, :path => ByRow(parse_config) => [:resolution, :mode])
 
 # Threshold errors
-transform!(result_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
-transform!(result_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
-transform!(result_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
+transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
+transform!(pro_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
+transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
 
 # Recalls by resolution & mode
-groups = groupby(result_df, [:resolution, :mode])
-recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
+recall_groups = groupby(pro_df, [:resolution, :mode])
+recalls = combine(recall_groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
+
+# Raw results for n_steps and mean_time
+raw_df = collect_results(datadir("exp_raw", experiment_name))
+transform!(raw_df, :path => ByRow(parse_config) => [:resolution, :mode])
+ts_groups = groupby(raw_df, [:resolution, :mode])
+times_and_steps = combine(ts_groups, :result_df => (rdf -> mean(vcat(getproperty.(rdf, :time)...))) => :mean_time, :parameters => (p -> getproperty.(p, :n_steps) |> mean) => :mean_steps)
+# Sanity check of inference times and steps
+display(times_and_steps)
 
 # Visualize
 using Plots
 gr()
 diss_defaults()
 
-mode_groups = groupby(recalls, [:mode])
-for group in mode_groups
-    sort!(group, :resolution)
-    p = plot(group.resolution, group.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5)
-    plot!(group.resolution, group.vsd_recall; label="VSD", linewidth=1.5)
-    plot!(group.resolution, group.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-    display(p)
-    savefig(p, joinpath("plots", "$experiment_name.pdf"))
-end
+# steps mode
+steps_recalls = filter(:mode => x -> x == "steps", recalls)
+steps_time = filter(:mode => x -> x == "steps", times_and_steps)
+sort!(steps_recalls, :resolution)
+sort!(steps_time, :resolution)
 
-# Sanity check of mean inference time
-raw_results = collect_results(result_dir)
-transform!(raw_results, :path => ByRow(parse_config) => [:resolution, :mode])
-time_groups = groupby(raw_results, [:resolution, :mode])
-# NOTE nice :) actually all quite close to the target of 0.5 sec. Maybe quick benchmark is the way to go
-times = combine(time_groups, :result_df => (rdf -> mean(vcat(getproperty.(rdf, :time)...))) => :mean_time)
-display(times)
+p1 = plot(steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:left)
+plot!(steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD", linewidth=1.5)
+plot!(steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
+plot!(twinx(), steps_recalls.resolution, steps_time.mean_time; ylabel="pose inference time / s", label="inference time", linestyle=:dash, color=:black, legend=:topleft)
+
+display(p1)
+savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
+
+# times mode
+time_recalls = filter(:mode => x -> x == "time", recalls)
+time_steps = filter(:mode => x -> x == "time", times_and_steps)
+sort!(time_recalls, :resolution)
+sort!(time_steps, :resolution)
+
+p1 = plot(time_recalls.resolution, time_recalls.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:left)
+plot!(time_recalls.resolution, time_recalls.vsd_recall; label="VSD", linewidth=1.5)
+plot!(time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
+plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:topleft)
+
+display(p1)
+savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))

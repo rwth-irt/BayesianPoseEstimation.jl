@@ -99,8 +99,7 @@ plot_scene_ontop(gl_context, scene, color_img)
 prior = point_prior(parameters, experiment, cpu_rng)
 
 # NOTE no association → prior_o has strong influence
-# @reset parameters.c_reg = 1 / 500
-# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 
 posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)

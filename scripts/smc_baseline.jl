@@ -40,8 +40,6 @@ Returns (parameters, eval(sampler))
 """
 function parameters_and_sampler(sampler)
     parameters = Parameters()
-    # For simple_posterior
-    @reset parameters.c_reg = 1 / 500
     if sampler == :smc_bootstrap
         @reset parameters.n_particles = 250
         @reset parameters.n_steps = 150

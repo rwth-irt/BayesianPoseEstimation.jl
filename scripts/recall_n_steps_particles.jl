@@ -85,7 +85,6 @@ function scene_inference(gl_context, config)
     # Extract config and load dataset
     @unpack dataset, testset, scene_id, n_steps, n_particles, sampler = config
     parameters = Parameters()
-    @reset parameters.c_reg = 1 / 500
     @reset parameters.n_steps = n_steps
     @reset parameters.n_particles = n_particles
 

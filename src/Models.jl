@@ -74,7 +74,10 @@ Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 
 """
     ImageLikelihoodNormalizer
-Use it in a modifier node to normalize the loglikelihood of the image to make it less independent from the number of visible pixels in μ. 
+Serves as a regularization of the image likelihood, where the independence assumption of individual pixels does not hold.
+Use it in a modifier node to normalize the loglikelihood of the image to make it less dependent from the number of visible pixels in μ.
+
+ℓ_reg = c_reg / n_visible_pixel * ℓ
 """
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
     c_reg::T
@@ -100,14 +103,23 @@ function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
     n_o = sum_and_dropdims(model.o .>= 0.5, (1, 2))
     logdensity_npixel.(ℓ, model.c_reg, n_o)
 end
-# (Broadcastable) Avoid undefined behavior (CPU: x/0=Inf, CUDA x/0=NaN). Nothing visible should be very unlikely → -∞
-logdensity_npixel(ℓ, norm_const, n_pixel) = iszero(ℓ) ? typemin(ℓ) : ℓ * norm_const / n_pixel
+"""
+    logdensity_npixel(ℓ, c_reg, n_pixel)
+(Broadcastable) Avoid undefined behavior for n_pixel = 0 - CPU: x/0=Inf, CUDA x/0=NaN.
+
+Nothing visible is very unlikely so return -∞ as loglikelihood.
+
+Otherwise returns: c_reg / n_pixel * ℓ
+"""
+logdensity_npixel(ℓ, c_reg, n_pixel) = iszero(n_pixel) ? typemin(ℓ) : c_reg / n_pixel * ℓ
 
 # TODO evaluate this in diss. Isn't it in Probabilistic Robotics? :D Introduce Hyperparameter like in the more complex one?
 """
     SimpleImageRegularization
 Use it in a modifier node to regularize the loglikelihood of the image to make it less dominant compared to the prior.
-Tunable Hyperparameter: c_reg is the regularization constant
+Tunable Hyperparameter: c_reg is the regularization constant.
+
+ℓ_reg = c_reg / n_pixel * ℓ
 """
 struct SimpleImageRegularization
     c_reg
@@ -115,10 +127,7 @@ end
 SimpleImageRegularization(c_reg, _...) = SimpleImageRegularization(c_reg)
 
 Base.rand(::AbstractRNG, ::SimpleImageRegularization, value) = value
-function DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ)
-    # NOTE one could estimate the expected number of visible pixels for a given image size. Is there a good explanation 
-    model.c_reg * ℓ
-end
+DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ) = logdensity_npixel(ℓ, model.c_reg, length(z))
 
 """
     expected_pixel_count(rng, prior_model, render_context, scene, parameters)

@@ -39,8 +39,6 @@ Returns (parameters, eval(sampler))
 """
 function parameters_and_sampler(sampler)
     parameters = Parameters()
-    # For simple_posterior
-    @reset parameters.c_reg = 1 / 500
     if sampler == :mh_sampler
         @reset parameters.n_steps = 250
         @reset parameters.n_thinning = 5
