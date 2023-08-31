@@ -36,13 +36,13 @@ CUDA.allowscalar(false)
 
 experiment_name = "smc_mh_resolution"
 result_dir = datadir("exp_raw", experiment_name)
-# TODO? dataset = ["lm", "tless", "itodd"]
-dataset = ["tless"]
+dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
-scene_id = [0:4...]
-resolution = [10:10:200...]
-configs = dict_list(@dict dataset testset scene_id resolution)
-
+scene_id = 0
+resolution = [25:25:200...]
+# Which one to keep constant
+mode = [:time, :steps]
+configs = dict_list(@dict dataset testset scene_id mode resolution)
 
 """
     mean_step_time(cpu_rng, posterior, sampler)
@@ -113,7 +113,7 @@ scene_inference(config)
 """
 function scene_inference(config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id, resolution = config
+    @unpack dataset, testset, scene_id, resolution, mode = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
     # For simple_posterior
@@ -129,10 +129,14 @@ function scene_inference(config)
     # Finally destroy gl_context
     try
         # TODO Approximately same inference time for all configurations - does it make sense?
-        df_row = first(scene_df)
-        depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-        step_time = mean_step_time(gl_context, parameters, depth_img, mask_img, mesh, df_row)
-        @reset parameters.n_steps = floor(Int, 0.5 / step_time)
+        if mode == :time
+            df_row = first(scene_df)
+            depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+            step_time = mean_step_time(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+            @reset parameters.n_steps = floor(Int, 0.5 / step_time)
+        elseif mode == :steps
+            @reset parameters.n_steps = 300
+        end
 
         # Store result in DataFrame. Numerical precision doesn't matter here → Float32
         result_df = select(scene_df, :scene_id, :img_id, :obj_id)
@@ -174,39 +178,43 @@ end
 # Calculate errors
 evaluate_errors(experiment_name)
 
-# Combine results per resolution
+# Combine results per resolution and mode
 result_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
 function parse_config(path)
     config = my_parse_savename(path)
-    @unpack resolution = config
-    resolution
+    @unpack resolution, mode = config
+    resolution, mode
 end
-transform!(result_df, :path => ByRow(parse_config) => [:resolution])
+transform!(result_df, :path => ByRow(parse_config) => [:resolution, :mode])
 
 # Threshold errors
 transform!(result_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
 transform!(result_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
 transform!(result_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
 
-# Recalls by resolution
-groups = groupby(result_df, :resolution)
+# Recalls by resolution & mode
+groups = groupby(result_df, [:resolution, :mode])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 
 # Visualize
 using Plots
 gr()
 diss_defaults()
-sort!(recalls, :resolution)
-p = plot(recalls.resolution, recalls.adds_recall; label="ADDS", xlabel="resolution / px x px", ylabel="recall", ylims=[0, 1], linewidth=1.5)
-plot!(recalls.resolution, recalls.vsd_recall; label="VSD", linewidth=1.5)
-plot!(recalls.resolution, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-display(p)
-savefig(p, joinpath("plots", "$experiment_name.pdf"))
+
+mode_groups = groupby(recalls, [:mode])
+for group in mode_groups
+    sort!(group, :resolution)
+    p = plot(group.resolution, group.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5)
+    plot!(group.resolution, group.vsd_recall; label="VSD", linewidth=1.5)
+    plot!(group.resolution, group.vsdbop_recall; label="VSDBOP", linewidth=1.5)
+    display(p)
+    savefig(p, joinpath("plots", "$experiment_name.pdf"))
+end
 
 # Sanity check of mean inference time
 raw_results = collect_results(result_dir)
-transform!(raw_results, :path => ByRow(parse_config) => [:resolution])
-groups = groupby(raw_results, [:resolution])
+transform!(raw_results, :path => ByRow(parse_config) => [:resolution, :mode])
+time_groups = groupby(raw_results, [:resolution, :mode])
 # NOTE nice :) actually all quite close to the target of 0.5 sec. Maybe quick benchmark is the way to go
-times = combine(groups, :result_df => (rdf -> mean(vcat(getproperty.(rdf, :time)...))) => :mean_time)
+times = combine(time_groups, :result_df => (rdf -> mean(vcat(getproperty.(rdf, :time)...))) => :mean_time)
 display(times)

@@ -132,8 +132,7 @@ gl_scene_inference = scene_inference | gl_context
 
 experiment_name = "recall_n_steps_particles"
 result_dir = datadir("exp_raw", experiment_name)
-# TODO? dataset = ["lm", "tless", "itodd"]
-dataset = ["tless"]
+dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
 
