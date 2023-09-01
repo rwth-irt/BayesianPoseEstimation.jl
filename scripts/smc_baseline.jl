@@ -80,10 +80,10 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
         states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters)
 
         # Extract best pose and score
-        sample = final_state.sample
-        score, idx = findmax(loglikelihood(sample))
-        t = variables(sample).t[:, idx]
-        r = variables(sample).r[idx]
+        final_sample = final_state.sample
+        score, idx = findmax(loglikelihood(final_sample))
+        t = variables(final_sample).t[:, idx]
+        r = variables(final_sample).r[idx]
     end
     t, r, score, final_state, states, time
 end

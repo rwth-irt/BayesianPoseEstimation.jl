@@ -84,7 +84,7 @@ Base.@kwdef struct Parameters
     association_σ = 0.01
     proposal_σ_o = 0.01
     # Image Model
-    c_reg = 20
+    c_reg = 100
 
     # Pose Model
     σ_t = fill(0.03, 3)

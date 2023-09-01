@@ -18,7 +18,6 @@ MCMCDepth.diss_defaults()
 function mtm_parameters()
     parameters = Parameters()
     # NOTE optimal parameter values of pixel_σ and c_reg seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-    @reset parameters.c_reg = 20
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 500
     @reset parameters.n_burn_in = 0
@@ -28,7 +27,6 @@ end
 
 function mh_parameters()
     parameters = Parameters()
-    @reset parameters.c_reg = 20
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 250
     # NOTE burn in not required/even harmful if maximum likelihood/posteriori is the goal
@@ -38,15 +36,16 @@ end
 
 function smc_parameters()
     parameters = Parameters()
-    # NOTE SMC: tempering is essential. More steps (MCMC) allows higher c_reg than more particles (FP, Bootstrap), 15-30 seems to be a good range
-    @reset parameters.c_reg = 20
+    # NOTE SMC: tempering is essential. More steps (MCMC) allows higher c_reg than more particles (FP, Bootstrap)
     @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE FP & Bootstrap do not allow independent moves so they profit from a large number of particles. They are also resampling dominated instead of acceptance.
     # NOTE Why is MTM so much worse? One reason might have been that tempering was not implemented.
     @reset parameters.n_steps = 200
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
-    @reset parameters.relative_ess = 0.5
+    @reset parameters.width = 500
+    @reset parameters.height = 500
+    @reset parameters.depth = parameters.n_particles
 end
 
 parameters = smc_parameters()
@@ -101,7 +100,7 @@ prior = point_prior(parameters, experiment, cpu_rng)
 # NOTE no association → prior_o has strong influence
 posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 
-posterior = association_posterior(parameters, experiment, prior, dev_rng)
+# posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
@@ -134,7 +133,6 @@ anim = @animate for i ∈ 0:2:360
 end;
 gif(anim, "anim.gif", fps=20)
 
-
 # MCMC samplers
 # parameters = mh_parameters()
 # sampler = mh_sampler(cpu_rng, parameters, posterior)
@@ -163,3 +161,5 @@ anim = @animate for i ∈ 0:2:360
     scatter_position(chain; background_color=:white, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
 end;
 gif(anim, "anim.gif", fps=20)
+
+destroy_context(gl_context)
