@@ -37,7 +37,7 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-resolution = [25:25:200...]
+resolution = [25:25:150...]
 # Which one to keep constant
 mode = [:time, :steps]
 configs = dict_list(@dict dataset testset scene_id mode resolution)
@@ -129,8 +129,6 @@ function scene_inference(config)
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             step_time = mean_step_time(gl_context, parameters, depth_img, mask_img, mesh, df_row)
             @reset parameters.n_steps = floor(Int, 0.5 / step_time)
-        elseif mode == :steps
-            @reset parameters.n_steps = 300
         end
 
         # Store result in DataFrame. Numerical precision doesn't matter here → Float32
