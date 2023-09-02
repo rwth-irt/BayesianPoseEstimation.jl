@@ -196,7 +196,7 @@ export vsdbop_row
 
 export evaluate_errors
 export my_parse_savename, my_savename
-export step_time_100px, step_time_200px
+export step_time_50px, step_time_100px, step_time_200px
 
 # Extensions and Reexports
 @reexport import Quaternions: Quaternion
