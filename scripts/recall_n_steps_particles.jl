@@ -144,7 +144,7 @@ n_hypotheses = [500, 1_000, 1_500, 2_000, 3_000, 5_000, 10_000]
 configs = dict_list(@dict dataset testset scene_id n_particles sampler)
 @progress "MTM n_steps and n_particles" for config in configs
     @progress "MTM for $(config[:n_particles]) particles" for tim in times
-        config[:n_steps] = floor(Int, tim / step_time_100px(config[:sampler], config[:n_particles]))
+        config[:n_steps] = floor(Int, tim / step_time_50px(config[:sampler], config[:n_particles]))
         @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
     end
 end
@@ -156,7 +156,7 @@ times = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
 configs = dict_list(@dict dataset testset scene_id n_particles sampler)
 @progress "SMC n_steps and n_particles" for config in configs
     @progress "SMC for $(config[:n_particles]) particles" for tim in times
-        config[:n_steps] = floor(Int, tim / step_time_100px(config[:sampler], config[:n_particles]))
+        config[:n_steps] = floor(Int, tim / step_time_50px(config[:sampler], config[:n_particles]))
         @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)
     end
 end

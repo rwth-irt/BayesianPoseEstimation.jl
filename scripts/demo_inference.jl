@@ -43,8 +43,6 @@ function smc_parameters()
     @reset parameters.n_steps = 200
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
-    @reset parameters.width = 50
-    @reset parameters.height = parameters.width
     @reset parameters.depth = parameters.n_particles
 end
 

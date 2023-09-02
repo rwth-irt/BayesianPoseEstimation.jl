@@ -37,7 +37,7 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-resolution = [25:25:150...]
+resolution = [5:5:25..., 30, 40, 50:25:100...]
 # Which one to keep constant
 mode = [:time, :steps]
 configs = dict_list(@dict dataset testset scene_id mode resolution)
@@ -208,10 +208,10 @@ steps_time = filter(:mode => x -> x == "steps", times_and_steps)
 sort!(steps_recalls, :resolution)
 sort!(steps_time, :resolution)
 
-p1 = plot(steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS", xlabel="resolution / px", xticks=steps_recalls.resolution, ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:right)
+p1 = plot(steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS", xlabel="resolution / px", xticks=steps_recalls.resolution, ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomleft)
 plot!(steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-plot!(twinx(), steps_recalls.resolution, steps_time.mean_time; ylabel="pose inference time / s", ylimits=[0, Inf], label="inference time", linestyle=:dash, color=:black, legend=:bottomright)
+plot!(twinx(), steps_recalls.resolution, steps_time.mean_time; ylabel="pose inference time / s", ylimits=[0, Inf], label="inference time", linestyle=:dash, color=:black, legend=:bottom)
 
 display(p1)
 savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
@@ -222,10 +222,10 @@ time_steps = filter(:mode => x -> x == "time", times_and_steps)
 sort!(time_recalls, :resolution)
 sort!(time_steps, :resolution)
 
-p1 = plot(time_recalls.resolution, time_recalls.adds_recall; label="ADDS", xlabel="resolution / px", xticks=steps_recalls.resolution, ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:left)
+p1 = plot(time_recalls.resolution, time_recalls.adds_recall; label="ADDS", xlabel="resolution / px", xticks=steps_recalls.resolution, ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomleft)
 plot!(time_recalls.resolution, time_recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:bottomleft)
+plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:bottom)
 
 display(p1)
 savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
