@@ -71,8 +71,8 @@ Deliberately not strongly typed because the strongly typed structs are construct
 """
 Base.@kwdef struct Parameters
     # Render context
-    width = 50
-    height = 50
+    width = 25
+    height = 25
     depth = 100
     min_depth = 0
     max_depth = 10

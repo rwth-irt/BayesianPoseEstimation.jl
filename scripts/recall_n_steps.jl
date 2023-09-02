@@ -4,10 +4,9 @@
 
 """
 Run different Metropolis Hastings MCMC on  the synthetic BOP datasets.
-TODO: Only the first scene of each dataset is evaluated because of the computation time.
+Only the first scene of each dataset is evaluated because of the computation time.
+
 WARN: Results vary based on sampler configuration
-TODO: plot recall over n_samples / n_particle as 2D heatmap
-TODO: plot recall over time
 """
 
 using DrWatson
