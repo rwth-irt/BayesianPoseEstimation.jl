@@ -97,7 +97,6 @@ prior = point_prior(parameters, experiment, cpu_rng)
 
 # NOTE no association → prior_o has strong influence
 posterior = simple_posterior(parameters, experiment, prior, dev_rng)
-
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 

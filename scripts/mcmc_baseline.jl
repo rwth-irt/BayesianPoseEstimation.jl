@@ -75,8 +75,10 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
         sampler = sampler(cpu_rng, parameters, posterior)
         chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning, progress=false)
 
+        # Extract best pose and score
         score, idx = findmax(loglikelihood.(chain))
-
+        t = variables(chain[idx]).t
+        r = variables(chain[idx]).r
     end
     t, r, score, chain, time
 end
