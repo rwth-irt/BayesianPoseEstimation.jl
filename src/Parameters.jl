@@ -71,9 +71,9 @@ Deliberately not strongly typed because the strongly typed structs are construct
 """
 Base.@kwdef struct Parameters
     # Render context
-    width = 100
-    height = 100
-    depth = 500
+    width = 50
+    height = 50
+    depth = 100
     min_depth = 0
     max_depth = 10
 
@@ -102,7 +102,7 @@ Base.@kwdef struct Parameters
     n_steps = 3_000
     n_burn_in = 0
     n_thinning = 0
-    n_particles = 50
+    n_particles = 100
     relative_ess = 0.5
     w_r_ind = 0.1
     w_t_ind = 0.1

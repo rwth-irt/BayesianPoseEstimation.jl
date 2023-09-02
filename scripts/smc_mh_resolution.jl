@@ -3,15 +3,13 @@
 # All rights reserved. 
 
 """
-Run different SMC algorithms on the synthetic BOP datasets:
-* MCMC
-* Forward Proposals
-* Bootstrap
-
-Model setup for segmentation:
-* Segmentation prior for position `t` and pixel association `o`
-* Simple likelihood function with mixture model for the pixels, a simple regularization, and without modeling the association,
+Run different SMC-MH on the synthetic BOP datasets for varying resolutions.
+Keep constant:
+* Number of steps
+* Inference time
 """
+
+# BUG for some reason, sometimes all particles have the same log likelihood for large resolutions. Check result plots and delete the faulty ones which have a very low recall.
 
 using DrWatson
 @quickactivate("MCMCDepth")
@@ -212,10 +210,10 @@ steps_time = filter(:mode => x -> x == "steps", times_and_steps)
 sort!(steps_recalls, :resolution)
 sort!(steps_time, :resolution)
 
-p1 = plot(steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:left)
+p1 = plot(steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:right)
 plot!(steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-plot!(twinx(), steps_recalls.resolution, steps_time.mean_time; ylabel="pose inference time / s", label="inference time", linestyle=:dash, color=:black, legend=:topleft)
+plot!(twinx(), steps_recalls.resolution, steps_time.mean_time; ylabel="pose inference time / s", label="inference time", linestyle=:dash, color=:black, legend=:bottomright)
 
 display(p1)
 savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
@@ -229,7 +227,7 @@ sort!(time_steps, :resolution)
 p1 = plot(time_recalls.resolution, time_recalls.adds_recall; label="ADDS", xlabel="resolution / px", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:left)
 plot!(time_recalls.resolution, time_recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:topleft)
+plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:bottomleft)
 
 display(p1)
 savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
