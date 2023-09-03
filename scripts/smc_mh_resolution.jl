@@ -29,7 +29,6 @@ using ProgressLogging
 using TerminalLoggers
 global_logger(TerminalLogger(right_justify=120))
 
-BenchmarkTools.DEFAULT_PARAMETERS.seconds = 1
 CUDA.allowscalar(false)
 
 experiment_name = "smc_mh_resolution"
@@ -43,31 +42,29 @@ mode = [:time, :steps]
 configs = dict_list(@dict dataset testset scene_id mode resolution)
 
 """
-    mean_step_time(cpu_rng, posterior, sampler)
-Returns the mean time per step of the benchmark in seconds.
-This allows an approximation of the number of steps given a constant compute budget.
+    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+Assembles the posterior model and the sampler from the loaded images, mesh, and DataFrame row.
 """
-function mean_step_time(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
     # Context
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
 
-    # Model
+    # Setup experiment
     camera = crop_camera(df_row)
     prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
     prior_o[mask_img] .= parameters.o_mask_is
+    # Prior t from mask is imprecise no need to bias
     prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
     experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
+
+    # Model
     prior = point_prior(parameters, experiment, cpu_rng)
     posterior = simple_posterior(parameters, experiment, prior, dev_rng)
-
-    # Benchmark sampler
+    # Sampler
     sampler = smc_mh(cpu_rng, parameters, posterior)
-    _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
-    # Interpolate local variables into the benchmark expression
-    t = @benchmark AbstractMCMC.step($cpu_rng, $posterior, $sampler, $state)
-    # Convert from ns to seconds
-    mean(t.times) * 1e-9
+    # Result
+    cpu_rng, posterior, sampler
 end
 
 """
@@ -75,26 +72,10 @@ end
 Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded.
 """
 function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
-    # Context
-    cpu_rng = Random.default_rng(parameters)
-    dev_rng = device_rng(parameters)
-
     time = @elapsed begin
-        # Setup experiment
-        camera = crop_camera(df_row)
-        prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
-        prior_o[mask_img] .= parameters.o_mask_is
-        # Prior t from mask is imprecise no need to bias
-        prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
-        experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
-
-        # Model
-        prior = point_prior(parameters, experiment, cpu_rng)
-        posterior = simple_posterior(parameters, experiment, prior, dev_rng)
-
-        # Sampler
-        sampler = smc_mh(cpu_rng, parameters, posterior)
-        states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters)
+        # Assemble sampler and run inference
+        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        states, final_state = smc_inference(rng, posterior, sampler, parameters)
 
         # Extract best pose and score
         final_sample = final_state.sample
@@ -125,9 +106,11 @@ function scene_inference(config)
     # Finally destroy gl_context
     try
         if mode == :time
+            # Benchmark model sampler configuration
             df_row = first(scene_df)
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-            step_time = mean_step_time(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+            rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+            step_time = mean_step_time(rng, posterior, sampler)
             @reset parameters.n_steps = floor(Int, 0.5 / step_time)
         end
 
@@ -229,4 +212,4 @@ plot!(time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP", linew
 plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:bottom, grid=:all)
 
 display(p1)
-savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
+savefig(p1, joinpath("plots", "$(experiment_name)_time.pdf"))
