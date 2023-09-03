@@ -164,7 +164,7 @@ p = plot(times.mean_time, recalls.adds_recall; label="ADDS", xlabel="pose infere
 plot!(twiny(), recalls.n_steps, recalls.adds_recall; color=:transparent, xlabel="iterations", legend=false)
 plot!(times.mean_time, recalls.vsd_recall; label="VSD", linewidth=1.5)
 plot!(times.mean_time, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5, grid=:all)
 
 display(p)
 savefig(p, joinpath("plots", "recall_n_steps_mh.pdf"))
