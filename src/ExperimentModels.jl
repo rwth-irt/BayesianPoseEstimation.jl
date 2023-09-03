@@ -14,7 +14,6 @@ function point_prior(params::Parameters, experiment::Experiment, cpu_rng::Abstra
     DeterministicNode(:μ, μ_fn, (t, r))
 end
 
-# TODO add to Diss
 """
     segmentation_to_point(bounding_box, depth_image, mask_img, cv_camera)
 Calculates a 3D point which can be used for `prior_t` in the `Experiment` with x and y at the center of the bounding box and z as the mean of the masked depth image.
