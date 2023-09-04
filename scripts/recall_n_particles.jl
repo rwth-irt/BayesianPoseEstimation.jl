@@ -137,7 +137,7 @@ function scene_inference(gl_context, config)
 end
 
 # General experiment
-experiment_name = "recall_n_steps_particles"
+experiment_name = "recall_n_particles"
 result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
@@ -190,34 +190,34 @@ diss_defaults()
 
 function parse_config(path)
     config = my_parse_savename(path)
-    @unpack n_steps, n_particles, sampler = config
-    n_steps, n_particles, sampler
+    @unpack pose_time, n_particles, sampler = config
+    pose_time, n_particles, sampler
 end
 
 # Calculate recalls
 pro_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
-transform!(pro_df, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
+transform!(pro_df, :path => ByRow(parse_config) => [:pose_time, :n_particles, :sampler])
 filter!(x -> x.n_particles > 1, pro_df)
 # Threshold errors
 transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
 transform!(pro_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
 transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
-groups = groupby(pro_df, [:sampler, :n_steps, :n_particles])
+groups = groupby(pro_df, [:sampler, :pose_time, :n_particles])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 
 # Calculate mean pose inference times
 raw_df = collect_results(result_dir)
-transform!(raw_df, :path => ByRow(parse_config) => [:n_steps, :n_particles, :sampler])
+transform!(raw_df, :path => ByRow(parse_config) => [:pose_time, :n_particles, :sampler])
 filter!(x -> x.n_particles > 1, raw_df)
-groups = groupby(raw_df, [:sampler, :n_steps, :n_particles])
+groups = groupby(raw_df, [:sampler, :pose_time, :n_particles])
 times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
 
 # Actually plot it
 function plot_sampler(sampler_name, recalls, times)
     recalls_filtered = filter(x -> x.sampler == sampler_name, recalls)
     times_filtered = filter(x -> x.sampler == sampler_name, times)
-    sort!(recalls_filtered, [:n_particles, :n_steps])
-    sort!(times_filtered, [:n_particles, :n_steps])
+    sort!(recalls_filtered, [:n_particles, :pose_time])
+    sort!(times_filtered, [:n_particles, :pose_time])
     # Visualize per n_particles
     recall_groups = groupby(recalls_filtered, :n_particles)
     time_groups = groupby(times_filtered, :n_particles)
@@ -243,7 +243,7 @@ function plot_sampler(sampler_name, recalls, times)
     lay = @layout [a; b c]
     p = plot(p_vsdbop, p_adds, p_vsd; layout=lay)
     display(p)
-    savefig(p, joinpath("plots", "recall_n_steps_particles_" * sampler_name * ".pdf"))
+    savefig(p, joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"))
 end
 
 for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
