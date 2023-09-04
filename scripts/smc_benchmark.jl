@@ -62,28 +62,17 @@ end
 Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded.
 """
 function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler_symbol)
-    time = @elapsed begin
+    timed = @elapsed begin
         rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler_symbol)
 
-        # Sampling
-        if sampler_symbol == :mtm_sampler
-            # Only MTM supports multiple particles. Metropolis Hastings in recall_n_steps.jl
-            chain = sample(rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning, progress=false)
-            # Extract best pose and score
-            score, idx = findmax(loglikelihood.(chain))
-            t = variables(chain[idx]).t
-            r = variables(chain[idx]).r
-        else
-            # Only MCMC or SMC style algorithms
-            _, final_state = smc_inference(rng, posterior, sampler, parameters)
-            # Extract best pose and score
-            final_sample = final_state.sample
-            score, idx = findmax(loglikelihood(final_sample))
-            t = variables(final_sample).t[:, idx]
-            r = variables(final_sample).r[idx]
-        end
+        _, final_state = smc_inference(rng, posterior, sampler, parameters)
+        # Extract best pose and score
+        final_sample = final_state.sample
+        score, idx = findmax(loglikelihood(final_sample))
+        t = variables(final_sample).t[:, idx]
+        r = variables(final_sample).r[idx]
     end
-    t, r, score, time
+    t, r, score, timed
 end
 
 """
@@ -94,36 +83,26 @@ function scene_inference(gl_context, config)
     # Extract config and load dataset
     @unpack dataset, testset, scene_id, pose_time, n_particles, sampler = config
     sampler_symbol = sampler
-    result_df = bop_test_or_train(dataset, testset, scene_id)
+    scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
     @reset parameters.n_particles = n_particles
 
-    # TODO do I really need it?
-    # Add gt_R & gt_t for testset
-    datasubset_path = datadir("bop", dataset, testset)
-    if !("gt_t" in names(result_df))
-        leftjoin!(gt_df, PoseErrors.gt_dataframe(datasubset_path, scene_id)
-            ; on=[:scene_id, :img_id, :gt_id])
-    end
-    if !("visib_fract" in names(result_df))
-        leftjoin!(gt_df, PoseErrors.gt_info_dataframe(datasubset_path, scene_id); on=[:scene_id, :img_id, :gt_id])
-    end
-
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
+    result_df = select(scene_df, :scene_id, :img_id, :obj_id)
     result_df.score = Vector{Float32}(undef, nrow(result_df))
     result_df.R = Vector{Quaternion{Float32}}(undef, nrow(result_df))
     result_df.t = Vector{Vector{Float32}}(undef, nrow(result_df))
-    time = Vector{Float32}(undef, nrow(result_df))
+    result_df.time = Vector{Float32}(undef, nrow(result_df))
 
     # Benchmark model sampler configuration to adapt number of steps - also avoids timing pre-compilation
-    df_row = first(result_df)
+    df_row = first(scene_df)
     depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
     rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler_symbol)
     step_time = mean_step_time(rng, posterior, sampler)
     @reset parameters.n_steps = floor(Int, pose_time / step_time)
 
     # Run inference per detection
-    @progress "Sampling poses" for (idx, df_row) in enumerate(eachrow(result_df))
+    @progress "Sampling poses" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
@@ -131,53 +110,31 @@ function scene_inference(gl_context, config)
         result_df[idx, :].score = score
         result_df[idx, :].R = R
         result_df[idx, :].t = t
-        time[idx] = timed
+        result_df[idx, :].time = timed
     end
-    @strdict parameters result_df time
+    @strdict parameters result_df
 end
 
 # General experiment
-experiment_name = "recall_n_particles"
+experiment_name = "smc_benchmark"
 result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-# MTM
-sampler = [:mtm_sampler]
-n_particles = [5, 10, 20, 40]
-pose_time = [0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0]
+sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
+n_particles = [10, 50] # TODO, 100, 250]
+pose_time = [0.05, 0.1] # TODO , 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
 configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
 
 # OpenGL context
 parameters = Parameters()
 @reset parameters.depth = maximum(n_particles)
-gl_context = render_context(parameters)
 # Avoid recreating the context in scene_inference by conditioning on it / closure
+gl_context = render_context(parameters)
 gl_scene_inference = scene_inference | gl_context
-
-@progress "MTM n_steps and n_particles" for config in configs
+@progress "SMC Benchmark" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
-
-destroy_context(gl_context)
-
-# SMC
-sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
-n_particles = [10, 50, 100, 250]
-pose_time = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
-configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
-
-# OpenGL context
-parameters = Parameters()
-@reset parameters.depth = maximum(n_particles)
-gl_context = render_context(parameters)
-# Avoid recreating the context in scene_inference by conditioning on it / closure
-gl_scene_inference = scene_inference | gl_context
-
-@progress "SMC n_steps and n_particles" for config in configs
-    @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)
-end
-
 destroy_context(gl_context)
 
 # Calculate errors
@@ -208,9 +165,8 @@ recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :
 # Calculate mean pose inference times
 raw_df = collect_results(result_dir)
 transform!(raw_df, :path => ByRow(parse_config) => [:pose_time, :n_particles, :sampler])
-filter!(x -> x.n_particles > 1, raw_df)
-groups = groupby(raw_df, [:sampler, :pose_time, :n_particles])
-times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
+times_groups = groupby(raw_df, [:sampler, :pose_time, :n_particles])
+times = combine(times_groups, :result_df => (x -> mean(vcat(getproperty.(x, :time)...))) => :mean_time)
 
 # Actually plot it
 function plot_sampler(sampler_name, recalls, times)
@@ -246,7 +202,6 @@ function plot_sampler(sampler_name, recalls, times)
     savefig(p, joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"))
 end
 
-# MTM in "plot_mcmc_particles.jl"
 for sampler_name in ["smc_bootstrap", "smc_forward", "smc_mh"]
     plot_sampler(sampler_name, recalls, times)
 end
