@@ -33,16 +33,16 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 # General experiment
-experiment_name = "smc_mh_baseline"
+experiment_name = "baseline"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
 @reset parameters.depth = parameters.n_particles
-gl_context = render_context(parameters)
+sampler = :smc_mh
 dataset = ["itodd", "lm", "tless"]
 testset = "train_pbr"
 scene_id = [0:4...]
-configs = dict_list(@dict dataset testset scene_id)
+configs = dict_list(@dict sampler dataset testset scene_id)
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
@@ -135,6 +135,7 @@ function scene_inference(gl_context, parameters, config)
 end
 
 # Avoid recreating the context in scene_inference by conditioning on it / closure
+gl_context = render_context(parameters)
 gl_scene_inference = scene_inference | (gl_context, parameters)
 @progress "SMC baseline" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)

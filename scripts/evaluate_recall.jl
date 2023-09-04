@@ -6,7 +6,8 @@
 Load the pose errors from disk, eagerly match the poses and calculate the average recall.
 """
 
-# TODO enable recall over threshold
+# TODO enable plotting recall over threshold
+# TODO make this a function similar to evaluate_errors
 
 using DrWatson
 @quickactivate("MCMCDepth")
@@ -37,4 +38,4 @@ groups = groupby(results, [:sampler])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 combine(groups,)
 
-print(recalls)
+display(recalls)

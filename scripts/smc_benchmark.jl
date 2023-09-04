@@ -31,6 +31,17 @@ global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
+# General experiment
+experiment_name = "smc_benchmark"
+result_dir = datadir("exp_raw", experiment_name)
+dataset = ["lm", "tless", "itodd"]
+testset = "train_pbr"
+scene_id = 0
+sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
+n_particles = [10, 50, 100, 250]
+pose_time = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
+configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
+
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler_symbol)
 Assembles the posterior model and the sampler from the loaded images, mesh, and DataFrame row.
@@ -102,7 +113,7 @@ function scene_inference(gl_context, config)
     @reset parameters.n_steps = floor(Int, pose_time / step_time)
 
     # Run inference per detection
-    @progress "Sampling poses" for (idx, df_row) in enumerate(eachrow(scene_df))
+    @progress "sampler: $(sampler_symbol), n_particles: $(n_particles)" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
@@ -114,17 +125,6 @@ function scene_inference(gl_context, config)
     end
     @strdict parameters result_df
 end
-
-# General experiment
-experiment_name = "smc_benchmark"
-result_dir = datadir("exp_raw", experiment_name)
-dataset = ["lm", "tless", "itodd"]
-testset = "train_pbr"
-scene_id = 0
-sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
-n_particles = [10, 50] # TODO, 100, 250]
-pose_time = [0.05, 0.1] # TODO , 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
-configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
 
 # OpenGL context
 parameters = Parameters()

@@ -99,7 +99,7 @@ function scene_inference(gl_context, config)
     @reset parameters.n_steps = floor(Int, pose_time / step_time)
 
     # Run inference per detection
-    @progress "Sampling poses" for (idx, df_row) in enumerate(eachrow(scene_df))
+    @progress "sampler: $(sampler_symbol), n_particles: $(n_particles)" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
