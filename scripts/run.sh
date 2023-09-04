@@ -7,8 +7,8 @@
 
 julia_remote_nvidia.sh scripts/smc_mh_resolution.jl
 julia_remote_nvidia.sh scripts/inference_time.jl
-julia_remote_nvidia.sh scripts/recall_n_steps.jl
 julia_remote_nvidia.sh scripts/recall_n_steps_particles.jl
+julia_remote_nvidia.sh scripts/recall_n_steps.jl
 
 julia_remote_nvidia.sh scripts/mcmc_baseline.jl
 julia_remote_nvidia.sh scripts/smc_mh_baseline.jl

@@ -116,7 +116,7 @@ gl_scene_inference = scene_inference | gl_context
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-n_steps = [50:50:200..., 250:250:750..., 1_000:500:3_000...]
+n_steps = [50, 100, 200, 500, 750, 1_000, 2_000, 3_000, 5_000]
 configs = dict_list(@dict dataset testset scene_id n_steps)
 experiment_name = "recall_n_steps"
 result_dir = datadir("exp_raw", experiment_name)
@@ -153,18 +153,5 @@ transform!(raw_df, :path => ByRow(parse_config) => [:n_steps, :dataset])
 groups = groupby(raw_df, [:n_steps])
 times = combine(groups, :time => (x -> mean(vcat(x...))) => :mean_time)
 
-# Visualize
-using Plots
-gr()
-diss_defaults()
-sort!(recalls, :n_steps)
-sort!(times, :n_steps)
-
-p = plot(times.mean_time, recalls.adds_recall; label="ADDS", xlabel="pose inference time / s", ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomright)
-plot!(twiny(), recalls.n_steps, recalls.adds_recall; color=:transparent, xlabel="iterations", legend=false)
-plot!(times.mean_time, recalls.vsd_recall; label="VSD", linewidth=1.5)
-plot!(times.mean_time, recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5, grid=:all)
-
-display(p)
-savefig(p, joinpath("plots", "recall_n_steps_mh.pdf"))
+# Visualization in plot_mcmc_particles.jl
+include("plot_mcmc_particles.jl")

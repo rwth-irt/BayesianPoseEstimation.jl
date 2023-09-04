@@ -246,6 +246,7 @@ function plot_sampler(sampler_name, recalls, times)
     savefig(p, joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"))
 end
 
-for sampler_name in ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
+# MTM in "plot_mcmc_particles.jl"
+for sampler_name in ["smc_bootstrap", "smc_forward", "smc_mh"]
     plot_sampler(sampler_name, recalls, times)
 end
