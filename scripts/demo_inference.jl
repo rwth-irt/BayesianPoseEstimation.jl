@@ -7,13 +7,11 @@ using Accessors
 using CUDA
 using MCMCDepth
 using Random
-using Plots
 using PoseErrors
 using SciGL
 
 CUDA.allowscalar(false)
-gr()
-MCMCDepth.diss_defaults()
+diss_defaults()
 
 function mtm_parameters()
     parameters = Parameters()
@@ -55,8 +53,8 @@ dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
 # Vice has distinct features, no occlusions
-# df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
-# row = df[101, :]
+df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
+row = df[101, :]
 
 # Buddha is very smooth without distinct features
 # df = gt_targets(joinpath("data", "bop", "lm", "test"), 1)
@@ -68,8 +66,8 @@ gl_context = render_context(parameters)
 
 # Clutter and occlusions
 # NOTE better crop → better result if using union in ℓ normalization
-df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-row = df[298, :]
+# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+# row = df[298, :]
 
 # Experiment setup
 camera = crop_camera(row)
@@ -111,24 +109,19 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # TODO diagnostics: Accepted steps, resampling steps
 @time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 # NOTE evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
-plot_logevidence(states)
+fig = plot_logevidence(states)
 # Plot state which uses the weights
 plot_pose_density(final_state.sample; trim=false, legend=true)
 # plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_state.sample, experiment, color_img; loglikelihood)
 
-step_size = length(states) ÷ 100
-anim = @animate for idx in 1:step_size:length(states)
-    # White background required for accurate axis colors
-    plot_best_pose(states[idx].sample, experiment, color_img; title="Iteration $(idx)", background_color=:white)
-end;
-gif(anim, "smc.gif", fps=15)
-
-anim = @animate for i ∈ 0:2:360
-    # White background required for accurate axis colors
-    scatter_position(final_state.sample, 100; background_color=:white, label="particle number", camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-end;
-gif(anim, "anim.gif", fps=20)
+# TODO
+# step_size = length(states) ÷ 100
+# anim = @animate for idx in 1:step_size:length(states)
+#     # White background required for accurate axis colors
+#     plot_best_pose(states[idx].sample, experiment, color_img; title="Iteration $(idx)", background_color=:white)
+# end;
+# gif(anim, "smc.gif", fps=15)
 
 # MCMC samplers
 # parameters = mh_parameters()
@@ -145,18 +138,12 @@ plot_pose_chain(chain, 50)
 # plot_prob_img(mean_image(chain, :o))
 plot_best_pose(chain, experiment, color_img)
 
-step_size = length(chain) ÷ 100
-anim = @animate for idx in 1:step_size:length(chain)
-    # White background required for accurate axis colors
-    plot_best_pose(chain[idx], experiment, color_img; title="Iteration $(idx)", background_color=:white)
-end;
-gif(anim, "mcmc.gif"; fps=15)
-
-# Visualize the maximum posterior
-anim = @animate for i ∈ 0:2:360
-    # White background required for accurate axis colors
-    scatter_position(chain; background_color=:white, camera=(i, 25), projection_type=:perspective, legend_position=:topright)
-end;
-gif(anim, "anim.gif", fps=20)
+# TODO
+# step_size = length(chain) ÷ 100
+# anim = @animate for idx in 1:step_size:length(chain)
+#     # White background required for accurate axis colors
+#     plot_best_pose(chain[idx], experiment, color_img; title="Iteration $(idx)", background_color=:white)
+# end;
+# gif(anim, "mcmc.gif"; fps=15)
 
 destroy_context(gl_context)

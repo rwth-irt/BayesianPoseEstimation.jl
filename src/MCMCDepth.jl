@@ -147,9 +147,9 @@ export pixel_valid_normal
 export pixel_valid_tail
 
 # Visualization
+export DISS_WIDTH
 export density_variable
 export diss_defaults
-export histogram_variable
 export mean_image
 export plot_best_pose
 export plot_depth_img
@@ -159,12 +159,6 @@ export plot_logprob
 export plot_pose_chain
 export plot_pose_density
 export plot_prob_img
-export plot_variable
-export polar_density_variable
-export polar_histogram_variable
-export scatter_position
-export sphere_density
-export sphere_scatter
 
 # Experiment utils
 export bop_test_or_train

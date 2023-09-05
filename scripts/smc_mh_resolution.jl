@@ -181,35 +181,42 @@ times_and_steps = combine(ts_groups, :result_df => (rdf -> mean(vcat(getproperty
 display(times_and_steps)
 
 # Visualize
-using Plots
-gr()
+using CairoMakie
 diss_defaults()
 
-# steps mode
+# Const n_steps
 steps_recalls = filter(:mode => x -> x == "steps", recalls)
 steps_time = filter(:mode => x -> x == "steps", times_and_steps)
 sort!(steps_recalls, :resolution)
 sort!(steps_time, :resolution)
 
-p1 = plot(steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS", xlabel="resolution / px", xticks=steps_recalls.resolution, ylabel="recall", ylims=[0, 1], linewidth=1.5, legend=:bottomleft)
-plot!(steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD", linewidth=1.5)
-plot!(steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-plot!(twinx(), steps_recalls.resolution, steps_time.mean_time; ylabel="pose inference time / s", ylimits=[0, Inf], label="inference time", linestyle=:dash, color=:black, legend=:bottom, grid=:all)
+f1 = Figure()
+ax1 = Axis(f1[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, limits=(nothing, nothing, 0, 1))
+lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
+lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
+lines!(ax1, steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP")
+ax2 = Axis(f1[1, 1]; ylabel="pose inference time", yaxisposition=:right)
+lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="time", linestyle=:dash, color=:black)
+axislegend(ax1; position=:rb)
+axislegend(ax2; position=:cb)
 
-display(p1)
-savefig(p1, joinpath("plots", "$(experiment_name)_steps.pdf"))
+display(f1)
+save(joinpath("plots", "$(experiment_name)_const_steps.pdf"), f1)
 
-# times mode
+# Const time
 time_recalls = filter(:mode => x -> x == "time", recalls)
 time_steps = filter(:mode => x -> x == "time", times_and_steps)
 sort!(time_recalls, :resolution)
-sort!(time_steps, :resolution)
 
-diss_defaults()
-p1 = plot(time_recalls.resolution, time_recalls.adds_recall; label="ADDS", xlabel="resolution / px", xticks=steps_recalls.resolution, ylabel="recall", ylimits=[0, 1], linewidth=1.5, legend=:bottomleft)
-plot!(time_recalls.resolution, time_recalls.vsd_recall; label="VSD", linewidth=1.5)
-plot!(time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP", linewidth=1.5)
-plot!(twinx(), time_recalls.resolution, time_steps.mean_steps; ylabel="pose inference steps", ylimits=[0, Inf], label="steps", linestyle=:dash, color=:black, legend=:bottom, grid=:all)
+f2 = Figure()
+ax1 = Axis(f2[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, limits=(nothing, nothing, 0, 1))
+lines!(ax1, time_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
+lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")
+lines!(ax1, time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP")
+ax2 = Axis(f2[1, 1]; ylabel="pose inference steps", yaxisposition=:right)
+lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="steps", linestyle=:dash, color=:black)
+axislegend(ax1; position=:lb)
+axislegend(ax2; position=:cb)
 
-display(p1)
-savefig(p1, joinpath("plots", "$(experiment_name)_time.pdf"))
+display(f2)
+save(joinpath("plots", "$(experiment_name)_const_time.pdf"), f2)
