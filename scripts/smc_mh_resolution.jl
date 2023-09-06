@@ -36,7 +36,7 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-resolution = [5:5:25..., 30, 40, 50:25:100...]
+resolution = [2, 5:5:25..., 30, 40, 50:25:100...]
 # Which one to keep constant
 mode = [:time, :steps]
 configs = dict_list(@dict dataset testset scene_id mode resolution)

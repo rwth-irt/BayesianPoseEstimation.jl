@@ -29,6 +29,10 @@ global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
+# General experiment
+experiment_name = "mcmc_benchmark"
+result_dir = datadir("exp_raw", experiment_name)
+
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler_symbol)
 Assembles the posterior model and the sampler from the loaded images, mesh, and DataFrame row.
@@ -112,10 +116,6 @@ function scene_inference(gl_context, config)
     @strdict parameters result_df
 end
 
-# General experiment
-experiment_name = "mcmc_benchmark"
-result_dir = datadir("exp_raw", experiment_name)
-
 # MH
 sampler = :mh_sampler
 n_particles = 1
@@ -178,8 +178,7 @@ times_groups = groupby(raw_df, [:sampler, :pose_time, :n_particles])
 times = combine(times_groups, :result_df => (x -> mean(vcat(getproperty.(x, :time)...))) => :mean_time)
 
 # Visualization
-using Plots
-gr()
+import CairoMakie as MK
 diss_defaults()
 
 # Visualize per n_particles
@@ -194,31 +193,31 @@ mtm_times = filter(c -> c.sampler == "mtm_sampler", times)
 recall_groups = groupby(mtm_recalls, :n_particles)
 time_groups = groupby(mtm_times, :n_particles)
 
-# Lines   
-p_adds = plot(; xlabel="pose inference time / s", ylabel="ADDS recall", ylims=[0, 1], linewidth=1.5)
+# Actually plot it
+fig = MK.Figure(resolution=(DISS_WIDTH, 2 / 3 * DISS_WIDTH); figure_padding=10)
+ax_vsd = MK.Axis(fig[2, 1]; xlabel="pose inference time / s", ylabel="VSD recall", limits=(nothing, (0, 1)), yticks=0:0.25:1)
 for (rec, tim) in zip(recall_groups, time_groups)
-    plot!(p_adds, tim.mean_time, rec.adds_recall; legend=false)
+    MK.lines!(ax_vsd, tim.mean_time, rec.vsd_recall; label="MTM $(rec.n_particles |> first) particles")
 end
-plot!(p_adds, mh_times.mean_time, mh_recalls.adds_recall; legend=false)
-vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+MK.lines!(ax_vsd, mh_times.mean_time, mh_recalls.vsd_recall; label="MCMC-MH")
+MK.vlines!(ax_vsd, [0.5]; color=:black, linestyle=:dash)
 
-p_vsd = plot(; xlabel="pose inference time / s", ylabel="VSD recall", ylims=[0, 1], linewidth=1.5)
+ax_adds = MK.Axis(fig[2, 2]; xlabel="pose inference time / s", ylabel="ADDS recall", limits=(nothing, (0, 1)), yticks=0:0.25:1)
 for (rec, tim) in zip(recall_groups, time_groups)
-    plot!(p_vsd, tim.mean_time, rec.vsd_recall; legend=false)
-end
-plot!(p_vsd, mh_times.mean_time, mh_recalls.vsd_recall; legend=false)
-vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+    MK.lines!(ax_adds, tim.mean_time, rec.adds_recall; label="MTM $(rec.n_particles |> first) particles")
 
-p_vsdbop = plot(; xlabel="pose inference time / s", ylabel="VSDBOP recall", ylims=[0, 1], linewidth=1.5)
+end
+MK.lines!(ax_adds, mh_times.mean_time, mh_recalls.adds_recall; label="MCMC-MH")
+MK.vlines!(ax_adds, [0.5]; color=:black, linestyle=:dash)
+
+ga = fig[1, :] = MK.GridLayout()
+ax_vsdbop = MK.Axis(ga[1, 1]; xlabel="pose inference time / s", ylabel="VSDBOP recall", limits=(nothing, (0, 1)), yticks=0:0.25:1)
 for (rec, tim) in zip(recall_groups, time_groups)
-    plot!(p_vsdbop, tim.mean_time, rec.vsdbop_recall; legend=:outerright, label="$(rec.n_particles |> first) particles")
+    MK.lines!(ax_vsdbop, tim.mean_time, rec.vsdbop_recall; label="MTM $(rec.n_particles |> first) particles")
 end
-plot!(p_vsdbop, mh_times.mean_time, mh_recalls.vsdbop_recall; label="MCMC-MH")
-vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+MK.lines!(ax_vsdbop, mh_times.mean_time, mh_recalls.vsdbop_recall; label="MCMC-MH")
+MK.vlines!(ax_vsdbop, [0.5]; color=:black, linestyle=:dash)
+MK.Legend(ga[1, 2], ax_vsdbop)
 
-lay = @layout [a; b c]
-p = plot(p_vsdbop, p_adds, p_vsd; layout=lay)
-display(p)
-
-savefig(p, joinpath("plots", "$experiment_name.pdf"))
-
+display(fig)
+save(joinpath("plots", "$experiment_name.pdf"), fig)

@@ -12,3 +12,4 @@ julia_remote_nvidia.sh scripts/mcmc_benchmark.jl
 
 julia_remote_nvidia.sh scripts/mcmc_baseline.jl
 julia_remote_nvidia.sh scripts/smc_mh_baseline.jl
+julia_remote_nvidia.sh scripts/evaluate_recall.jl
