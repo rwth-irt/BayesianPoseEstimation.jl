@@ -12,7 +12,6 @@ WARN: Results vary based on sampler configuration
 using DrWatson
 @quickactivate("MCMCDepth")
 
-@info "Loading packages"
 using Accessors
 using CUDA
 using DataFrames

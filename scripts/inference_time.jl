@@ -12,7 +12,6 @@ Run different samplers on fake data to benchmark the performance    Only the fir
 using DrWatson
 @quickactivate("MCMCDepth")
 
-@info "Loading packages"
 using Accessors
 using BenchmarkTools
 using CUDA

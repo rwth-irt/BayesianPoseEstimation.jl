@@ -18,9 +18,7 @@ using Accessors
 using BenchmarkTools
 using CUDA
 using DataFrames
-@info "Loading"
 using MCMCDepth
-@info "Loading"
 using PoseErrors
 using Random
 using SciGL
