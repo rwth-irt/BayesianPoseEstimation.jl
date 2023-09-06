@@ -141,8 +141,7 @@ destroy_context(gl_context)
 evaluate_errors(experiment_name)
 
 # Plot
-using Plots
-gr()
+import CairoMakie as MK
 diss_defaults()
 
 function parse_config(path)
@@ -177,29 +176,32 @@ function plot_sampler(sampler_name, recalls, times)
     # Visualize per n_particles
     recall_groups = groupby(recalls_filtered, :n_particles)
     time_groups = groupby(times_filtered, :n_particles)
+
+    fig = MK.Figure(; figure_padding=10)
+
+    ax_vsd = MK.Axis(fig[2, 1]; xlabel="pose inference time / s", ylabel="VSD recall", limits=(nothing, (0, 1)))
+    for (rec, tim) in zip(recall_groups, time_groups)
+        MK.lines!(ax_vsd, tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles")
+    end
+    MK.vlines!(ax_vsd, [0.5]; color=:black, linestyle=:dash)
+
+    ax_adds = MK.Axis(fig[2, 2], xlabel="pose inference time / s", ylabel="ADDS recall", limits=(nothing, (0, 1)))
     # Lines   
-    p_adds = plot(; xlabel="pose inference time / s", ylabel="ADDS recall", ylims=[0, 1], linewidth=1.5)
     for (rec, tim) in zip(recall_groups, time_groups)
-        plot!(p_adds, tim.mean_time, rec.adds_recall; legend=false)
+        MK.lines!(ax_adds, tim.mean_time, rec.adds_recall; label="$(rec.n_particles |> first) particles")
     end
-    vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+    MK.vlines!(ax_adds, [0.5]; color=:black, linestyle=:dash)
 
-    p_vsd = plot(; xlabel="pose inference time / s", ylabel="VSD recall", ylims=[0, 1], linewidth=1.5)
+    ga = fig[1, :] = MK.GridLayout()
+    ax_vsdbop = MK.Axis(ga[1, 1]; xlabel="pose inference time / s", ylabel="VSDBOP recall", limits=(nothing, (0, 1)))
     for (rec, tim) in zip(recall_groups, time_groups)
-        plot!(p_vsd, tim.mean_time, rec.vsd_recall; legend=false)
+        MK.lines!(ax_vsdbop, tim.mean_time, rec.vsdbop_recall; label="$(rec.n_particles |> first) particles")
     end
-    vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
+    MK.vlines!(ax_vsdbop, [0.5]; color=:black, linestyle=:dash)
+    MK.Legend(ga[1, 2], ax_vsdbop)
 
-    p_vsdbop = plot(; xlabel="pose inference time / s", ylabel="VSDBOP recall", ylims=[0, 1], linewidth=1.5)
-    for (rec, tim) in zip(recall_groups, time_groups)
-        plot!(p_vsdbop, tim.mean_time, rec.vsdbop_recall; legend=:outerright, label="$(rec.n_particles |> first) particles")
-    end
-    vline!([0.5]; label=nothing, color=:black, linestyle=:dash, linewidth=1.5)
-
-    lay = @layout [a; b c]
-    p = plot(p_vsdbop, p_adds, p_vsd; layout=lay)
-    display(p)
-    savefig(p, joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"))
+    display(fig)
+    save(joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"), fig)
 end
 
 for sampler_name in ["smc_bootstrap", "smc_forward", "smc_mh"]

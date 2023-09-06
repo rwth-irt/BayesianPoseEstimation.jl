@@ -17,10 +17,7 @@ using Accessors
 using BenchmarkTools
 using CUDA
 using DataFrames
-using GLM
 using MCMCDepth
-using Plots
-using Plots.PlotMeasures
 using Random
 using SciGL
 
@@ -29,8 +26,10 @@ using ProgressLogging
 using TerminalLoggers
 global_logger(TerminalLogger(right_justify=120))
 
+import CairoMakie as MK
+
 # Experiment setup
-img_sizes = [50, 100, 200]
+img_sizes = [25, 50, 100]
 for img_size in img_sizes
     experiment_name = "inference_time_$img_size"
     sampler = [:mtm_sampler, :smc_bootstrap, :smc_forward, :smc_mh]
@@ -39,8 +38,6 @@ for img_size in img_sizes
     # Context
     BenchmarkTools.DEFAULT_PARAMETERS.seconds = 1
     CUDA.allowscalar(false)
-    gr()
-    diss_defaults()
     parameters = Parameters()
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
@@ -97,26 +94,30 @@ for img_size in img_sizes
     destroy_context(gl_context)
 
     # Visualize and save plot
+    diss_defaults()
     samplers = ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
     labels = ["MTM", "SMC bootstrap", "SMC forward", "SMC MH"]
 
-    p = plot(; legend=:top, xlabel="number of particles", ylabel="mean step time / s", linewidth=1.5)
-    for (s, l) in zip(samplers, labels)
-        df = collect_results(result_dir, rinclude=[Regex(s)])
-        mean_seconds(trial) = mean(trial).time * 1e-9
-        row = first(df)
-        mean_sec = mean_seconds.(row.trials)
-        # NOTE at ≈350 particles, the time per step triples. For 100x100 and 200x200 images. So it seems that CUDA or OpenGL struggles with textures of larger depth.
-        plot!(row.n_particles, mean_sec; label=l)
-
-        # Fit a linear function to data ∈ [0,280] particles
-        upper = findfirst(x -> x >= 280, row.n_particles)
-        regression_df = DataFrame(:mean_time => mean_sec[1:upper], :n_particles => row.n_particles[1:upper])
-        res = lm(@formula(mean_time ~ n_particles), regression_df)
-        intersect, slope = res.model.pp.beta0
-        println("$s step_time = $slope * n_particles + $intersect")
+    function draw_samplers!(axis, samplers, labels)
+        for (s, l) in zip(samplers, labels)
+            df = collect_results(result_dir, rinclude=[Regex(s)])
+            mean_seconds(trial) = mean(trial).time * 1e-9
+            row = first(df)
+            mean_sec = mean_seconds.(row.trials)
+            # NOTE at ≈350 particles, the time per step triples. For 100x100 and 200x200 images. So it seems that CUDA or OpenGL struggles with textures of larger depth.
+            MK.lines!(axis, row.n_particles, mean_sec; label=l)
+        end
     end
-    lens!([0, 50], [0, 0.003]; inset=(1, bbox(0.1, 0.3, 0.22, 0.3, :left)))
-    display(p)
-    savefig(p, joinpath("plots", "inference_time_$(parameters.width).pdf"))
+
+    fig = MK.Figure()
+    ax = MK.Axis(fig[1, 1]; xlabel="number of particles", ylabel="mean step time / s")
+    draw_samplers!(ax, samplers, labels)
+    Legend(fig[2, 1], ax; orientation=:horizontal)
+
+    ax2 = MK.Axis(fig; bbox=BBox(100, 190, 145, 202), xticks=[0, 10, 20, 30], yticks=[0, 0.001, 0.002])
+    draw_samplers!(ax2, samplers, labels)
+    limits!(ax2, 0, 30, 0, 0.002)
+
+    display(fig)
+    save(joinpath("plots", "inference_time_$(parameters.width).pdf"), fig)
 end
