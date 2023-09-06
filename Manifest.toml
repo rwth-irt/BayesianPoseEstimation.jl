@@ -2,7 +2,7 @@
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "88eb70e295984aaef33a9c228178e0ddd8a9cd59"
+project_hash = "155a5d4889d2c866671e4936db4e76708619f69b"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -185,9 +185,9 @@ version = "1.3.2"
 
 [[deps.Bijectors]]
 deps = ["ArgCheck", "ChainRules", "ChainRulesCore", "ChangesOfVariables", "Compat", "Distributions", "Functors", "InverseFunctions", "IrrationalConstants", "LinearAlgebra", "LogExpFunctions", "MappedArrays", "Random", "Reexport", "Requires", "Roots", "SparseArrays", "Statistics"]
-git-tree-sha1 = "af192c7c235264bdc6f67321fd1c57be0dd7ffb5"
+git-tree-sha1 = "8eacff457e5b8c13a97848484ad650dabbffa0fc"
 uuid = "76274a88-744f-5084-9051-94815aaf08c4"
-version = "0.13.6"
+version = "0.13.7"
 
     [deps.Bijectors.extensions]
     BijectorsDistributionsADExt = "DistributionsAD"
@@ -744,12 +744,6 @@ git-tree-sha1 = "d972031d28c8c8d9d7b41a536ad7bb0c2579caca"
 uuid = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
 version = "3.3.8+0"
 
-[[deps.GLM]]
-deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels"]
-git-tree-sha1 = "97829cfda0df99ddaeaafb5b370d6cab87b7013e"
-uuid = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
-version = "1.8.3"
-
 [[deps.GPUArrays]]
 deps = ["Adapt", "GPUArraysCore", "LLVM", "LinearAlgebra", "Printf", "Random", "Reexport", "Serialization", "Statistics"]
 git-tree-sha1 = "2e57b4a4f9cc15e85a24d603256fe08e527f48d1"
@@ -1062,7 +1056,7 @@ version = "0.6.7"
 
 [[deps.KernelDistributions]]
 deps = ["BenchmarkTools", "Bijectors", "CUDA", "ChangesOfVariables", "DensityInterface", "Distributions", "LinearAlgebra", "LogExpFunctions", "Quaternions", "Random", "Random123", "Reexport", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "6203158f3e3d2c650f7f93a8e42edecd4b8903aa"
+git-tree-sha1 = "3e98e49e728e4dabd867ed57cb6f67f90a86f85b"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/kerneldistributions.jl.git"
 uuid = "9994844f-d2c8-4ad1-b0b3-ac5ee308e667"
@@ -1088,15 +1082,15 @@ version = "3.0.0+1"
 
 [[deps.LLVM]]
 deps = ["CEnum", "LLVMExtra_jll", "Libdl", "Printf", "Unicode"]
-git-tree-sha1 = "8695a49bfe05a2dc0feeefd06b4ca6361a018729"
+git-tree-sha1 = "a9d2ce1d5007b1e8f6c5b89c5a31ff8bd146db5c"
 uuid = "929cbde3-209d-540e-8aea-75f648917ca0"
-version = "6.1.0"
+version = "6.2.1"
 
 [[deps.LLVMExtra_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "c35203c1e1002747da220ffc3c0762ce7754b08c"
+git-tree-sha1 = "7ca6850ae880cc99b59b88517545f91a52020afa"
 uuid = "dad2f222-ce93-54a1-a47d-0025e8a3acab"
-version = "0.0.23+0"
+version = "0.0.25+0"
 
 [[deps.LLVMOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1780,9 +1774,9 @@ version = "1.3.0"
 
 [[deps.RingLists]]
 deps = ["Random"]
-git-tree-sha1 = "9712ebc42e91850f35272b48eb840e60c0270ec0"
+git-tree-sha1 = "f39da63aa6d2d88e0c1bd20ed6a3ff9ea7171ada"
 uuid = "286e9d63-9694-5540-9e3c-4e6708fa07b2"
-version = "0.2.7"
+version = "0.2.8"
 
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
@@ -1870,11 +1864,6 @@ version = "0.3.0"
 [[deps.SharedArrays]]
 deps = ["Distributed", "Mmap", "Random", "Serialization"]
 uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
-
-[[deps.ShiftedArrays]]
-git-tree-sha1 = "503688b59397b3307443af35cd953a13e8005c16"
-uuid = "1277b4bf-5013-50f5-be3d-901d8477a67a"
-version = "2.0.0"
 
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
@@ -2035,12 +2024,6 @@ weakdeps = ["ChainRulesCore", "InverseFunctions"]
     [deps.StatsFuns.extensions]
     StatsFunsChainRulesCoreExt = "ChainRulesCore"
     StatsFunsInverseFunctionsExt = "InverseFunctions"
-
-[[deps.StatsModels]]
-deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsBase", "StatsFuns", "Tables"]
-git-tree-sha1 = "8cc7a5385ecaa420f0b3426f9b0135d0df0638ed"
-uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
-version = "0.7.2"
 
 [[deps.StatsPlots]]
 deps = ["AbstractFFTs", "Clustering", "DataStructures", "Distributions", "Interpolations", "KernelDensity", "LinearAlgebra", "MultivariateStats", "NaNMath", "Observables", "Plots", "RecipesBase", "RecipesPipeline", "Reexport", "StatsBase", "TableOperations", "Tables", "Widgets"]

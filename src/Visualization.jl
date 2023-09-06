@@ -30,14 +30,17 @@ const DISS_WIDTH = 422.52348
 function diss_defaults()
     # GLMakie uses the original GLAbstractions, I hijacked GLAbstractions for my purposes
     MK.set_theme!(
-        Axis=(; xticklabelsize=9, yticklabelsize=9),
+        Axis=(; xticklabelsize=9, yticklabelsize=9, xgridstyle=:dash, ygridstyle=:dash),
+        Axis3=(; xticklabelsize=9, yticklabelsize=9, zticklabelsize=9),
         CairoMakie=(; type="png", px_per_unit=2.0),
-        Colorbar=(; size=10),
-        Legend=(; patchsize=(5, 5)),
+        Colorbar=(; width=7),
+        Legend=(; patchsize=(5, 5), padding=(5, 5, 5, 5)),
         Lines=(; linewidth=1),
         Scatter=(; markersize=4),
         fontsize=11, # Latex "small" for normal 12
-        resolution=(DISS_WIDTH, DISS_WIDTH / 2)
+        resolution=(DISS_WIDTH, DISS_WIDTH / 2),
+        rowgap=5, colgap=5,
+        figure_padding=5
     )
 end
 
@@ -118,7 +121,7 @@ function plot_depth_ontop(img, depth_img; colorbar_label="depth / m", kwargs...)
     fig, ax = img_fig_axis()
     # Plot the image as background
     MK.image!(ax, img; aspect=1)
-    depth_hm = plot_depth_img!(ax, depth_img; alpha=0.5, kwargs...)
+    depth_hm = plot_depth_img!(ax, depth_img; alpha=0.7, kwargs...)
     depth_hm_colorbar!(fig, depth_hm; label=colorbar_label)
     fig
 end
