@@ -12,17 +12,19 @@ Keep constant:
 # BUG for some reason, sometimes all particles have the same log likelihood for large resolutions. Check result plots and delete the faulty ones which have a very low recall.
 
 using DrWatson
-@quickactivate("MCMCDepth")
+@quickactivate
 
-@info "Loading packages"
 using Accessors
 using BenchmarkTools
 using CUDA
 using DataFrames
+@info "Loading"
 using MCMCDepth
+@info "Loading"
 using PoseErrors
 using Random
 using SciGL
+
 
 using Logging
 using ProgressLogging
@@ -196,11 +198,11 @@ MK.lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS"
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP")
 ax2 = MK.Axis(f1[1, 1]; ylabel="pose inference time", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, limits=(nothing, (0, 1)))
-MK.lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="time", linestyle=:dash, color=:black)
+MK.lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="mean time", linestyle=:dash, color=:black)
 MK.axislegend(ax1; position=:rb)
 MK.axislegend(ax2; position=:cb)
 
-display(f1)
+# display(f1)
 save(joinpath("plots", "$(experiment_name)_const_steps.pdf"), f1)
 
 # Const time
@@ -214,10 +216,10 @@ MK.lines!(ax1, time_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
 MK.lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")
 MK.lines!(ax1, time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP")
 ax2 = MK.Axis(f2[1, 1]; ylabel="steps per inference", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, limits=(nothing, (0, 1)))
-MK.lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="time", linestyle=:dash, color=:black)
+MK.lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="mean steps", linestyle=:dash, color=:black)
 MK.limits!(ax2, 0, nothing, 0, nothing)
 MK.axislegend(ax1; position=:rb)
 MK.axislegend(ax2; position=:cb)
 
-display(f2)
+# display(f2)
 save(joinpath("plots", "$(experiment_name)_const_time.pdf"), f2)

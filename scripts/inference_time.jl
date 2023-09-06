@@ -112,12 +112,12 @@ for img_size in img_sizes
     fig = MK.Figure()
     ax = MK.Axis(fig[1, 1]; xlabel="number of particles", ylabel="mean step time / s")
     draw_samplers!(ax, samplers, labels)
-    MK.Legend(fig[2, 1], ax; orientation=:horizontal)
+    MK.axislegend(ax; position=:rb)
 
     ax2 = MK.Axis(fig; bbox=MK.BBox(100, 190, 145, 198), xticks=[0, 10, 20, 30], yticks=[0, 0.001, 0.002])
     draw_samplers!(ax2, samplers, labels)
     MK.limits!(ax2, 0, 30, 0, 0.002)
 
-    display(fig)
+    # display(fig)
     save(joinpath("plots", "inference_time_$(img_size).pdf"), fig)
 end

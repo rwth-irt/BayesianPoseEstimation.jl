@@ -111,7 +111,7 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # NOTE evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
 fig = plot_logevidence(states)
 # Plot state which uses the weights
-plot_pose_density(final_state.sample; trim=false, legend=true)
+plot_pose_density(final_state.sample)
 # plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_state.sample, experiment, color_img; loglikelihood)
 
