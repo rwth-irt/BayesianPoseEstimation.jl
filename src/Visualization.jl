@@ -15,12 +15,17 @@ change_alpha(color; alpha=0.4) = @reset color.alpha = alpha
 DENSITY_PALETTE = change_alpha.(MK.Makie.wong_colors())
 WONG2 = [MK.Makie.wong_colors()[4:7]..., MK.Makie.wong_colors()[1:3]...]
 WONG2_ALPHA = change_alpha.(WONG2; alpha=0.2)
+function wilkinson_ticks()
+    wt = MK.WilkinsonTicks(5)
+    @reset wt.granularity_weight = 1
+    wt
+end
 
 function diss_defaults()
     # GLMakie uses the original GLAbstractions, I hijacked GLAbstractions for my purposes
     MK.set_theme!(
         palette=(; density_color=DENSITY_PALETTE, wong2=WONG2, wong2_alpha=WONG2_ALPHA),
-        Axis=(; xticklabelsize=9, yticklabelsize=9, xgridstyle=:dash, ygridstyle=:dash, xticksize=0.4, yticksize=0.4, spinewidth=0.7),
+        Axis=(; xticklabelsize=9, yticklabelsize=9, xgridstyle=:dash, ygridstyle=:dash, xgridwidth=0.5, ygridwidth=0.5, xticks=wilkinson_ticks(), yticks=wilkinson_ticks(), xticksize=0.4, yticksize=0.4, spinewidth=0.7),
         Axis3=(; xticklabelsize=9, yticklabelsize=9, zticklabelsize=9, xticksize=0.4, yticksize=0.4, zticksize=0.4, spinewidth=0.7),
         CairoMakie=(; type="png", px_per_unit=2.0),
         Colorbar=(; width=7),
