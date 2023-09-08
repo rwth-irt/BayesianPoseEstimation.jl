@@ -221,7 +221,7 @@ function scatter_variable!(axis, chain, var_name, len=100; labels=nothing)
 end
 
 function plot_pose_density(sample)
-    fig = MK.Figure(; resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
+    fig = MK.Figure(; resolution=(DISS_WIDTH, 1 / 4 * DISS_WIDTH))
     ax_t = MK.Axis(fig[1, 1]; xlabel="position / m", ylabel="density")
     density_variable!(ax_t, sample, :t; labels=["x" "y" "z"])
     ax_r = MK.Axis(fig[1, 2]; xlabel="orientation / rad", ylabel="density")
@@ -240,7 +240,7 @@ function plot_pose_chain(model_chain, len=50)
     ax_td = MK.Axis(fig[2, 1]; xlabel="position / m", ylabel="density")
     density_variable!(ax_td, model_chain, :t; labels=["x" "y" "z"])
 
-    ax_rs = MK.Axis(fig[1, 2]; xlabel="iteration ÷ $(length(model_chain) ÷ len)", ylabel="orientation / rad")
+    ax_rs = MK.Axis(fig[1, 2]; xlabel="iteration ÷ $(length(model_chain) ÷ len)", ylabel="orien. / rad")
     scatter_variable!(ax_rs, model_chain, :r, len; labels=["x" "y" "z"])
     ax_rd = MK.Axis(fig[2, 2]; xlabel="orientation / rad", ylabel="density")
     density_variable!(ax_rd, model_chain, :r; labels=["x" "y" "z"])
