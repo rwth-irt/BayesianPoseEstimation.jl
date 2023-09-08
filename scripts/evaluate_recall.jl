@@ -73,7 +73,7 @@ for group in groups
     vsdbop_thresh = map(θ -> threshold_errors.(vcat(group.vsdbop...), θ), θ_range)
     vsdbop_recalls = map(x -> recall(x...), vsdbop_thresh)
     MK.lines!(ax_vsdbop_recall, θ_range, vsdbop_recalls; label=label_for_sampler[first(group.sampler)])
-    ds = MK.density!(ax_vsdbop_density, reduce(vcat, reduce(vcat, group.vsdbop)); label=label_for_sampler[first(group.sampler)], boundary=(0, 1))
+    MK.density!(ax_vsdbop_density, reduce(vcat, reduce(vcat, group.vsdbop)); label=label_for_sampler[first(group.sampler)], boundary=(0, 1))
 end
 
 MK.vspan!(ax_vsdbop_recall, first(BOP19_THRESHOLDS), last(BOP19_THRESHOLDS))

@@ -113,7 +113,7 @@ fig = plot_logevidence(states)
 # Plot state which uses the weights
 plot_pose_density(final_state.sample)
 # plot_prob_img(mean_image(final_sample, :o))
-plot_best_pose(final_state.sample, experiment, color_img; loglikelihood)
+plot_best_pose(final_state.sample, experiment, color_img, logprobability)
 
 # TODO
 # step_size = length(states) ÷ 100

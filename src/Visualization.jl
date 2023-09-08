@@ -18,7 +18,6 @@ WONG2_ALPHA = change_alpha.(WONG2; alpha=0.2)
 function wilkinson_ticks()
     wt = MK.WilkinsonTicks(5)
     @reset wt.granularity_weight = 1
-    wt
 end
 
 function diss_defaults()
@@ -26,7 +25,7 @@ function diss_defaults()
     MK.set_theme!(
         palette=(; density_color=DENSITY_PALETTE, wong2=WONG2, wong2_alpha=WONG2_ALPHA),
         Axis=(; xticklabelsize=9, yticklabelsize=9, xgridstyle=:dash, ygridstyle=:dash, xgridwidth=0.5, ygridwidth=0.5, xticks=wilkinson_ticks(), yticks=wilkinson_ticks(), xticksize=0.4, yticksize=0.4, spinewidth=0.7),
-        Axis3=(; xticklabelsize=9, yticklabelsize=9, zticklabelsize=9, xticksize=0.4, yticksize=0.4, zticksize=0.4, spinewidth=0.7),
+        Axis3=(; xticklabelsize=9, yticklabelsize=9, zticklabelsize=9, xticksize=0.4, yticksize=0.4, zticksize=0.4, xgridwidth=0.5, ygridwidth=0.5, zgridwidth=0.5, spinewidth=0.7),
         CairoMakie=(; type="png", px_per_unit=2.0),
         Colorbar=(; width=7),
         Density=(; strokewidth=1, cycle=MK.Cycle([:color => :density_color, :strokecolor => :color], covary=true)),
@@ -44,7 +43,7 @@ end
 
 # Image plotting
 
-function plot_depth_img!(ax, img; colormap=:viridis, reverse=true)
+function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0)
     # Transfer to CPU
     img = Array(img)
     if reverse
@@ -52,7 +51,7 @@ function plot_depth_img!(ax, img; colormap=:viridis, reverse=true)
     end
     min_depth = minimum(x -> x > 0 ? x : typemax(x), img)
     max_depth = maximum(x -> isinf(x) ? zero(x) : x, img)
-    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent)
+    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, alpha=alpha)
 end
 
 function plot_prob_img!(ax, img; colormap=:viridis, reverse=false)
@@ -119,7 +118,7 @@ function plot_depth_ontop(img, depth_img; colorbar_label="depth / m")
     fig, ax = img_fig_axis()
     # Plot the image as background
     MK.image!(ax, img; aspect=1)
-    depth_hm = plot_depth_img!(ax, depth_img; alpha=0.7)
+    depth_hm = plot_depth_img!(ax, depth_img; alpha=0.5)
     depth_hm_colorbar!(fig, depth_hm; label=colorbar_label)
     fig
 end
@@ -235,7 +234,7 @@ end
 plot_pose_density(state::SmcState) = plot_pose_density(state.sample; weights=exp.(state.log_weights))
 
 function plot_pose_chain(model_chain, len=50)
-    fig = MK.Figure(resolution=(DISS_WIDTH, 2 / 3 * DISS_WIDTH))
+    fig = MK.Figure()
     ax_ts = MK.Axis(fig[1, 1]; xlabel="iteration ÷ $(length(model_chain) ÷ len)", ylabel="position / m")
     scatter_variable!(ax_ts, model_chain, :t, len; labels=["x" "y" "z"])
     ax_td = MK.Axis(fig[2, 1]; xlabel="position / m", ylabel="density")
