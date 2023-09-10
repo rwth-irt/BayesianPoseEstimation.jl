@@ -32,7 +32,7 @@ function diss_defaults()
         Legend=(; patchsize=(5, 5), padding=(5, 5, 5, 5), framewidth=0.7),
         Lines=(; linewidth=1),
         Scatter=(; markersize=4),
-        VLines=(; cycle=[:color => :wong2], linestyle=:dash),
+        VLines=(; cycle=[:color => :wong2], linestyle=:dash, linewidth=1),
         VSpan=(; cycle=[:color => :wong2_alpha]),
         fontsize=11, # Latex "small" for normal 12
         resolution=(DISS_WIDTH, DISS_WIDTH / 2),
@@ -87,7 +87,7 @@ depth_hm_colorbar!(fig, depth_hm; label="depth / m") = MK.Colorbar(fig[:, end+1]
 Plot a probability image with a given `color_scheme`.
 Clips zero → black, one → white.
 """
-function plot_prob_img(img; colorbar_label="probability [0,1]")
+function plot_prob_img(img; colorbar_label="probability ∈ [0,1]")
     fig, ax = img_fig_axis()
     prob_hm = plot_prob_img!(ax, img)
     depth_hm_colorbar!(fig, prob_hm; label=colorbar_label)
