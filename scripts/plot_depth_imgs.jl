@@ -11,8 +11,8 @@ using SciGL
 
 parameters = Parameters()
 @reset parameters.device = :CPU
-@reset parameters.width = 300
-@reset parameters.height = 300
+@reset parameters.width = 150
+@reset parameters.height = 150
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
@@ -64,7 +64,7 @@ diss_defaults()
 fig = MK.Figure(resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
 grid_meas = MK.GridLayout(fig[1, 1])
 ax_exp = img_axis(fig[1, 2]; title="expectation μ", ylabel="")
-ax_gen = img_axis(fig[1, 3]; title="generated noise", ylabel="", xticks=[100, 200])
+ax_gen = img_axis(fig[1, 3]; title="generated noise", ylabel="")
 
 plot_depth_ontop!(grid_meas, color_img, depth_img; title="measurement z")
 hm = plot_depth_img!(ax_exp, render_img)
