@@ -92,7 +92,7 @@ export transition_probability
 export Experiment
 export Parameters
 
-export cuda_rng, device_rng, cpu_array, device_array_type, device_array
+export host_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
 
 # RenderContext
 export render_context
@@ -150,15 +150,17 @@ export pixel_valid_tail
 export DISS_WIDTH
 export density_variable
 export diss_defaults
+export heatmap_colorbar!
+export img_axis, img_fig_axis
 export mean_image
 export plot_best_pose
-export plot_depth_img
-export plot_depth_ontop, plot_scene_ontop
+export plot_depth_img, plot_depth_img!
+export plot_depth_ontop, plot_depth_ontop!, plot_scene_ontop
 export plot_logevidence
 export plot_logprob
 export plot_pose_chain
 export plot_pose_density
-export plot_prob_img
+export plot_prob_img, plot_prob_img!
 
 # Experiment utils
 export bop_test_or_train

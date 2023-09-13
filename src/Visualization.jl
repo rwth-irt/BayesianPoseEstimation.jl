@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 import CairoMakie as MK
+using CairoMakie.Makie: FigureAxisPlot
 using CoordinateTransformations: SphericalFromCartesian
 using IterTools: partition
 
@@ -15,19 +16,15 @@ change_alpha(color; alpha=0.4) = @reset color.alpha = alpha
 DENSITY_PALETTE = change_alpha.(MK.Makie.wong_colors())
 WONG2 = [MK.Makie.wong_colors()[4:7]..., MK.Makie.wong_colors()[1:3]...]
 WONG2_ALPHA = change_alpha.(WONG2; alpha=0.2)
-function wilkinson_ticks()
-    wt = MK.WilkinsonTicks(5)
-    @reset wt.granularity_weight = 1
-end
 
 function diss_defaults()
     # GLMakie uses the original GLAbstractions, I hijacked GLAbstractions for my purposes
     MK.set_theme!(
         palette=(; density_color=DENSITY_PALETTE, wong2=WONG2, wong2_alpha=WONG2_ALPHA),
-        Axis=(; xticklabelsize=9, yticklabelsize=9, xgridstyle=:dash, ygridstyle=:dash, xgridwidth=0.5, ygridwidth=0.5, xticks=wilkinson_ticks(), yticks=wilkinson_ticks(), xticksize=0.4, yticksize=0.4, spinewidth=0.7),
+        Axis=(; xticklabelsize=9, yticklabelsize=9, xgridstyle=:dash, ygridstyle=:dash, xgridwidth=0.5, ygridwidth=0.5, xticksize=0.4, yticksize=0.4, spinewidth=0.7),
         Axis3=(; xticklabelsize=9, yticklabelsize=9, zticklabelsize=9, xticksize=0.4, yticksize=0.4, zticksize=0.4, xgridwidth=0.5, ygridwidth=0.5, zgridwidth=0.5, spinewidth=0.7),
         CairoMakie=(; type="png", px_per_unit=2.0),
-        Colorbar=(; width=7),
+        Colorbar=(; width=5),
         Density=(; strokewidth=1, cycle=MK.Cycle([:color => :density_color, :strokecolor => :color], covary=true)),
         Legend=(; patchsize=(5, 5), padding=(5, 5, 5, 5), framewidth=0.7),
         Lines=(; linewidth=1),
@@ -73,54 +70,82 @@ function plot_prob_img!(ax, img; colormap=:viridis, reverse=false)
     MK.heatmap!(ax, img; colormap=colormap, colorrange=(0, 1), lowclip=:black, highclip=:white)
 end
 
+function img_axis(grid_pos::MK.GridPosition; xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+    ax = MK.Axis(grid_pos; xlabel=xlabel, ylabel=ylabel, aspect=1, yreversed=true, kwargs...)
+    MK.hidedecorations!(ax; label=false, ticklabels=false, ticks=false)
+    ax
+end
+
 function img_fig_axis()
     fig = MK.Figure()
-    ax = MK.Axis(fig[1, 1], xlabel="x-pixels", ylabel="y-pixels", aspect=1, yreversed=true)
-    MK.hidedecorations!(ax; label=false, ticklabels=false, ticks=false)
+    ax = img_axis(fig[1, 1])
     fig, ax
 end
 
-depth_hm_colorbar!(fig, depth_hm; label="depth / m") = MK.Colorbar(fig[:, end+1], depth_hm; label=label)
+heatmap_colorbar!(fig, depth_hm; label="depth / m", kwargs...) = MK.Colorbar(fig[:, end+1], depth_hm; label=label, kwargs...)
 
 """
     plot_prob_img
 Plot a probability image with a given `color_scheme`.
 Clips zero → black, one → white.
 """
-function plot_prob_img(img; colorbar_label="probability ∈ [0,1]")
+function plot_prob_img(img)
     fig, ax = img_fig_axis()
     prob_hm = plot_prob_img!(ax, img)
-    depth_hm_colorbar!(fig, prob_hm; label=colorbar_label)
-    fig
+    FigureAxisPlot(fig, ax, prob_hm)
 end
 
 """
-    plot_depth_img(img; [value_to_typemax=0, reverse=true])
+    plot_depth_img!(figure, img; [value_to_typemax=0])
 Plot a depth image with a given `color_scheme` and use black for values of 0.
 `value_to_typemax` specifies the value which is converted to typemax.
-`reverse` determines whether the color scheme is reversed.
+
+Returns (Axis, Heatmap) 
+
+See also [`plot_depth_img`](@ref)
 """
-function plot_depth_img(img; colorbar_label="depth / m")
-    fig, ax = img_fig_axis()
+function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels")
+    ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel)
     depth_hm = plot_depth_img!(ax, img)
-    depth_hm_colorbar!(fig, depth_hm; label=colorbar_label)
-    fig
+    heatmap_colorbar!(figure, depth_hm; label=colorbar_label)
+    ax, depth_hm
 end
 
 """
-    plot_depth_ontop(img, depth_img; [colorbar_label="depth / m", reverse=true])
+    plot_depth_img(grid_layout, img; kwargs...)
+See [`plot_depth_img!`](@ref)
+"""
+function plot_depth_img(img; kwargs...)
+    fig = MK.Figure()
+    ax, hm = plot_depth_img!(fig, img; kwargs...)
+    FigureAxisPlot(fig, ax, hm)
+end
+
+"""
+    plot_depth_ontop!(figure, img, depth_img; [xlabel="x-pixels", ylabel="y-pixels", title=""])
 Plot a depth image with a given `color_scheme` on top of another image.
 `reverse` determines whether the color scheme is reversed.
 
-See also [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
+Returns (Axis, Heatmap) 
+
+See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
 """
-function plot_depth_ontop(img, depth_img; colorbar_label="depth / m")
-    fig, ax = img_fig_axis()
+function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="")
+    ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title)
     # Plot the image as background
     MK.image!(ax, img; aspect=1)
-    depth_hm = plot_depth_img!(ax, depth_img; alpha=0.5)
-    depth_hm_colorbar!(fig, depth_hm; label=colorbar_label)
-    fig
+    hm = plot_depth_img!(ax, depth_img; alpha=0.5)
+    (ax, hm)
+end
+
+"""
+    plot_depth_ontop(img, depth_img; kwargs...)
+See [`plot_depth_ontop!`](@ref), also [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
+"""
+function plot_depth_ontop(img, depth_img; kwargs...)
+    fig = MK.Figure()
+    ax, hm = plot_depth_ontop!(fig, img, depth_img; kwargs...)
+    FigureAxisPlot(fig, ax, hm)
 end
 
 """

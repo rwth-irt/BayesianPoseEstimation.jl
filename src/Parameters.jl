@@ -125,6 +125,12 @@ function Random.default_rng(p::Parameters)
 end
 
 """
+    cpu_rng(parameters)
+Returns the seeded random number generator for the CPU.
+"""
+host_rng(p::Parameters) = Random.default_rng(p)
+
+"""
     cuda_rng(parameters)
 Returns the seeded random number generator for the CUDA device.
 """
@@ -133,7 +139,6 @@ function cuda_rng(p::Parameters)
     Random.seed!(rng, p.seed)
     return rng
 end
-
 
 """
     device_rng(parameters)
