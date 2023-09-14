@@ -40,7 +40,7 @@ end
 
 # Image plotting
 
-function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0)
+function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0, rasterize=3, kwargs...)
     # Transfer to CPU
     img = Array(img)
     if reverse
@@ -48,7 +48,7 @@ function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0)
     end
     min_depth = minimum(x -> x > 0 ? x : typemax(x), img)
     max_depth = maximum(x -> isinf(x) ? zero(x) : x, img)
-    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, alpha=alpha)
+    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, alpha=alpha, rasterize=rasterize, kwargs...)
 end
 
 function plot_prob_img!(ax, img; colormap=:viridis, reverse=false)
@@ -96,17 +96,18 @@ function plot_prob_img(img)
 end
 
 """
-    plot_depth_img!(figure, img; [value_to_typemax=0])
+    plot_depth_img!(figure, img; [vcolorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels", kwargs...])
 Plot a depth image with a given `color_scheme` and use black for values of 0.
 `value_to_typemax` specifies the value which is converted to typemax.
+`kwargs` are passed to `heatmap!`.
 
 Returns (Axis, Heatmap) 
 
 See also [`plot_depth_img`](@ref)
 """
-function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels")
+function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels", kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel)
-    depth_hm = plot_depth_img!(ax, img)
+    depth_hm = plot_depth_img!(ax, img, kwargs...)
     heatmap_colorbar!(figure, depth_hm; label=colorbar_label)
     ax, depth_hm
 end
@@ -122,19 +123,20 @@ function plot_depth_img(img; kwargs...)
 end
 
 """
-    plot_depth_ontop!(figure, img, depth_img; [xlabel="x-pixels", ylabel="y-pixels", title=""])
+    plot_depth_ontop!(figure, img, depth_img; [xlabel="x-pixels", ylabel="y-pixels", title="", kwargs...])
 Plot a depth image with a given `color_scheme` on top of another image.
 `reverse` determines whether the color scheme is reversed.
+`kwargs` are passed to `heatmap!`.
 
 Returns (Axis, Heatmap) 
 
 See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
 """
-function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="")
+function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="", kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title)
     # Plot the image as background
     MK.image!(ax, img; aspect=1)
-    hm = plot_depth_img!(ax, depth_img; alpha=0.5)
+    hm = plot_depth_img!(ax, depth_img; alpha=0.5, kwargs...)
     (ax, hm)
 end
 

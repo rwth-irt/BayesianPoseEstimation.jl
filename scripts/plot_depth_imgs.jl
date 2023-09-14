@@ -35,7 +35,7 @@ render_img = draw(gl_context, scene)
 # Load data for probabilistic model
 mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
 prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
-prior_o = fill(parameters.float_type(0.5), parameters.width, parameters.height)
+prior_o = fill(parameters.float_type(0.8), parameters.width, parameters.height)
 
 # Probabilistic model   
 t = BroadcastedNode(:t, rng, KernelNormal, prior_t, parameters.σ_t)
@@ -64,14 +64,13 @@ diss_defaults()
 fig = MK.Figure(resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
 grid_meas = MK.GridLayout(fig[1, 1])
 ax_exp = img_axis(fig[1, 2]; title="expectation μ", ylabel="")
-ax_gen = img_axis(fig[1, 3]; title="generated noise", ylabel="")
+ax_gen = img_axis(fig[1, 3]; title="μ + noise", ylabel="")
 
 plot_depth_ontop!(grid_meas, color_img, depth_img; title="measurement z")
 hm = plot_depth_img!(ax_exp, render_img)
 plot_depth_img!(ax_gen, gen_img)
 cb = MCMCDepth.heatmap_colorbar!(fig, hm; label="", ticks=([minimum(render_img[render_img.>0]) + 0.01, maximum(render_img) - 0.01], ["close", "far"]))
+
 display(fig)
-
 MK.save(joinpath("plots", "gen_depth.pdf"), fig)
-
 destroy_context(gl_context)
