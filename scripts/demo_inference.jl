@@ -82,7 +82,7 @@ prior_o[mask_img] .= parameters.o_mask_is
 prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
 # For RFID scenario
 # prior_t = row.gt_t + rand(cpu_rng, KernelNormal(0, 0.01f0), 3)
-# prior_o .= 0.5
+prior_o .= 0.5
 experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
 # Draw result for visual validation
@@ -94,9 +94,10 @@ plot_scene_ontop(gl_context, scene, color_img)
 prior = point_prior(parameters, experiment, cpu_rng)
 
 # NOTE no association → prior_o has strong influence
-posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
-# posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
+# NOTE flat prior_o .= 0.5 seems to require the association and truncation
+posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters()
@@ -112,8 +113,8 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 fig = plot_logevidence(states)
 # Plot state which uses the weights
 plot_pose_density(final_state.sample)
-# plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_state.sample, experiment, color_img, logprobability)
+# plot_prob_img(mean_image(final_state.sample, :o))
 
 # TODO animate Makie
 # step_size = length(states) ÷ 100

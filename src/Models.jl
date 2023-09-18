@@ -15,60 +15,21 @@ Each pixel is assumed to be independent and the measurement can be described by 
 Therefore, the image logdensity for the measurement `z` is calculated by summing the pixel logdensities.
 Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
 
-# Normalization
-If `c_reg` is provided, `pixel_dist` is wrapped by a `ValidPixel`, which ignores invalid expected depth values (== 0).
-This effectively changes the number of data points evaluated in the sum of the image loglikelihood for different views.
-Thus, the algorithm might prefer (incorrect) poses further or closer to the object, which depends if the pixel loglikelihood is positive or negative.
+# Regularization
+Previously, `ValidPixel` has been used to determine whether the rendered image was in the support of the distributions.
+Now, the distributions must handle values outside their support by returning a logdensity of -Inf.
+WARN: Truncated distributions return +Inf if min=max=z. 
 
-To remove the sensitivity to the number of valid expected pixels, the images is normalized by diving the sum of the pixel loglikelihood by the number of valid pixels.
+The algorithm might prefer (incorrect) poses further or closer to the object, which depends if the pixel loglikelihood is positive or negative.
+To remove the sensitivity to the number of valid expected pixels, the images is **normalized** by diving the sum of the pixel loglikelihood by the number of valid pixels.
 The `c_reg` is multiplied afterwards.
 
-# Alternatives to Normalization
+Alternatives include:
 * proper preprocessing by cropping or segmenting the image
 * a pixel_dist which handles the tail distribution by providing a reasonable likelihood for invalid expected values
 """
 
-"""
-    ValidPixel
-Takes care of missing values in the expected depth `μ == 0` by setting the logdensity to zero, effectively ignoring these pixels in the sum.
-Consequently, the sum of the image likelihood must be normalized by dividing through the number of valid pixels, since the likelihood is very sensitive to the number of evaluated data points.
-"""
-struct ValidPixel{T<:Real,D} <: AbstractKernelDistribution{T,Continuous}
-    # Should not cause memory overhead if used in lazily broadcasted context
-    μ::T
-    # Do not constrain M<:AbstractKernelDistribution{T} because it might be transformed / truncated
-    model::D
-end
 
-function Distributions.logpdf(dist::ValidPixel{T}, x) where {T}
-    if !insupport(dist, dist.μ)
-        # If the expected value is invalid, it does not provide any information
-        zero(T)
-    else
-        # clamp to avoid NaNs
-        logdensityof(dist.model, clamp(x, minimum(dist), maximum(dist)))
-    end
-end
-
-function KernelDistributions.rand_kernel(rng::AbstractRNG, dist::ValidPixel{T}) where {T}
-    if !insupport(dist, dist.μ)
-        zero(T)
-    else
-        depth = rand(rng, dist.model)
-        # maximum is inf
-        clamp(depth, minimum(dist), maximum(dist))
-    end
-end
-
-# Depth pixels can have any positive value not like radar
-Base.maximum(dist::ValidPixel{T}) where {T} = maximum(dist.model)
-# Negative measurements do not make any sense, all others might, depending on the underlying model.
-Base.minimum(dist::ValidPixel{T}) where {T} = max(zero(T), minimum(dist.model))
-# logpdf explicitly handles outliers, so no transformation is desired
-Bijectors.bijector(dist::ValidPixel) = Bijectors.TruncatedBijector(minimum(dist), maximum(dist))
-Distributions
-# Depth pixels can have any positive value, zero and negative are invalid
-Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 
 ########## Likelihood normalization ##########
 
@@ -77,7 +38,7 @@ Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 Serves as a regularization of the image likelihood, where the independence assumption of individual pixels does not hold.
 Use it in a modifier node to normalize the loglikelihood of the image to make it less dependent from the number of visible pixels in μ.
 
-NOTE: This complex regularization technique only seems to be required if ValidPixel is used.
+NOTE: Seems to be beneficial for occlusions.
 
 ℓ_reg = c_reg / n_visible_pixel * ℓ
 """
@@ -148,17 +109,41 @@ function pixel_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) wh
     BinaryMixture(normal, tail, o, one(o) - o)
 end
 
-pixel_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_mixture(min_depth, max_depth, θ, σ, μ, o))
-
 function pixel_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
-    # NOTE Truncated does not seem to make a difference. Should effectively do the same as checking for valid pixel, since the logdensity will be 0 for μ ⋜ min_depth. Here, a smooth Exponential is beneficial which avoids 0.
     exponential = KernelExponential(θ)
     uniform = TailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
     BinaryMixture(exponential, uniform, one(T), one(T))
 end
 
-pixel_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, pixel_tail(min_depth, max_depth, θ, σ, μ))
+"""
+    truncated_mixture(min_depth, max_depth, θ, σ, μ, o)
+Mixture distribution for a depth pixel: normal / tail.
+The mixture is weighted by the association o for the normal and 1-o for the tail.
+
+* Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
+* Tail distribution: occlusions are modeled by a truncated Exponential distribution and random outliers via a TailUniform
+"""
+function truncated_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
+    normal = KernelNormal(μ, σ)
+    tail = truncated_tail(min_depth, max_depth, θ, σ, μ)
+    BinaryMixture(normal, tail, o, one(o) - o)
+end
+
+# NOTE seems to be beneficial for occlusions
+function truncated_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
+    if μ > 0
+        exponential = truncated(KernelExponential(θ), nothing, μ)
+    else
+        # if μ==0 && z==0, Inf is returned for the logdensity which breaks everything
+        # must return the same type for CUDA so truncated without limits
+        # only uniform should be returned, β=Inf → logdensity=-Inf
+        exponential = truncated(KernelExponential(typemax(T)), nothing, nothing)
+    end
+    uniform = TailUniform(min_depth, max_depth)
+    # TODO custom weights for exponential and uniform?
+    BinaryMixture(exponential, uniform, one(T), one(T))
+end
 
 """
     smooth_mixture(min_depth, max_depth, θ, σ, μ, o)
@@ -174,8 +159,6 @@ function smooth_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) w
     BinaryMixture(normal, tail, o, one(o) - o)
 end
 
-smooth_valid_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, smooth_mixture(min_depth, max_depth, θ, σ, μ, o))
-
 function smooth_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
     exponential = SmoothExponential(min_depth, μ, θ, σ)
     uniform = TailUniform(min_depth, max_depth)
@@ -183,33 +166,7 @@ function smooth_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:
     BinaryMixture(exponential, uniform, one(T), one(T))
 end
 
-smooth_valid_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real} = ValidPixel(μ, smooth_tail(min_depth, max_depth, θ, σ, μ))
-
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
-pixel_valid_normal(σ, μ) = ValidPixel(μ, KernelNormal(μ, σ))
-
-pixel_valid_uniform(min_depth, max_depth, μ) = ValidPixel(μ, TailUniform(min_depth, max_depth))
-
-"""
-    pixel_explicit(min_depth, max_depth, θ, σ, μ, o)
-Mixture distribution for a depth pixel which explicitly handles invalid μ.
-In case the expected depth is invalid, only the tail distribution for outliers is evaluated.
-Otherwise, if the measured depth and expected depth are zero, a unreasonably high likelihood would be returned.
-The mixture is weighted by the association o for the normal and 1-o for the tail.
-
-* Normal distribution: measuring the object of interest with the expected depth μ and standard deviation σ
-* Tail distribution: occlusions (exponential) and random outliers (uniform)
-"""
-function pixel_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real}
-    if μ > 0
-        pixel_mixture(min_depth, max_depth, θ, σ, μ, o)
-    else
-        # Distribution must be of same type for type stable CUDA support so set o to zero to evaluate the tail only
-        pixel_mixture(min_depth, max_depth, θ, σ, μ, zero(T))
-    end
-end
-
-pixel_valid_explicit(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) where {T<:Real} = ValidPixel(μ, pixel_explicit(min_depth, max_depth, θ, σ, μ, o))
 
 """
     render_fn(render_context, scene, object_id, t, r)
@@ -237,10 +194,12 @@ end
 Consists of a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
 Moreover, a `prior` is required for the association probability `o`.
 The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
+
+If μ is invalid (≤0) no information exists, whether the pixel belongs to the object or not.
+Thus, the prior cannot be updated and is returned unmodified.
 """
 function marginalized_association(dist_is, dist_not, prior, μ, z)
-    # TODO return no prior if no information is available? Performs worse than returning 0?
-    if μ <= 0
+    if μ ≤ 0
         return prior
     end
     p_is = pdf(dist_is(μ), z)
@@ -262,6 +221,19 @@ Uses:
 function pixel_association_fn(params)
     dist_is = pixel_normal | params.association_σ
     dist_not = pixel_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
+    marginalized_association | (dist_is, dist_not)
+end
+
+"""
+    truncated_association_fn(params)
+Returns a function `fn(prior, μ, z)` which analytically calculates the association probability via marginalization.
+Uses:
+* normal distribution for measuring the object of interest.
+* mixture of a truncated exponential and uniform distribution for the tail, i.e. measuring anything but the object of interest.
+"""
+function truncated_association_fn(params)
+    dist_is = pixel_normal | params.association_σ
+    dist_not = truncated_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
     marginalized_association | (dist_is, dist_not)
 end
 

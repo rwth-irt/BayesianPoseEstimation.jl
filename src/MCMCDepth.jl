@@ -126,12 +126,10 @@ export smc_step
 
 # Models
 export ImageLikelihoodNormalizer
-export ValidPixel
 
 export expected_pixel_count
 export nonzero_pixels
 export pixel_association_fn
-export pixel_explicit
 export pixel_mixture
 export pixel_normal
 export pixel_tail
@@ -139,12 +137,9 @@ export render_fn
 export smooth_association_fn
 export smooth_mixture
 export smooth_tail
-export smooth_valid_mixture
-export smooth_valid_tail
-export pixel_valid_explicit
-export pixel_valid_mixture
-export pixel_valid_normal
-export pixel_valid_tail
+export truncated_association_fn
+export truncated_mixture
+export truncated_tail
 
 # Visualization
 export DISS_WIDTH
