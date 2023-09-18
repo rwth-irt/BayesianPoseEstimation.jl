@@ -35,7 +35,7 @@ render_img = draw(gl_context, scene)
 # Load data for probabilistic model
 mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
 prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
-prior_o = fill(parameters.float_type(0.8), parameters.width, parameters.height)
+prior_o = fill(parameters.o_mask_is, parameters.width, parameters.height)
 
 # Probabilistic model   
 t = BroadcastedNode(:t, rng, KernelNormal, prior_t, parameters.σ_t)

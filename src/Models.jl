@@ -160,7 +160,8 @@ function smooth_mixture(min_depth::T, max_depth::T, θ::T, σ::T, μ::T, o::T) w
 end
 
 function smooth_tail(min_depth::T, max_depth::T, θ::T, σ::T, μ::T) where {T<:Real}
-    exponential = SmoothExponential(min_depth, μ, θ, σ)
+    # Occlusions might occur in front of min_depth
+    exponential = SmoothExponential(zero(T), μ, θ, σ)
     uniform = TailUniform(min_depth, max_depth)
     # TODO custom weights for exponential and uniform?
     BinaryMixture(exponential, uniform, one(T), one(T))
@@ -172,7 +173,7 @@ pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
     render_fn(render_context, scene, object_id, t, r)
 Function can be conditioned on the render_context, scene & object_id to be used in a model node to render different poses for t & r.
 """
-function render_fn(render_context, scene, t, r)
+function render_fn(render_context::OffscreenContext{T}, scene, t, r) where {T}
     p = to_pose(t, r)
     render(render_context, scene, p)
 end
@@ -194,14 +195,8 @@ end
 Consists of a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
 Moreover, a `prior` is required for the association probability `o`.
 The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
-
-If μ is invalid (≤0) no information exists, whether the pixel belongs to the object or not.
-Thus, the prior cannot be updated and is returned unmodified.
 """
 function marginalized_association(dist_is, dist_not, prior, μ, z)
-    if μ ≤ 0
-        return prior
-    end
     p_is = pdf(dist_is(μ), z)
     p_not = pdf(dist_not(μ), z)
     nominator = prior * p_is

@@ -30,7 +30,7 @@ Deliberately not strongly typed because the strongly typed structs are construct
 
 # Render context
 * `width, height` Dimensions of the images.
-* `min_depth, max_depth` Range limit of the sensor / region of interest
+* `min_depth, max_depth` Region of interest / range limit of the sensor
 * `depth` z-dimension resembles the number of parallel renderings
 
 # Observation Model
@@ -74,8 +74,9 @@ Base.@kwdef struct Parameters
     width = 50
     height = 50
     depth = 100
-    min_depth = 0
-    max_depth = 10
+    # Most BOP datasets and the Zivid One+ fall in this range
+    min_depth = 0.5
+    max_depth = 1.5
 
     # Depth pixel model
     pixel_σ = 0.01
@@ -84,7 +85,7 @@ Base.@kwdef struct Parameters
     association_σ = 0.01
     proposal_σ_o = 0.01
     # Image Model
-    c_reg = 100
+    c_reg = 50
 
     # Pose Model
     σ_t = fill(0.03, 3)
@@ -175,7 +176,10 @@ Base.getproperty(p::Parameters, ::Val{:min_depth}) = p.float_type.(getfield(p, :
 Base.getproperty(p::Parameters, ::Val{:max_depth}) = p.float_type.(getfield(p, :max_depth))
 
 Base.getproperty(p::Parameters, ::Val{:prior_o}) = p.float_type.(getfield(p, :prior_o))
+Base.getproperty(p::Parameters, ::Val{:o_mask_is}) = p.float_type.(getfield(p, :o_mask_is))
+Base.getproperty(p::Parameters, ::Val{:o_mask_not}) = p.float_type.(getfield(p, :o_mask_not))
 Base.getproperty(p::Parameters, ::Val{:proposal_σ_o}) = p.float_type.(getfield(p, :proposal_σ_o))
+
 Base.getproperty(p::Parameters, ::Val{:c_reg}) = p.float_type.(getfield(p, :c_reg))
 Base.getproperty(p::Parameters, ::Val{:pixel_σ}) = p.float_type.(getfield(p, :pixel_σ))
 Base.getproperty(p::Parameters, ::Val{:association_σ}) = p.float_type.(getfield(p, :association_σ))

@@ -53,8 +53,8 @@ dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
 # Vice has distinct features, no occlusions
-df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
-row = df[101, :]
+# df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
+# row = df[101, :]
 
 # Buddha is very smooth without distinct features
 # df = gt_targets(joinpath("data", "bop", "lm", "test"), 1)
@@ -66,8 +66,8 @@ row = df[101, :]
 
 # Clutter and occlusions
 # NOTE better crop → better result if using union in ℓ normalization
-# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-# row = df[298, :]
+df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+row = df[298, :]
 
 # Experiment setup
 camera = crop_camera(row)
@@ -75,6 +75,9 @@ mesh = upload_mesh(gl_context, load_mesh(row))
 @reset mesh.pose = to_pose(row.gt_t, row.gt_R)
 # Observation is cropped and resized to match the gl_context and crop_camera
 depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
+# TODO might be the cleanest solution to avoid checking for valid pixels? Always returns tail.
+# TODO where should I enforce it? ExperimentModels - reusable function to condition the posterior
+@. depth_img[depth_img==0] = typemax(parameters.float_type)
 mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
 prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
@@ -114,7 +117,7 @@ fig = plot_logevidence(states)
 # Plot state which uses the weights
 plot_pose_density(final_state.sample)
 plot_best_pose(final_state.sample, experiment, color_img, logprobability)
-# plot_prob_img(mean_image(final_state.sample, :o))
+plot_prob_img(mean_image(final_state.sample, :o))
 
 # TODO animate Makie
 # step_size = length(states) ÷ 100
