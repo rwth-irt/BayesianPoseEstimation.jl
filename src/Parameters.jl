@@ -89,8 +89,8 @@ Base.@kwdef struct Parameters
     # Pose Model
     σ_t = fill(0.03, 3)
     # Association model
-    o_mask_is = 0.9
-    o_mask_not = 0.1
+    o_mask_is = 0.7
+    o_mask_not = 0.3
     # Proposal Model
     proposal_σ_t = fill(0.01, 3)
     proposal_σ_r = fill(0.1, 3)

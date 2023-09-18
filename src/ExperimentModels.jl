@@ -59,8 +59,8 @@ function association_posterior(params, experiment, μ_node, dev_rng)
     # NOTE ValidPixel diverges without regularization. Moreover, ValidPixel is not required if a regularization is used.
     z_i = pixel_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
-    # NOTE seems to perform better with ImageLikelihoodNormalizer if prior is known for o. Also seems to perform worse than the simple_posterior if SimpleImageRegularization is used.
-    z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.c_reg)
+    # NOTE seems to perform better with SimpleImageRegularization after removing ValidPixel from the association functions
+    z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization | params.c_reg)
     PosteriorModel(z_norm | experiment.depth_image)
 end
 
@@ -78,7 +78,7 @@ function smooth_posterior(params, experiment, μ_node, dev_rng)
     # NOTE ValidPixel diverges without regularization. Moreover, ValidPixel is not required if a regularization is used.
     pixel_model = smooth_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, pixel_model, (μ_node, o))
-    # NOTE seems to perform better with ImageLikelihoodNormalizer if prior is known for o. Also seems to perform worse than the simple_posterior if SimpleImageRegularization is used.
-    z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.c_reg)
+    # NOTE seems to perform better with SimpleImageRegularization after removing ValidPixel from the association functions
+    z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization | params.c_reg)
     PosteriorModel(z_norm | experiment.depth_image)
 end

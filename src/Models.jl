@@ -77,6 +77,8 @@ Distributions.insupport(dist::ValidPixel, x::Real) = minimum(dist) < x
 Serves as a regularization of the image likelihood, where the independence assumption of individual pixels does not hold.
 Use it in a modifier node to normalize the loglikelihood of the image to make it less dependent from the number of visible pixels in μ.
 
+NOTE: This complex regularization technique only seems to be required if ValidPixel is used.
+
 ℓ_reg = c_reg / n_visible_pixel * ℓ
 """
 struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
@@ -128,27 +130,6 @@ SimpleImageRegularization(c_reg, _...) = SimpleImageRegularization(c_reg)
 
 Base.rand(::AbstractRNG, ::SimpleImageRegularization, value) = value
 DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ) = logdensity_npixel(ℓ, model.c_reg, length(z))
-
-"""
-    expected_pixel_count(rng, prior_model, render_context, scene, parameters)
-Calculates the expected number of valid rendered pixels for the poses of the prior model.
-This number can for example be used as the normalization constant in the observation model.
-"""
-function expected_pixel_count(rng::AbstractRNG, prior_model, render_context::OffscreenContext, scene::Scene, parameters::Parameters)
-    n_pixel = Vector{parameters.float_type}(undef, 0)
-    for _ in 1:cld(parameters.n_normalization_samples, parameters.depth)
-        prior_sample = rand(rng, prior_model, parameters.depth)
-        img = render(render_context, scene, parameters.object_id, to_pose(variables(prior_sample).t, variables(prior_sample).r))
-        append!(n_pixel, nonzero_pixels(img, (1, 2)))
-    end
-    mean(n_pixel)
-end
-
-"""
-    nonzero_pixels(images, dims)
-Calculates the number of nonzero pixels for each image with the given dims.
-"""
-nonzero_pixels(images, dims) = sum_and_dropdims(images .!= 0, dims)
 
 ######### Pixel models #########
 
@@ -258,7 +239,10 @@ Moreover, a `prior` is required for the association probability `o`.
 The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
 """
 function marginalized_association(dist_is, dist_not, prior, μ, z)
-    # Internal ValidPixels handle outliers by returning 1.0 as probability which will result in the prior q without too much overhead
+    # TODO return no prior if no information is available? Performs worse than returning 0?
+    if μ <= 0
+        return prior
+    end
     p_is = pdf(dist_is(μ), z)
     p_not = pdf(dist_not(μ), z)
     nominator = prior * p_is
@@ -276,8 +260,8 @@ Uses:
 * uniform distribution for the tail, i.e. measuring anything but the object of interest.
 """
 function pixel_association_fn(params)
-    dist_is = pixel_valid_normal | params.association_σ
-    dist_not = pixel_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
+    dist_is = pixel_normal | params.association_σ
+    dist_not = pixel_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
     marginalized_association | (dist_is, dist_not)
 end
 
@@ -289,7 +273,7 @@ Uses:
 * mixture of a smoothly truncated exponential and uniform distribution for the tail, i.e. measuring anything but the object of interest.
 """
 function smooth_association_fn(params)
-    dist_is = pixel_valid_normal | params.association_σ
-    dist_not = smooth_valid_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
+    dist_is = pixel_normal | params.association_σ
+    dist_not = smooth_tail | (params.min_depth, params.max_depth, params.pixel_θ, params.association_σ)
     marginalized_association | (dist_is, dist_not)
 end

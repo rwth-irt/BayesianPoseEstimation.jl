@@ -115,7 +115,7 @@ plot_pose_density(final_state.sample)
 # plot_prob_img(mean_image(final_sample, :o))
 plot_best_pose(final_state.sample, experiment, color_img, logprobability)
 
-# TODO
+# TODO animate Makie
 # step_size = length(states) ÷ 100
 # anim = @animate for idx in 1:step_size:length(states)
 #     # White background required for accurate axis colors
@@ -138,7 +138,7 @@ plot_pose_chain(chain, 50)
 # plot_prob_img(mean_image(chain, :o))
 plot_best_pose(chain, experiment, color_img)
 
-# TODO
+# TODO animate Makie
 # step_size = length(chain) ÷ 100
 # anim = @animate for idx in 1:step_size:length(chain)
 #     # White background required for accurate axis colors
