@@ -75,9 +75,6 @@ mesh = upload_mesh(gl_context, load_mesh(row))
 @reset mesh.pose = to_pose(row.gt_t, row.gt_R)
 # Observation is cropped and resized to match the gl_context and crop_camera
 depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
-# TODO might be the cleanest solution to avoid checking for valid pixels? Always returns tail.
-# TODO where should I enforce it? ExperimentModels - reusable function to condition the posterior
-@. depth_img[depth_img==0] = typemax(parameters.float_type)
 mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
 prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
 # NOTE Result / conclusion: adding masks makes the algorithm more robust and allows higher σ_t (quantitative difference of how much offset in the prior_t is possible?)
@@ -86,7 +83,7 @@ prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
 # For RFID scenario
 # prior_t = row.gt_t + rand(cpu_rng, KernelNormal(0, 0.01f0), 3)
 prior_o .= 0.5
-experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
+experiment = preprocessed_experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
 # Draw result for visual validation
 color_img = load_color_image(row, parameters.img_size...)

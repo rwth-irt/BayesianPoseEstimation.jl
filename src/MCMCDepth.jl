@@ -91,8 +91,9 @@ export transition_probability
 # Parameters
 export Experiment
 export Parameters
-
-export host_rng, cuda_rng, device_rng, cpu_array, device_array_type, device_array
+export preprocessed_experiment
+export host_rng, cuda_rng, device_rng
+export cpu_array, device_array_type, device_array
 
 # RenderContext
 export render_context

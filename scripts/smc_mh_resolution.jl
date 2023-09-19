@@ -56,7 +56,7 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
     prior_o[mask_img] .= parameters.o_mask_is
     # Prior t from mask is imprecise no need to bias
     prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
-    experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
+    experiment = preprocessed_experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
     # Model
     prior = point_prior(parameters, experiment, cpu_rng)
@@ -191,7 +191,7 @@ sort!(steps_recalls, :resolution)
 sort!(steps_time, :resolution)
 
 f1 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
-ax1 = MK.Axis(f1[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, limits=(nothing, nothing, 0, 1))
+ax1 = MK.Axis(f1[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, yticks=0:0.2:1, limits=(nothing, nothing, 0, 1))
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP")
@@ -207,9 +207,10 @@ save(joinpath("plots", "$(experiment_name)_const_steps.pdf"), f1)
 time_recalls = filter(:mode => x -> x == "time", recalls)
 time_steps = filter(:mode => x -> x == "time", times_and_steps)
 sort!(time_recalls, :resolution)
+sort!(time_steps, :resolution)
 
 f2 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
-ax1 = MK.Axis(f2[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, limits=(nothing, (0, 1)))
+ax1 = MK.Axis(f2[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, yticks=0:0.2:1, limits=(nothing, (0, 1)))
 MK.lines!(ax1, time_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
 MK.lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")
 MK.lines!(ax1, time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP")

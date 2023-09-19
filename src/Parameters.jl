@@ -2,8 +2,7 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO Use https://juliadynamics.github.io/DrWatson.jl/dev/save/ for reproducible experiments, make a new experiments project and dev src/MCMCDepth as described in their documentation
-# TODO might want to convert this to a dict for DrWatson
+using Accessors
 
 """
     Experiment
@@ -21,6 +20,16 @@ struct Experiment
     prior_o::AbstractMatrix{Float32}
     prior_t::Vector{Float32}
     depth_image::AbstractMatrix{Float32}
+end
+
+"""
+    preprocessed_experiment(gl_context, scene, prior_o, prior_t, depth_image)
+Preprocess the data before setting up the experiment.
+All pixels with depth 0 are replaced with infinity so all probability densities except the long tail are zero.
+"""
+function preprocessed_experiment(gl_context, scene, prior_o, prior_t, depth_image::AbstractArray{T}) where {T}
+    @. depth_image[depth_image==0] = typemax(T)
+    Experiment(gl_context, scene, prior_o, prior_t, depth_image)
 end
 
 """

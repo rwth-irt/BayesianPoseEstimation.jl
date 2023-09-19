@@ -63,7 +63,7 @@ for img_size in img_sizes
     mask_img = depth_img .> 0
 
     # Probabilistic model
-    experiment = Experiment(gl_context, Scene(camera, [mesh]), mask_img, pose.translation.translation, depth_img)
+    experiment = preprocessed_experiment(gl_context, Scene(camera, [mesh]), mask_img, pose.translation.translation, depth_img)
     prior = point_prior(parameters, experiment, cpu_rng)
     posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 

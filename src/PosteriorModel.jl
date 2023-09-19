@@ -26,7 +26,7 @@ function PosteriorModel(graph::SequentializedGraph)
     PosteriorModel(bijectors, prior_nodes, obs_nodes)
 end
 
-# TODO replace with BayesNet::ObserationNode?
+# TODO replace with BayesNet::ObservationNode s
 PosteriorModel(root_node::AbstractNode) = PosteriorModel(sequentialize(root_node))
 
 Base.show(io::IO, posterior::PosteriorModel) = print(io, "PosteriorModel(prior for $(keys(posterior.prior)), likelihood for $(keys(posterior.likelihood)) & bijectors for $(keys(posterior.bijectors)))")

@@ -58,7 +58,7 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
     prior_o[mask_img] .= parameters.o_mask_is
     # Prior t from mask is imprecise no need to bias
     prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
-    experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
+    experiment = preprocessed_experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
     # Model
     prior = point_prior(parameters, experiment, cpu_rng)
