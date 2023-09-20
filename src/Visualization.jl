@@ -48,7 +48,7 @@ function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0, ra
     end
     min_depth = minimum(x -> x > 0 ? x : typemax(x), img)
     max_depth = maximum(x -> isinf(x) ? zero(x) : x, img)
-    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, highclip=:transparent, alpha=alpha, rasterize=rasterize, kwargs...)
+    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, alpha=alpha, rasterize=rasterize, kwargs...)
 end
 
 function plot_prob_img!(ax, img; colormap=:viridis, reverse=false)

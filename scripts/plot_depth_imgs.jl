@@ -35,7 +35,7 @@ render_img = draw(gl_context, scene)
 # Load data for probabilistic model
 mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
 prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
-prior_o = fill(parameters.o_mask_is, parameters.width, parameters.height)
+prior_o = fill(parameters.float_type(0.5), parameters.width, parameters.height)
 
 # Probabilistic model   
 t = BroadcastedNode(:t, rng, KernelNormal, prior_t, parameters.σ_t)
@@ -50,8 +50,8 @@ s = rand(z)
 gen_img = copy(s.z)
 
 # With mask
-prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
-prior_o[mask_img] .= parameters.o_mask_is
+prior_o = fill(parameters.float_type(0.2), parameters.width, parameters.height) |> device_array_type(parameters)
+prior_o[mask_img] .= 0.8
 o = BroadcastedNode(:o, rng, KernelDirac, prior_o)
 z_i = pixel_mixture | (parameters.min_depth, parameters.max_depth, parameters.pixel_θ, parameters.pixel_σ)
 z = BroadcastedNode(:z, rng, z_i, (μ, o))
@@ -59,18 +59,32 @@ Random.seed!(rng, 8)
 s = rand(z)
 masked_img = copy(s.z)
 
+destroy_context(gl_context)
+
 # Compose figures
 diss_defaults()
+
+# Simple generative model
 fig = MK.Figure(resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
 grid_meas = MK.GridLayout(fig[1, 1])
 ax_exp = img_axis(fig[1, 2]; title="expectation μ", ylabel="")
 ax_gen = img_axis(fig[1, 3]; title="μ + noise", ylabel="")
-
 plot_depth_ontop!(grid_meas, color_img, depth_img; title="measurement z")
 hm = plot_depth_img!(ax_exp, render_img)
 plot_depth_img!(ax_gen, gen_img)
 cb = MCMCDepth.heatmap_colorbar!(fig, hm; label="", ticks=([minimum(render_img[render_img.>0]) + 0.01, maximum(render_img) - 0.01], ["close", "far"]))
-
+display(fig)
 display(fig)
 MK.save(joinpath("plots", "gen_depth.pdf"), fig)
-destroy_context(gl_context)
+
+# Using the prior
+fig = MK.Figure(resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
+grid_meas = MK.GridLayout(fig[1, 1])
+ax_unin = img_axis(fig[1, 2]; title="uninformed prior", ylabel="")
+ax_mask = img_axis(fig[1, 3]; title="mask prior", ylabel="")
+plot_depth_ontop!(grid_meas, color_img, depth_img; title="measurement z")
+plot_depth_img!(ax_unin, gen_img)
+hm = plot_depth_img!(ax_mask, masked_img)
+cb = MCMCDepth.heatmap_colorbar!(fig, hm; label="", ticks=([minimum(masked_img[masked_img.>0]) + 0.01, maximum(masked_img) - 0.01], ["close", "far"]))
+display(fig)
+MK.save(joinpath("plots", "gen_depth_prior_o.pdf"), fig)
