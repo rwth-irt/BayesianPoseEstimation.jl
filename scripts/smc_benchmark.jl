@@ -38,7 +38,7 @@ testset = "train_pbr"
 scene_id = 0
 sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
 n_particles = [10, 50, 100, 250]
-pose_time = [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.9]
+pose_time = [0.05, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.9, 1.2]
 configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
 
 """
