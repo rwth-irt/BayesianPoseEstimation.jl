@@ -119,7 +119,7 @@ function smc_forward(cpu_rng, params, posterior)
     ComposedSampler(weights, samplers...)
 end
 
-# NOTE tends to diverge with to few samples, since there is no prior pulling it back to sensible values. But it can also converge with over-confident variance since there is no prior holding it back.
+# NOTE tends to diverge with to few particles, since there is no prior pulling it back to sensible values. But it can also converge with over-confident variance since there is no prior holding it back.
 """
     smc_bootstrap(cpu_rng, params, posterior)
 Component-wise sampling of the position and orientation via Sequential Monte Carlo with a bootstrap kernel which results in the loglikelihood as weights similar to a bootstrap particle filter.

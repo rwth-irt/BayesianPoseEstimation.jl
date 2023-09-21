@@ -14,7 +14,7 @@ parameters = Parameters()
 @reset parameters.width = 150
 @reset parameters.height = 150
 
-# NOTE takes minutes instead of seconds
+# Takes minutes instead of seconds
 # @reset parameters.device = :CPU
 rng = device_rng(parameters)
 gl_context = render_context(parameters)

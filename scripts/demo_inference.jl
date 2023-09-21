@@ -65,7 +65,6 @@ gl_context = render_context(parameters)
 # row = df[100, :]
 
 # Clutter and occlusions
-# NOTE better crop → better result if using union in ℓ normalization
 df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
 row = df[298, :]
 
@@ -105,7 +104,6 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 # sampler = smc_forward(cpu_rng, parameters, posterior)
 
-# NOTE Benchmark results for smc_mh association & simple ≈ 4.28sec, smooth ≈ 4.74sec
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
 @time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
@@ -133,7 +131,6 @@ sampler = mtm_sampler(cpu_rng, parameters, posterior);
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 @time chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
-# NOTE looks like sampling a pole which is probably sampling uniformly and transforming it back to Euler
 plot_pose_chain(chain, 50)
 # plot_logprob(chain, 50)
 # plot_prob_img(mean_image(chain, :o))

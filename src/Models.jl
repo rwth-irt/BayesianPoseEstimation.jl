@@ -53,16 +53,6 @@ ImageLikelihoodNormalizer(c_reg::T, μ::M, _...) where {T,M} = ImageLikelihoodNo
 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
-    # NOTE This incentives poses where only a handful of pixels is visible at the edges of the image which perfectly fit the measured depth. Especially for non distinct features.
-    # n_μ = model.μ != 0
-    # logdensity_npixel.(ℓ,  model.c_reg, n_μ)
-
-    # NOTE This regularization incentives a minimization of the visible pixels, e.g. fitting the silhouette into the prior mask. - loglikelihood grows more than linear with the number of pixels? Pixel association does not modify the prior in regions where nothing is rendered.
-    # union = @. model.μ != 0 || model.o > 0.5
-    # n_pixel = sum_and_dropdims(union, (1, 2))
-    # logdensity_npixel.(ℓ, model.c_reg, n_pixel)
-
-    # NOTE this is more stable than the above and should still capture the varying number of pixels. It fuses the information form the prior and the observation so it is the best guess of pixels which actually contribute information on the pose.
     n_o = sum_and_dropdims(model.o .>= 0.5, (1, 2))
     logdensity_npixel.(ℓ, model.c_reg, n_o)
 end

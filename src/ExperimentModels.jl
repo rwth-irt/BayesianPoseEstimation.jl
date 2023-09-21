@@ -38,10 +38,8 @@ Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function simple_posterior(params, experiment, μ_node, dev_rng)
     o = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
-    # NOTE Not checking for μ > 0 works well with SimpleImageRegularization
     z_i = pixel_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
-    # NOTE If o is not estimated, the ImageLikelihoodNormalizer boils down to SimpleImageRegularization as sum(o .>= 0.5) is constant
     z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization | params.c_reg)
     PosteriorModel(z_norm | experiment.depth_image)
 end

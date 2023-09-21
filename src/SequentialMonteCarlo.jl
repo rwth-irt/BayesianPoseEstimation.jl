@@ -28,7 +28,7 @@ end
 logevidence(state::SmcState) = state.log_evidence
 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::SequentialMonteCarlo)
-    # NOTE This is an IS step
+    # This is an importance sampling step
     # rand on PosteriorModel samples from prior in unconstrained domain
     sample = rand(model, sampler.n_particles)
     # tempering starts with ϕ₀=0
