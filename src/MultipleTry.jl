@@ -22,7 +22,6 @@ If the proposal is independent from the previous sample, no auxiliary weights ar
 const IndependentMultipleTry = MultipleTry{<:Proposal{<:Any,typeof(propose_independent)}}
 
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry)
-    # TODO tempering
     # rand on PosteriorModel samples from prior in unconstrained domain
     sample = rand(model)
     # initial evaluation of the posterior logdensity
@@ -42,7 +41,6 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     pro_sample = propose(sampler.proposal, old_state.sample, sampler.n_tries)
     pro_sample = tempered_logdensity_sample(model, pro_sample, new_temp)
     pro_transition = transition_probability(sampler.proposal, pro_sample, old_state.sample)
-    # TODO correct?
     pro_weights = logprobability(pro_sample) .- pro_transition
 
     # Select one sample proportional to its importance weight
