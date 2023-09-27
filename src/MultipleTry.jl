@@ -37,8 +37,10 @@ General MTM case without simplifications.
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::MultipleTry, old_state::MCMCState)
     # Schedule the likelihood tempering
     new_temp = increment_temperature(sampler.temp_schedule, old_state.temperature)
+    # Fix from Martino 2016: Issues in the Multiple Try Metropolis mixing. At least 2 for aux_sample.
+    n_tries = rand(rng, 2:sampler.n_tries)
     # Propose N samples and calculate their importance weights
-    pro_sample = propose(sampler.proposal, old_state.sample, sampler.n_tries)
+    pro_sample = propose(sampler.proposal, old_state.sample, n_tries)
     pro_sample = tempered_logdensity_sample(model, pro_sample, new_temp)
     pro_transition = transition_probability(sampler.proposal, pro_sample, old_state.sample)
     pro_weights = logprobability(pro_sample) .- pro_transition
@@ -49,7 +51,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     selected = Sample(selected_variables, logprobability(pro_sample)[selected_index], loglikelihood(pro_sample)[selected_index])
 
     # Propose N-1 auxiliary variables samples
-    aux_sample = propose(sampler.proposal, selected, sampler.n_tries - 1)
+    aux_sample = propose(sampler.proposal, selected, n_tries - 1)
     aux_sample = tempered_logdensity_sample(model, aux_sample, new_temp)
     aux_transition = transition_probability(sampler.proposal, aux_sample, selected)
     aux_weights = logprobability(aux_sample) .- aux_transition
@@ -76,8 +78,10 @@ Simplification for independent proposals: I-MTM
 function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::IndependentMultipleTry, old_state::Sample)
     # Schedule the likelihood tempering
     new_temp = increment_temperature(sampler.temp_schedule, old_state.temperature)
+    # Fix from Martino 2016: Issues in the Multiple Try Metropolis mixing.
+    n_tries = rand(rng, 1:sampler.n_tries)
     # Propose one sample via a kind of importance sampling
-    pro_sample = propose(sampler.proposal, state, sampler.n_tries)
+    pro_sample = propose(sampler.proposal, state, n_tries)
     pro_sample = tempered_logdensity_sample(model, pro_sample, new_temp)
     pro_transition = transition_probability(sampler.proposal, pro, state)
     proposed_weights = logprobability(pro_sample) .- pro_transition
