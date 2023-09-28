@@ -42,6 +42,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Mul
     # Propose N samples and calculate their importance weights
     pro_sample = propose(sampler.proposal, old_state.sample, n_tries)
     pro_sample = tempered_logdensity_sample(model, pro_sample, new_temp)
+    # symmetric proposals only depend on target density (Liu 2000), so this is also correct for the symmetric_proposal
     pro_transition = transition_probability(sampler.proposal, pro_sample, old_state.sample)
     pro_weights = logprobability(pro_sample) .- pro_transition
 
