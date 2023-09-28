@@ -132,10 +132,9 @@ forward(kernel::BootstrapKernel, new_sample, old_sample) = new_sample
 
 """
     increment_weights(kernel, new_sample, new_temp, old_state)
-Bootstrap particle filter: tempered likelihood is the (non incremental) weight.
+Bootstrap particle filter: tempered likelihood is the weight increment.
 """
-incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_temp, old_state::SmcState) =
-    add_logdensity(loglikelihood(new_sample), -old_state.log_weights)
+incremental_weights(kernel::BootstrapKernel, new_sample::Sample, new_temp, old_state::SmcState) = loglikelihood(new_sample)
 
 """
     AdaptiveKernel(kernel)
