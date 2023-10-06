@@ -5,7 +5,7 @@
 # TODO should I enforce log_prob and log_like to be stored on CPU RAM? Avoids some scalar indexing and GPU out-of-memory errors. Might hinder massively parallelized calculations.
 """
     Sample{T,V}(variables, logp, logℓ)
-Consists of the state `variables θ`, the log likelihood `log_like(t(θ)|z)+`, and the corrected log posterior probability `log_prob=log_liket(θ)|z)+logp(θ)+logjacdet(t(θ))`.
+Consists of the state `variables θ`, the log likelihood `log_like(t(θ)|z)+`, and the corrected log posterior probability `log_prob=log_like(θ)|z) + logp(θ) + logjacdet(t(θ))`.
 Samples are typed by `T,V` as the internal named tuple for the variable names types.
 """
 struct Sample{T<:NamedTuple,L<:Union{Real,Array},P<:Union{Real,Array}}
