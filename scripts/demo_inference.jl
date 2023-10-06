@@ -9,6 +9,7 @@ using MCMCDepth
 using Random
 using PoseErrors
 using SciGL
+import CairoMakie as MK
 
 CUDA.allowscalar(false)
 diss_defaults()
@@ -45,6 +46,8 @@ function smc_parameters()
 end
 
 parameters = smc_parameters()
+@reset parameters.width = 50;
+@reset parameters.height = 50;
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
@@ -110,9 +113,12 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 # NOTE evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
 fig = plot_logevidence(states)
 # Plot state which uses the weights
-plot_pose_density(final_state.sample)
-plot_best_pose(final_state.sample, experiment, color_img, logprobability)
-plot_prob_img(mean_image(final_state.sample, :o))
+fig = plot_pose_density(final_state.sample)
+MK.save(joinpath("plots", "density_smc_clutter.pdf"), fig)
+fig, _, plot1 = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
+MK.save(joinpath("plots", "best_smc_clutter.pdf"), fig)
+fig, _, plot2 = plot_prob_img(mean_image(final_state.sample, :o))
+MK.save(joinpath("plots", "prob_img_clutter.pdf"), fig)
 
 # TODO animate Makie
 # step_size = length(states) ÷ 100
@@ -123,18 +129,20 @@ plot_prob_img(mean_image(final_state.sample, :o))
 # gif(anim, "smc.gif", fps=15)
 
 # MCMC samplers
-# parameters = mh_parameters()
-# sampler = mh_sampler(cpu_rng, parameters, posterior)
+parameters = mh_parameters()
+sampler = mh_sampler(cpu_rng, parameters, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
-parameters = mtm_parameters()
-sampler = mtm_sampler(cpu_rng, parameters, posterior);
+# parameters = mtm_parameters()
+# sampler = mtm_sampler(cpu_rng, parameters, posterior);
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 @time chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
-plot_pose_chain(chain, 50)
+fig = plot_pose_chain(chain, 50)
+MK.save(joinpath("plots", "density_mcmc_clutter.pdf"), fig)
 # plot_logprob(chain, 50)
 # plot_prob_img(mean_image(chain, :o))
-plot_best_pose(chain, experiment, color_img)
+fig = plot_best_pose(chain, experiment, color_img)
+MK.save(joinpath("plots", "best_mcmc_clutter.pdf"), fig)
 
 # TODO animate Makie
 # step_size = length(chain) ÷ 100

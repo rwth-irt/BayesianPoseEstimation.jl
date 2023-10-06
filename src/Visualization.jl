@@ -272,10 +272,7 @@ function plot_pose_chain(model_chain, len=50)
     ax_rd = MK.Axis(fig[2, 2]; xlabel="orientation / rad", ylabel="density")
     density_variable!(ax_rd, model_chain, :r; labels=["x" "y" "z"])
 
-    MK.axislegend(ax_ts; position=:rt)
     MK.axislegend(ax_td; position=:ct)
-    MK.axislegend(ax_rs; position=:rt)
-    MK.axislegend(ax_rd; position=:rt)
     fig
 end
 
