@@ -149,10 +149,10 @@ Thanks to the Metropolis Hastings kernel which only replaces a subset of the sam
 Use this sample for exploration.
 """
 function smc_mh(cpu_rng, params, posterior)
-    # NOTE LinearSchedule seems reasonable, ExponentialSchedule and ConstantSchedule either explore too much or not enough
+    # LinearSchedule seems reasonable, ExponentialSchedule and ConstantSchedule either explore too much or not enough
     temp_schedule = LinearSchedule(params.n_steps)
 
-    # NOTE use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
+    # use independent proposals only with an MCMC Kernel, otherwise all information is thrown away.
     r_ind = BroadcastedNode(:r, cpu_rng, QuaternionUniform, params.float_type)
     r_ind_proposal = independent_proposal(r_ind, posterior)
     r_ind_kernel = MhKernel(cpu_rng, r_ind_proposal)

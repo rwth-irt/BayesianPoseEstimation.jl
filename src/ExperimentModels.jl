@@ -70,7 +70,7 @@ The pixel tail distribution is a mixture of a smoothed exponential and uniform d
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 """
 function smooth_posterior(params, experiment, μ_node, dev_rng)
-    # NOTE Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
+    # Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
     o_fn = smooth_association_fn(params)
     # condition on data via closure
     o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (μ_node,))
