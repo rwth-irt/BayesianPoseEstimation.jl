@@ -6,6 +6,7 @@ using Accessors
 using FileIO
 using LinearAlgebra
 using MCMCDepth
+using PoseErrors
 using Quaternions
 using RobotOSData
 using SciGL
@@ -69,5 +70,16 @@ rendered_img = draw(gl_context, scene)
 plot_depth_img(rendered_img) |> display
 plot_depth_img(depth_img) |> display
 
+# Pre-load data for particle filtering so disk reading is not the bottleneck
+resize_closure(img) = PoseErrors.depth_resize(img, WIDTH, HEIGHT)
+depth_imgs = @. img_bag["/camera/depth/image_rect_raw"] |> ros_depth_img |> resize_closure
 
-#
+# Probabilistic model
+
+# Bootstrap kernel for particle filter
+
+# Filter loop
+elaps = @elapsed for img in depth_imgs
+    # new posterior model for each img
+end
+frame_rate = length(depth_img) / elaps
