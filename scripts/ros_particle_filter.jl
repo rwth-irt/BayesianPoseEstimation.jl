@@ -8,11 +8,13 @@ using LinearAlgebra
 using MCMCDepth
 using PoseErrors
 using Quaternions
+using Random
 using RobotOSData
 using SciGL
 
 WIDTH = HEIGHT = 50
 
+# TODO document in README how BOP and ros datasets must be stored in data/
 # make sure to decompress the data or it will be painfully slow
 img_bag = load("data/p2_li_25_50/p2_li_25_50.bag")
 
@@ -61,25 +63,63 @@ pose_bag = load("data/p2_li_25_50/p2_li_25_50_poses.bag")
 t, R = pose_bag["/tf/camera_depth_optical_frame.filtered_object"] |> last |> ros_pose
 pose = to_pose(t, R)
 
-# Preview decoded image and pose
-gl_context = depth_offscreen_context(100, 100)
+# Context
+parameters = Parameters()
+@reset parameters.width = 100
+@reset parameters.height = 100
+@reset parameters.n_particles = 100;
+
+# TODO Evaluate different numbers of particles
+cpu_rng = Random.default_rng(parameters)
+dev_rng = device_rng(parameters)
+
+# TODO do not hardcode depth
+gl_context = render_context(parameters)
 mesh = upload_mesh(gl_context, "data/p2_li_25_50/track.obj")
 @reset mesh.pose = pose
 scene = Scene(camera, [mesh])
-rendered_img = draw(gl_context, scene)
-plot_depth_img(rendered_img) |> display
-plot_depth_img(depth_img) |> display
+
+# Preview decoded image and pose
+# rendered_img = draw(gl_context, scene)
+# plot_depth_img(rendered_img) |> display
+# plot_depth_img(depth_img) |> display
 
 # Pre-load data for particle filtering so disk reading is not the bottleneck
-resize_closure(img) = PoseErrors.depth_resize(img, WIDTH, HEIGHT)
+# TODO export depth_resize
+resize_closure(img) = PoseErrors.depth_resize(img, parameters.width, parameters.height)
 depth_imgs = @. img_bag["/camera/depth/image_rect_raw"] |> ros_depth_img |> resize_closure
 
-# Probabilistic model
 
-# Bootstrap kernel for particle filter
+# Prepare
+# TODO use prior from previous image?
+prior_o = fill(parameters.float_type(0.5), parameters.width, parameters.height) |> device_array_type(parameters)
+# Prior t only used for initialization if using bootstrap kernel
+prior_t = t
+
 
 # Filter loop
-elaps = @elapsed for img in depth_imgs
-    # new posterior model for each img
+state = nothing
+elaps = @elapsed for depth_img in depth_imgs
+    # TODO crop depth_img
+    # Online execution would also require transfer to device
+    device_img = depth_img |> device_array_type(parameters)
+    # TODO it works but is quite hidden... Should it be default Experiment constructor?
+    experiment = preprocessed_experiment(gl_context, scene, prior_o, prior_t, device_img)
+    # Model
+    prior = point_prior(parameters, experiment, cpu_rng)
+    # TODO or association / smooth
+    posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+    # Bootstrap kernel for particle filter
+    sampler = smc_bootstrap(cpu_rng, parameters, posterior)
+    # TODO
+    if isnothing(state)
+        _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
+    else
+        _, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
+    end
 end
-frame_rate = length(depth_img) / elaps
+frame_rate = length(depth_imgs) / elaps
+
+diss_defaults()
+fig = plot_pose_density(state.sample)
+fig, _, _ = plot_best_pose(state.sample, experiment, color_img, logprobability)

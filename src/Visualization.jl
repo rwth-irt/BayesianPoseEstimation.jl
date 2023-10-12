@@ -4,8 +4,6 @@
 
 import CairoMakie as MK
 using CairoMakie.Makie: FigureAxisPlot
-using CoordinateTransformations: SphericalFromCartesian
-using IterTools: partition
 
 """
 Width of the document in pt

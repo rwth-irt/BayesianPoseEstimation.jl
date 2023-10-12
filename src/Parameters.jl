@@ -66,7 +66,7 @@ Deliberately not strongly typed because the strongly typed structs are construct
 * `proposal_σ_r_quat` Standard deviation of the random walk moves for the quaternions based orientation
 
 # Inference
-* `precision` Type of the floating point precision, typically Float32 (or Float64)
+* `float_type` Type of the floating point precision, typically Float32 (or Float64)
 * `device` :CUDA or :CPU which is used in array_type, rng and device_rng.
 * `seed` Seed of the rng
 * `algorithm` Symbol of the inference algorithm
