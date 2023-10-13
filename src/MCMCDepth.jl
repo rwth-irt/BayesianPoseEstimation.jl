@@ -39,6 +39,7 @@ include("Tempering.jl")
 
 include("MetropolisHastings.jl")
 include("ComposedSampler.jl")
+include("CoordinateSampler.jl")
 include("Gibbs.jl")
 include("MultipleTry.jl")
 include("SequentialMonteCarlo.jl")
@@ -110,6 +111,7 @@ export increment_temperature
 
 # Samplers
 export ComposedSampler
+export CoordinateSampler
 export Gibbs
 export MetropolisHastings
 export MultipleTry

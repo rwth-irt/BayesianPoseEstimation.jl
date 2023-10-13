@@ -23,7 +23,7 @@ struct LinearSchedule
     n_steps::Float64
 end
 
-increment_temperature(schedule::LinearSchedule, temperature) = min(1, temperature + inv(schedule.n_steps))
+increment_temperature(schedule::LinearSchedule, temperature) = min(one(temperature), temperature + inv(schedule.n_steps))
 
 """
     LinearSchedule

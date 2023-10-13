@@ -196,34 +196,53 @@ function smc_inference(cpu_rng, posterior, sampler, params::Parameters; collect_
 end
 
 # TODO new ParticleFilter.jl file
-struct PFProposal{Q}
-    q::Q
+struct DynamicPosition
+    rng
 end
 
-function propose(proposal::PFProposal, previous_sample, dims...)
+function propose(proposal::DynamicPosition, sample, dims...)
+    t_dot = sample.variables.t_dot
+    t = sample.variables.t
     # Decaying velocity
-    sample = @set previous_sample.variables.t_dot *= 0.8
-    sample = @set sample.variables.r_dot *= 0.8
+    t_dot *= 0.3
     # Add noise to velocity
-    sample = propose_additive(proposal.q, sample, dims...)
-    # Integrate position and orientation
-    @set sample.variables.t = sample.variables.t .⊕ sample.variables.t_dot
-    @set sample.variables.r = sample.variables.r .⊕ sample.variables.r_dot
+    t_dot += rand(proposal.rng, KernelNormal(0, 0.005), 3, dims...)
+    # Integration position and orientation
+    @reset sample.variables.t_dot = t_dot
+    @reset sample.variables.t = t + t_dot
+end
+transition_probability(proposal::DynamicPosition, new_sample, previous_sample) = transition_probability_symmetric(proposal.q, new_sample, previous_sample)
+
+
+struct DynamicOrientation
+    rng
 end
 
-transition_probability(proposal::PFProposal, new_sample, previous_sample) = transition_probability_symmetric(proposal.q, new_sample, previous_sample)
+function propose(proposal::DynamicOrientation, sample, dims...)
+    r_dot = sample.variables.r_dot
+    r = sample.variables.r
+    # Decaying velocity
+    r_dot *= 0
+    # Add noise to velocity
+    r_dot += rand(proposal.rng, KernelNormal(0, 0.002), 3, dims...)
+    # Integration position and orientation
+    @reset sample.variables.r_dot = r_dot
+    @reset sample.variables.r = r .⊕ r_dot
+end
+transition_probability(proposal::DynamicOrientation, new_sample, previous_sample) = transition_probability_symmetric(proposal.q, new_sample, previous_sample)
 
 function pf_sampler(cpu_rng, params, posterior)
     # tempering does not matter for bootstrap kernel
     temp_schedule = ConstantSchedule()
-    # TODO decaying velocity model for dynamics
-    t_dot = BroadcastedNode(:t_dot, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
-    r_dot = BroadcastedNode(:r_dot, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     # NOTE not component wise
     # TODO use dynamics?
-    proposal = PFProposal(symmetric_proposal((; t_dot=t_dot, r_dot=r_dot), posterior))
-    kernel = BootstrapKernel(proposal)
-    SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    t_proposal = DynamicPosition(cpu_rng)
+    r_proposal = DynamicOrientation(cpu_rng)
+    t_kernel = BootstrapKernel(t_proposal)
+    r_kernel = BootstrapKernel(r_proposal)
+    CoordinateSampler(
+        SequentialMonteCarlo(t_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles)),
+        SequentialMonteCarlo(r_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles)))
 end
 
 function pf_inference(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, params::Parameters, experiment::Experiment, depth_imgs; collect_vars=(:t, :r))

@@ -23,6 +23,7 @@ struct SmcState{S<:Sample,W<:AbstractVector}
     log_weights::W
     log_evidence::Float64
     temperature::Float64
+    ess::Float64
 end
 
 logevidence(state::SmcState) = state.log_evidence
@@ -37,7 +38,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     # ϕ₀=0 → importance distribution = target density → wᵢ=1, normalized:
     normalized_log_weights = fill(-log(sampler.n_particles), sampler.n_particles)
     # IS normalizing constant: 1/n * ∑ₙ wᵢ = n_particles / n_particles = 1 → log(1) = 0
-    state = SmcState(sample, normalized_log_weights, 0.0, 0.0)
+    state = SmcState(sample, normalized_log_weights, 0.0, 0.0, effective_sample_size(normalized_log_weights))
 
     state.sample, state
 end
@@ -61,7 +62,7 @@ function AbstractMCMC.step(rng::AbstractRNG, model::PosteriorModel, sampler::Seq
     # Unnormalized new weights from (12) are the elements of (14) in the SMC paper
     new_evidence = old_state.log_evidence + logsumexp(new_weights)
     normalized_weights = normalize_log_weights(new_weights)
-    new_state = SmcState(new_sample, normalized_weights, new_evidence, new_temp)
+    new_state = SmcState(new_sample, normalized_weights, new_evidence, new_temp, effective_sample_size(normalized_weights))
 
     resampled = maybe_resample(rng, new_state, sampler.log_resample_threshold)
     resampled.sample, resampled
@@ -211,7 +212,7 @@ quat_eltype(::AbstractArray{T}) where {T} = T
     maybe_resample(rng, state, log_threshold)
 Resample the variables of the `state` with their respective log-weights & -probabilities if the log effective sample size is smaller than the `log_threshold`
 """
-maybe_resample(rng::AbstractRNG, state::SmcState, log_threshold) = effective_sample_size(state.log_weights) < log_threshold ? resample_systematic(rng, state) : state
+maybe_resample(rng::AbstractRNG, state::SmcState, log_threshold) = state.ess < log_threshold ? resample_systematic(rng, state) : state
 
 """
     resample_systematic(rng, state, log_threshold)
@@ -227,7 +228,7 @@ function resample_systematic(rng::AbstractRNG, state::SmcState)
     re_sample = Sample(vars, log_probs, log_likes)
     # Reset weights
     log_weights = fill(-log(length(log_probs)), length(log_probs))
-    SmcState(re_sample, log_weights, state.log_evidence, state.temperature)
+    SmcState(re_sample, log_weights, state.log_evidence, state.temperature, state.ess)
 end
 
 """

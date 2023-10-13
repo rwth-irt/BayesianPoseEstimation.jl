@@ -12,6 +12,8 @@ using Random
 using RobotOSData
 using SciGL
 
+import CairoMakie as MK
+
 WIDTH = HEIGHT = 50
 
 # TODO document in README how BOP and ros datasets must be stored in data/
@@ -84,9 +86,9 @@ scene = Scene(camera, [mesh])
 
 # TODO Evaluate different numbers of particles
 @reset parameters.n_particles = parameters.depth;
+@reset parameters.relative_ess = 0.5;
 # TODO tune for tracking
-@reset parameters.proposal_σ_t = [0.005, 0.005, 0.005]
-@reset parameters.proposal_σ_r = [0.01, 0.01, 0.01]
+@reset parameters.pixel_σ = 0.005
 
 # Preview decoded image and pose
 # rendered_img = draw(gl_context, scene)
@@ -102,15 +104,16 @@ state = nothing
 experiment = Experiment(gl_context, scene, prior_o, t, R, first(depth_imgs))
 elaps = @elapsed begin
     # TODO different posterior_fn
-    states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, association_posterior, parameters, experiment, depth_imgs)
+    # NOTE regularization only makes a difference for association models... simple model best?
+    # BUG smooth_posterior -Inf likelihoods, assocation_posterior, too?
+    states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, simple_posterior, parameters, experiment, depth_imgs)
 end
 frame_rate = length(depth_imgs) / elaps
 
-diss_defaults()
-# fig = plot_pose_density(final_state.sample)
-# TODO Are missing dynamics a problem
 begin
-    idx = 400
+    diss_defaults()
+
+    idx = 250
     experiment = Experiment(experiment, depth_imgs[idx])
     depth_img = copy(depth_imgs[idx])
     depth_min = minimum(depth_img)
@@ -119,3 +122,5 @@ begin
     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
     display(fig)
 end
+MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
+# fig = plot_pose_density(final_state.sample)
