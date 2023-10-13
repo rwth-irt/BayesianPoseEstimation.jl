@@ -15,6 +15,8 @@ Each pixel is assumed to be independent and the measurement can be described by 
 Therefore, the image logdensity for the measurement `z` is calculated by summing the pixel logdensities.
 Other static parameters should be applied partially to the function beforehand (or worse be hardcoded).
 
+**Invalid values of z** (the measurement) must be preprocessed an set to inf.
+
 # Regularization
 Previously, `ValidPixel` has been used to determine whether the rendered image was in the support of the distributions.
 Now, the distributions must handle values outside their support by returning a logdensity of -Inf.

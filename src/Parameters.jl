@@ -14,23 +14,33 @@ Data which might change from one experiment to another
 * `prior_t` estimated position of the object center e.g. via RFID or bounding box
 * `depth_img` depth image of the observed scene
 """
-struct Experiment
+struct Experiment{T}
     gl_context::OffscreenContext
     scene::Scene
-    prior_o::AbstractMatrix{Float32}
-    prior_t::Vector{Float32}
-    depth_image::AbstractMatrix{Float32}
+    prior_o::AbstractMatrix{T}
+    prior_t::Vector{T}
+    prior_r::Quaternion{T}
+    depth_image::AbstractMatrix{T}
+
+    """
+    Experiment(gl_context, scene, prior_o, prior_t, depth_image)
+        Preprocesses the data before setting up the experiment:
+        All pixels with depth 0 are replaced with infinity so all probability densities except the long tail are zero.
+
+        Automatically transfers `depth_image` to the device of the `gl_context`.
+    """
+    function Experiment(gl_context::OffscreenContext{<:Any,<:Any,A}, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {A,T}
+        @. depth_image[depth_image==0] = typemax(T)
+        device_img = Base.typename(A).wrapper(depth_image)
+        new{T}(gl_context, scene, prior_o, prior_t, prior_r, device_img)
+    end
 end
 
 """
-    preprocessed_experiment(gl_context, scene, prior_o, prior_t, depth_image)
-Preprocess the data before setting up the experiment.
-All pixels with depth 0 are replaced with infinity so all probability densities except the long tail are zero.
+    Experiment(experiment, depth_image)
+Return a new experiment where the depth image is replaced.
 """
-function preprocessed_experiment(gl_context, scene, prior_o, prior_t, depth_image::AbstractArray{T}) where {T}
-    @. depth_image[depth_image==0] = typemax(T)
-    Experiment(gl_context, scene, prior_o, prior_t, depth_image)
-end
+Experiment(ex::Experiment, depth_img::AbstractMatrix) = Experiment(ex.gl_context, ex.scene, ex.prior_o, ex.prior_t, ex.prior_r, depth_img)
 
 """
     Parameters

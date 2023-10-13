@@ -85,7 +85,7 @@ prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
 # For RFID scenario
 # prior_t = row.gt_t + rand(cpu_rng, KernelNormal(0, 0.01f0), 3)
 prior_o .= 0.5
-experiment = preprocessed_experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
+experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
 # Draw result for visual validation
 color_img = load_color_image(row, parameters.img_size...)

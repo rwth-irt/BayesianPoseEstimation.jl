@@ -131,8 +131,9 @@ function smc_bootstrap(cpu_rng, params, posterior)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal(t_sym, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
-    t_sym_kernel = AdaptiveKernel(cpu_rng, ForwardProposalKernel(t_sym_proposal))
-    r_sym_kernel = ForwardProposalKernel(r_sym_proposal)
+    # BUG this has been ForwardProposalKernel... ReRun
+    t_sym_kernel = BootstrapKernel(t_sym_proposal)
+    r_sym_kernel = BootstrapKernel(r_sym_proposal)
 
     kernels = (t_sym_kernel, r_sym_kernel)
     weights = Weights([params.w_t_sym, params.w_r_sym])
@@ -190,6 +191,61 @@ function smc_inference(cpu_rng, posterior, sampler, params::Parameters; collect_
     for idx in 2:params.n_steps
         _, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
         states[idx] = collect_variables(state, collect_vars)
+    end
+    states, state
+end
+
+# TODO new ParticleFilter.jl file
+struct PFProposal{Q}
+    q::Q
+end
+
+function propose(proposal::PFProposal, previous_sample, dims...)
+    # Decaying velocity
+    sample = @set previous_sample.variables.t_dot *= 0.8
+    sample = @set sample.variables.r_dot *= 0.8
+    # Add noise to velocity
+    sample = propose_additive(proposal.q, sample, dims...)
+    # Integrate position and orientation
+    @set sample.variables.t = sample.variables.t .⊕ sample.variables.t_dot
+    @set sample.variables.r = sample.variables.r .⊕ sample.variables.r_dot
+end
+
+transition_probability(proposal::PFProposal, new_sample, previous_sample) = transition_probability_symmetric(proposal.q, new_sample, previous_sample)
+
+function pf_sampler(cpu_rng, params, posterior)
+    # tempering does not matter for bootstrap kernel
+    temp_schedule = ConstantSchedule()
+    # TODO decaying velocity model for dynamics
+    t_dot = BroadcastedNode(:t_dot, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
+    r_dot = BroadcastedNode(:r_dot, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
+    # NOTE not component wise
+    # TODO use dynamics?
+    proposal = PFProposal(symmetric_proposal((; t_dot=t_dot, r_dot=r_dot), posterior))
+    kernel = BootstrapKernel(proposal)
+    SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+end
+
+function pf_inference(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, params::Parameters, experiment::Experiment, depth_imgs; collect_vars=(:t, :r))
+    state = nothing
+    states = Vector{SmcState}()
+    for depth_img in depth_imgs
+        # TODO crop depth_img
+        experiment = Experiment(experiment, depth_img)
+        # TODO prior for orientation, too;
+        prior = pose_prior(params, experiment, cpu_rng)
+        # TODO or association / smooth
+        posterior = posterior_fn(params, experiment, prior, dev_rng)
+        # Bootstrap kernel for particle filter
+        # sampler = smc_bootstrap(cpu_rng, params, posterior)
+        sampler = pf_sampler(cpu_rng, params, posterior)
+        if isnothing(state)
+            _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
+        else
+            _, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
+        end
+        # TODO track ESS
+        push!(states, collect_variables(state, collect_vars))
     end
     states, state
 end

@@ -15,6 +15,23 @@ function point_prior(params::Parameters, experiment::Experiment, cpu_rng::Abstra
 end
 
 """
+    pose_prior(params, experiment, cpu_rng)
+Returns a BayesNet for μ(t,r) for an approximately known position and orientation.
+Uses the proposal standard deviations.
+"""
+function pose_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG)
+    t_dot = BroadcastedNode(:t_dot, cpu_rng, KernelNormal, zeros(params.float_type, 3), params.proposal_σ_t)
+    r_dot = BroadcastedNode(:r_dot, cpu_rng, KernelNormal, zeros(params.float_type, 3), params.proposal_σ_r)
+
+    t = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.proposal_σ_t)
+    r = BroadcastedNode(:r, cpu_rng, QuaternionNormal, experiment.prior_r, first(params.proposal_σ_r))
+
+    # TODO include t_dot and r_dot in node but not render function
+    μ_fn(t, r, t_dot, r_dot) = render_fn(experiment.gl_context, experiment.scene, t, r)
+    DeterministicNode(:μ, μ_fn, (t_dot, r_dot, t, r))
+end
+
+"""
     segmentation_to_point(bounding_box, depth_image, mask_img, cv_camera)
 Calculates a 3D point which can be used for `prior_t` in the `Experiment` with x and y at the center of the bounding box and z as the mean of the masked depth image.
 The `bounding_box` should contain the mask at its center.  
