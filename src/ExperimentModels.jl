@@ -26,9 +26,9 @@ function pose_prior(params::Parameters, experiment::Experiment, cpu_rng::Abstrac
     t = BroadcastedNode(:t, cpu_rng, KernelNormal, experiment.prior_t, params.proposal_σ_t)
     r = BroadcastedNode(:r, cpu_rng, QuaternionNormal, experiment.prior_r, first(params.proposal_σ_r))
 
-    # TODO include t_dot and r_dot in node but not render function
+    # include t_dot and r_dot in node but not render function
     μ_fn(t, r, t_dot, r_dot) = render_fn(experiment.gl_context, experiment.scene, t, r)
-    DeterministicNode(:μ, μ_fn, (t_dot, r_dot, t, r))
+    DeterministicNode(:μ, μ_fn, (t, r, t_dot, r_dot))
 end
 
 """
