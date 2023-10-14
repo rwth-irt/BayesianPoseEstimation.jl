@@ -18,7 +18,7 @@ WIDTH = HEIGHT = 50
 
 # TODO document in README how BOP and ros datasets must be stored in data/
 # make sure to decompress the data or it will be painfully slow
-img_bag = load("data/p2_li_25_50/p2_li_25_50.bag")
+img_bag = load("data/p2_li/p2_li_0.bag")
 
 function SciGL.CvCamera(camera_info=MessageData{RobotOSData.CommonMsgs.sensor_msgs.CameraInfo})
     K = camera_info.data.K
@@ -61,14 +61,14 @@ function ros_pose(pose_msg::MessageData{RobotOSData.CommonMsgs.geometry_msgs.Pos
     tz = pose_msg.data.pose.position.z
     [tx, ty, tz], q
 end
-pose_bag = load("data/p2_li_25_50/p2_li_25_50_poses.bag")
-t, R = pose_bag["/tf/camera_depth_optical_frame.filtered_object"] |> last |> ros_pose
+pose_bag = load("data/p2_li/p2_li_0_poses.bag")
+t, R = pose_bag["/tf/camera_depth_optical_frame.tracked_object"] |> first |> ros_pose
 pose = to_pose(t, R)
 
 # Context
 parameters = Parameters()
-@reset parameters.width = 50
-@reset parameters.height = 50
+@reset parameters.width = 100
+@reset parameters.height = 100
 @reset parameters.depth = 500
 gl_context = render_context(parameters)
 cpu_rng = Random.default_rng(parameters)
@@ -80,15 +80,17 @@ resize_closure(img) = PoseErrors.depth_resize(img, parameters.width, parameters.
 depth_imgs = @. img_bag["/camera/depth/image_rect_raw"] |> ros_depth_img |> resize_closure
 
 # TODO do not hardcode depth
-mesh = upload_mesh(gl_context, "data/p2_li_25_50/track.obj")
+mesh = upload_mesh(gl_context, "data/p2_li/track.obj")
 @reset mesh.pose = pose
 scene = Scene(camera, [mesh])
 
 # TODO Evaluate different numbers of particles
 @reset parameters.n_particles = parameters.depth;
+@reset parameters.min_depth = 0.15
+@reset parameters.max_depth = 2
 @reset parameters.relative_ess = 0.5;
 # TODO tune for tracking
-@reset parameters.pixel_σ = 0.005
+@reset parameters.pixel_σ = 0.003
 
 # Preview decoded image and pose
 # rendered_img = draw(gl_context, scene)
@@ -97,7 +99,7 @@ scene = Scene(camera, [mesh])
 
 # Prepare
 # TODO use prior from previous image?
-prior_o = fill(parameters.float_type(0.5), parameters.width, parameters.height) |> device_array_type(parameters)
+prior_o = 0.5f0 #fill(parameters.float_type(0.6), parameters.width, parameters.height) |> device_array_type(parameters)
 
 # Filter loop
 state = nothing
@@ -108,12 +110,13 @@ elaps = @elapsed begin
     # BUG smooth_posterior -Inf likelihoods, assocation_posterior, too?
     states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, simple_posterior, parameters, experiment, depth_imgs)
 end
-frame_rate = length(depth_imgs) / elaps
+# frame_rate = length(depth_imgs) / elaps
+MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
 begin
     diss_defaults()
 
-    idx = 250
+    idx = 10
     experiment = Experiment(experiment, depth_imgs[idx])
     depth_img = copy(depth_imgs[idx])
     depth_min = minimum(depth_img)
@@ -122,5 +125,4 @@ begin
     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
     display(fig)
 end
-MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 # fig = plot_pose_density(final_state.sample)

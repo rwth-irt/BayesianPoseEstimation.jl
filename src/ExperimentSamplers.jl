@@ -201,15 +201,13 @@ struct DynamicPosition
 end
 
 function propose(proposal::DynamicPosition, sample, dims...)
-    t_dot = sample.variables.t_dot
     t = sample.variables.t
+    t_d = sample.variables.t_dot
+    t_dd = rand(proposal.rng, KernelNormal(0, 1e-5), 3, dims...)
     # Decaying velocity
-    t_dot *= 0.3
-    # Add noise to velocity
-    t_dot += rand(proposal.rng, KernelNormal(0, 0.005), 3, dims...)
-    # Integration position and orientation
-    @reset sample.variables.t_dot = t_dot
-    @reset sample.variables.t = t + t_dot
+    @reset sample.variables.t_dot = 0.9 * (t_d + t_dd)
+    # Constant acceleration integration
+    @reset sample.variables.t = t + t_d + 0.5 * t_dd
 end
 transition_probability(proposal::DynamicPosition, new_sample, previous_sample) = transition_probability_symmetric(proposal.q, new_sample, previous_sample)
 
@@ -219,15 +217,13 @@ struct DynamicOrientation
 end
 
 function propose(proposal::DynamicOrientation, sample, dims...)
-    r_dot = sample.variables.r_dot
     r = sample.variables.r
+    r_d = sample.variables.r_dot
+    r_dd = rand(proposal.rng, KernelNormal(0, 1e-6), 3, dims...)
     # Decaying velocity
-    r_dot *= 0
-    # Add noise to velocity
-    r_dot += rand(proposal.rng, KernelNormal(0, 0.002), 3, dims...)
-    # Integration position and orientation
-    @reset sample.variables.r_dot = r_dot
-    @reset sample.variables.r = r .⊕ r_dot
+    @reset sample.variables.r_dot = 0.9 * r_d + r_dd
+    # Constant acceleration integration
+    @reset sample.variables.r = r .⊕ (r_d + 0.5 * r_dd)
 end
 transition_probability(proposal::DynamicOrientation, new_sample, previous_sample) = transition_probability_symmetric(proposal.q, new_sample, previous_sample)
 

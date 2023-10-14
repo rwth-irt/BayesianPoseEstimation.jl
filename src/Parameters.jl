@@ -17,10 +17,10 @@ Data which might change from one experiment to another
 struct Experiment{T}
     gl_context::OffscreenContext
     scene::Scene
-    prior_o::AbstractMatrix{T}
+    prior_o
     prior_t::Vector{T}
     prior_r::Quaternion{T}
-    depth_image::AbstractMatrix{T}
+    depth_image
 
     """
     Experiment(gl_context, scene, prior_o, prior_t, depth_image)
