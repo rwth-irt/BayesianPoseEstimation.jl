@@ -4,7 +4,7 @@
 
 using KernelDistributions
 
-function pf_sampler(cpu_rng, params, posterior)
+function coordinate_pf_sampler(cpu_rng, params, posterior)
     # tempering does not matter for bootstrap kernel
     temp_schedule = ConstantSchedule()
     # NOTE not component wise
@@ -20,12 +20,24 @@ function pf_sampler(cpu_rng, params, posterior)
         SequentialMonteCarlo(r_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles)))
 end
 
+function pf_sampler(cpu_rng, params, posterior)
+    # tempering does not matter for bootstrap kernel
+    temp_schedule = ConstantSchedule()
+    # NOTE not component wise
+    t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
+    r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
+    # TODO it is possible to use this interface but I really have to bend it to my will... redesign!
+    tr_proposal = Proposal(propose_tr_dyn, transition_probability_symmetric, (; t=t_sym, r=r_sym), parents(posterior.prior, :r), (; t=ZeroIdentity(), r=ZeroIdentity()), bijector(posterior))
+    tr_kernel = BootstrapKernel(tr_proposal)
+    SequentialMonteCarlo(tr_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+end
+
 function propose_t_dyn(proposal, sample, dims...)
     t = sample.variables.t
     t_d = sample.variables.t_dot
     t_dd = rand(proposal.model, dims...).t
     # Decaying velocity
-    @reset sample.variables.t_dot = 0.9 * (t_d + t_dd)
+    @reset sample.variables.t_dot = 0 * t_d + t_dd
     # Constant acceleration integration
     @reset sample.variables.t = t + t_d + 0.5 * t_dd
     @reset sample.variables.t = t + t_dd
@@ -33,7 +45,6 @@ function propose_t_dyn(proposal, sample, dims...)
     model_sample, _ = to_model_domain(sample, proposal.posterior_bijectors)
     evaluated = evaluate(proposal.evaluation, variables(model_sample))
     to_unconstrained_domain(Sample(evaluated), proposal.posterior_bijectors)
-
 end
 
 function propose_r_dyn(proposal, sample, dims...)
@@ -41,9 +52,35 @@ function propose_r_dyn(proposal, sample, dims...)
     r_d = sample.variables.r_dot
     r_dd = rand(proposal.model, dims...).r
     # Decaying velocity
-    @reset sample.variables.r_dot = 0.9 * r_d + r_dd
+    @reset sample.variables.r_dot = 0 * r_d + r_dd
     # Constant acceleration integration
     @reset sample.variables.r = r .⊕ (r_d + 0.5 * r_dd)
+    # Evaluate rendering
+    model_sample, _ = to_model_domain(sample, proposal.posterior_bijectors)
+    evaluated = evaluate(proposal.evaluation, variables(model_sample))
+    to_unconstrained_domain(Sample(evaluated), proposal.posterior_bijectors)
+end
+
+function propose_tr_dyn(proposal, sample, dims...)
+    proposed = rand(proposal.model, dims...)
+
+    t = sample.variables.t
+    t_d = sample.variables.t_dot
+    t_dd = proposed.t
+    # Decaying velocity
+    @reset sample.variables.t_dot = 0.8 * t_d + t_dd
+    # Constant acceleration integration
+    @reset sample.variables.t = t + t_d + 0.5 * t_dd
+    @reset sample.variables.t = t + t_dd
+
+    r = sample.variables.r
+    r_d = sample.variables.r_dot
+    r_dd = proposed.r
+    # Decaying velocity
+    @reset sample.variables.r_dot = 0.8 * r_d + r_dd
+    # Constant acceleration integration
+    @reset sample.variables.r = r .⊕ (r_d + 0.5 * r_dd)
+
     # Evaluate rendering
     model_sample, _ = to_model_domain(sample, proposal.posterior_bijectors)
     evaluated = evaluate(proposal.evaluation, variables(model_sample))
@@ -62,7 +99,7 @@ function pf_inference(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, 
         posterior = posterior_fn(params, experiment, prior, dev_rng)
         # Bootstrap kernel for particle filter
         # sampler = smc_bootstrap(cpu_rng, params, posterior)
-        sampler = pf_sampler(cpu_rng, params, posterior)
+        sampler = coordinate_pf_sampler(cpu_rng, params, posterior)
         if isnothing(state)
             _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
         else

@@ -69,7 +69,7 @@ pose = to_pose(t, R)
 parameters = Parameters()
 @reset parameters.width = 100
 @reset parameters.height = 100
-@reset parameters.depth = 1_000
+@reset parameters.depth = 500
 gl_context = render_context(parameters)
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
@@ -89,8 +89,8 @@ scene = Scene(camera, [mesh])
 @reset parameters.relative_ess = 0.5;
 # TODO tune for tracking
 @reset parameters.pixel_σ = 0.01
-@reset parameters.proposal_σ_r = fill(5e-3, 3)
-@reset parameters.proposal_σ_t = fill(1e-2, 3)
+@reset parameters.proposal_σ_t = fill(1e-3, 3)
+@reset parameters.proposal_σ_r = fill(1e-3, 3)
 
 # Preview decoded image and pose
 # rendered_img = draw(gl_context, scene)
