@@ -17,9 +17,9 @@ Data which might change from one experiment to another
 struct Experiment
     gl_context::OffscreenContext
     scene::Scene
-    prior_o::AbstractMatrix{Float32}
+    prior_o
     prior_t::Vector{Float32}
-    depth_image::AbstractMatrix{Float32}
+    depth_image
 end
 
 """

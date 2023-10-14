@@ -52,8 +52,8 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 
     # Setup experiment
     camera = crop_camera(df_row)
-    prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
-    prior_o[mask_img] .= parameters.o_mask_is
+    # Scalar is quite a bit faster than transferring an array back and forth to CUDA
+    prior_o = parameters.o_mask_is
     # Prior t from mask is imprecise no need to bias
     prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
     experiment = preprocessed_experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
