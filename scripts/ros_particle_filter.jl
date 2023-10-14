@@ -14,11 +14,10 @@ using SciGL
 
 import CairoMakie as MK
 
-WIDTH = HEIGHT = 50
-
 # TODO document in README how BOP and ros datasets must be stored in data/
-# make sure to decompress the data or it will be painfully slow
-img_bag = load("data/p2_li/p2_li_0.bag")
+# TODO doc make sure to decompress the data or it will be painfully slow
+# TODO as variable
+img_bag = load("data/p2_li/p2_li_25_50.bag")
 
 function SciGL.CvCamera(camera_info=MessageData{RobotOSData.CommonMsgs.sensor_msgs.CameraInfo})
     K = camera_info.data.K
@@ -61,15 +60,16 @@ function ros_pose(pose_msg::MessageData{RobotOSData.CommonMsgs.geometry_msgs.Pos
     tz = pose_msg.data.pose.position.z
     [tx, ty, tz], q
 end
-pose_bag = load("data/p2_li/p2_li_0_poses.bag")
-t, R = pose_bag["/tf/camera_depth_optical_frame.tracked_object"] |> first |> ros_pose
+pose_bag = load("data/p2_li/p2_li_25_50_poses.bag")
+t, R = pose_bag["/tf/camera_depth_optical_frame.filtered_object"] |> first |> ros_pose
 pose = to_pose(t, R)
 
 # Context
 parameters = Parameters()
+# TODO lower to 50 after crop
 @reset parameters.width = 100
 @reset parameters.height = 100
-@reset parameters.depth = 200
+@reset parameters.depth = 300
 gl_context = render_context(parameters)
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
@@ -87,8 +87,8 @@ scene = Scene(camera, [mesh])
 # TODO Evaluate different numbers of particles
 @reset parameters.n_particles = parameters.depth;
 @reset parameters.relative_ess = 0.5;
-# TODO tune for tracking
-@reset parameters.pixel_σ = 0.01
+# NOTE low value crucial for best performance
+@reset parameters.pixel_σ = 0.001
 @reset parameters.proposal_σ_t = fill(1e-3, 3)
 @reset parameters.proposal_σ_r = fill(1e-3, 3)
 
@@ -106,16 +106,16 @@ state = nothing
 experiment = Experiment(gl_context, scene, prior_o, t, R, first(depth_imgs))
 elaps = @elapsed begin
     # TODO different posterior_fn
-    # NOTE regularization only makes a difference for association models... simple model best?
-    # BUG smooth_posterior -Inf likelihoods, assocation_posterior, too?
-    states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, smooth_posterior, parameters, experiment, depth_imgs)
+    # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
+    states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, simple_posterior, parameters, experiment, depth_imgs)
 end
 frame_rate = length(depth_imgs) / elaps
+# Looks much more reasonable for association models
 MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
 begin
     diss_defaults()
-    idx = 450
+    idx = 100
     experiment = Experiment(experiment, depth_imgs[idx])
     depth_img = copy(depth_imgs[idx])
     depth_min = minimum(depth_img)

@@ -980,11 +980,11 @@ version = "0.6.7"
 
 [[deps.KernelDistributions]]
 deps = ["BenchmarkTools", "Bijectors", "CUDA", "ChangesOfVariables", "DensityInterface", "Distributions", "LinearAlgebra", "LogExpFunctions", "Quaternions", "Random", "Random123", "Reexport", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns"]
-git-tree-sha1 = "a2b54ed21e50abbd76bc13597e39f05ff5c6e4ae"
+git-tree-sha1 = "cd82c8c3133a2cc8721356024f923827acc3d662"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/kerneldistributions.jl.git"
 uuid = "9994844f-d2c8-4ad1-b0b3-ac5ee308e667"
-version = "0.3.9"
+version = "0.3.10"
 
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
