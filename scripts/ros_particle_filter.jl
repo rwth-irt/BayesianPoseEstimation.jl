@@ -69,7 +69,7 @@ pose = to_pose(t, R)
 parameters = Parameters()
 @reset parameters.width = 100
 @reset parameters.height = 100
-@reset parameters.depth = 500
+@reset parameters.depth = 1_000
 gl_context = render_context(parameters)
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
@@ -86,11 +86,11 @@ scene = Scene(camera, [mesh])
 
 # TODO Evaluate different numbers of particles
 @reset parameters.n_particles = parameters.depth;
-@reset parameters.min_depth = 0.15
-@reset parameters.max_depth = 2
 @reset parameters.relative_ess = 0.5;
 # TODO tune for tracking
-@reset parameters.pixel_σ = 0.003
+@reset parameters.pixel_σ = 0.01
+@reset parameters.proposal_σ_r = fill(5e-3, 3)
+@reset parameters.proposal_σ_t = fill(1e-2, 3)
 
 # Preview decoded image and pose
 # rendered_img = draw(gl_context, scene)
@@ -108,15 +108,14 @@ elaps = @elapsed begin
     # TODO different posterior_fn
     # NOTE regularization only makes a difference for association models... simple model best?
     # BUG smooth_posterior -Inf likelihoods, assocation_posterior, too?
-    states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, simple_posterior, parameters, experiment, depth_imgs)
+    states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, smooth_posterior, parameters, experiment, depth_imgs)
 end
-# frame_rate = length(depth_imgs) / elaps
+frame_rate = length(depth_imgs) / elaps
 MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
 begin
     diss_defaults()
-
-    idx = 10
+    idx = 600
     experiment = Experiment(experiment, depth_imgs[idx])
     depth_img = copy(depth_imgs[idx])
     depth_min = minimum(depth_img)

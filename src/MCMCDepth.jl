@@ -53,6 +53,7 @@ include("Models.jl")
 include("ExperimentUtils.jl")
 include("ExperimentModels.jl")
 include("ExperimentSamplers.jl")
+include("ParticleFilter.jl")
 
 # Evaluation and tuning
 include("Evaluation.jl")
