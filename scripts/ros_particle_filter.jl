@@ -69,7 +69,7 @@ pose = to_pose(t, R)
 parameters = Parameters()
 @reset parameters.width = 100
 @reset parameters.height = 100
-@reset parameters.depth = 500
+@reset parameters.depth = 200
 gl_context = render_context(parameters)
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
@@ -115,7 +115,7 @@ MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
 begin
     diss_defaults()
-    idx = 600
+    idx = 450
     experiment = Experiment(experiment, depth_imgs[idx])
     depth_img = copy(depth_imgs[idx])
     depth_min = minimum(depth_img)

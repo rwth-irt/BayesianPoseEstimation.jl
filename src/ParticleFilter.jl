@@ -37,7 +37,7 @@ function propose_t_dyn(proposal, sample, dims...)
     t_d = sample.variables.t_dot
     t_dd = rand(proposal.model, dims...).t
     # Decaying velocity
-    @reset sample.variables.t_dot = 0 * t_d + t_dd
+    @reset sample.variables.t_dot = 0.6 * t_d + t_dd
     # Constant acceleration integration
     @reset sample.variables.t = t + t_d + 0.5 * t_dd
     @reset sample.variables.t = t + t_dd
@@ -52,7 +52,7 @@ function propose_r_dyn(proposal, sample, dims...)
     r_d = sample.variables.r_dot
     r_dd = rand(proposal.model, dims...).r
     # Decaying velocity
-    @reset sample.variables.r_dot = 0 * r_d + r_dd
+    @reset sample.variables.r_dot = 0.6 * r_d + r_dd
     # Constant acceleration integration
     @reset sample.variables.r = r .⊕ (r_d + 0.5 * r_dd)
     # Evaluate rendering
@@ -99,6 +99,8 @@ function pf_inference(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, 
         posterior = posterior_fn(params, experiment, prior, dev_rng)
         # Bootstrap kernel for particle filter
         # sampler = smc_bootstrap(cpu_rng, params, posterior)
+        # TODO allow different Samplers
+        # NOTE component wise sampling is king, running twice allows much lower particle count
         sampler = coordinate_pf_sampler(cpu_rng, params, posterior)
         if isnothing(state)
             _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
