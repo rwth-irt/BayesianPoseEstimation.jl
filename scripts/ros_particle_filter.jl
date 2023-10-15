@@ -112,13 +112,13 @@ elaps = @elapsed begin
     # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
     states, final_state = MCMCDepth.pf_inference(cpu_rng, dev_rng, simple_posterior, parameters, experiment, depth_imgs)
 end
-frame_rate = length(depth_imgs) / elaps
+println("tracking rate: $(length(depth_imgs) / elaps)Hz")
 # Looks much more reasonable for association models
 MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
 begin
     diss_defaults()
-    idx = 100
+    idx = 800
     experiment = Experiment(experiment, depth_imgs[idx])
     depth_img = copy(depth_imgs[idx])
     depth_min = minimum(depth_img)
@@ -131,23 +131,23 @@ fig = plot_pose_density(final_state.sample)
 
 # TODO export TUM csv or rosbag
 # extract timestamps
-function to_secs(time::ROSTime)
-    secs = Float64(time.secs)
-    nsecs = time.nsecs * 1e-9
-    secs + nsecs
-end
+to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
 ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
 
 timestamp = img_bag["/camera/depth/camera_info"] .|> ros_time_secs
-x, y, z, q_x, q_y, q_z, q_w = [similar(timestamp) for _ in 1:7];
+duration = last(timestamp) - first(timestamp)
+bag_fps = length(timestamp) / duration
+
+x, y, z, qx, qy, qz, qw = [similar(timestamp) for _ in 1:7];
 for (idx, state) in enumerate(states)
     _, best_idx = findmax(loglikelihood(state.sample))
     x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
-    q_w[idx] = real(state.sample.variables.r[best_idx])
-    q_x[idx], q_y[idx], q_z[idx] = imag_part(state.sample.variables.r[best_idx])
+    qw[idx] = real(state.sample.variables.r[best_idx])
+    qx[idx], qy[idx], qz[idx] = imag_part(state.sample.variables.r[best_idx])
 end
 # TODO save via DrWatson
-df_dict = @dict timestamp x y z q_x q_y q_z q_w
-# TUM stores q_w last
-df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=q_x, q_y=q_y, q_z=q_z, q_w=q_w)
-CSV.write("data/exp_raw/pf/test.txt", df)
+df_dict = @dict timestamp x y z qx qy qz qw
+
+df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
+# TODO filename
+CSV.write("data/exp_raw/pf/p2_li_25_50_coordinate.txt", df; delim=" ", writeheader=false)
