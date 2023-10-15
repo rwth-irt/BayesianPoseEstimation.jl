@@ -28,9 +28,9 @@ camera = img_bag["/camera/depth/camera_info"] |> first |> CvCamera #|> Camera
 
 depth_img = img_bag["/camera/depth/image_rect_raw"] |> first |> ros_depth_img
 
-pose_bag = load("data/p2_li/p2_li_25_50_poses.bag")
-t, R = pose_bag["/tf/camera_depth_optical_frame.filtered_object"] |> first |> ros_pose
-pose = to_pose(t, R)
+row = CSV.File("data/p2_li/tf_camera_depth_optical_frame.tracked_object.tum", delim=" ", header=[:timestamp, :tx, :ty, :tz, :qx, :qy, :qz, :qw]) |> first
+t = [row.tx, row.ty, row.tz]
+R = Quaternion(row.qw, row.qx, row.qy, row.qz)
 
 # Context
 parameters = Parameters()
@@ -50,7 +50,6 @@ depth_imgs = @. img_bag["/camera/depth/image_rect_raw"] |> ros_depth_img;
 mesh = load("data/p2_li/track.obj")
 diameter = model_diameter(mesh)
 scene_mesh = upload_mesh(gl_context, mesh)
-@reset scene_mesh.pose = pose
 scene = Scene(camera, [scene_mesh])
 
 # TODO Evaluate different numbers of particles
@@ -112,4 +111,4 @@ df_dict = @dict timestamp x y z qx qy qz qw
 
 df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
 # TODO filename
-CSV.write("data/exp_raw/pf/p2_li_25_50_coordinate.txt", df; delim=" ", writeheader=false)
+CSV.write("data/exp_raw/pf/p2_li_25_50_coordinate.tum", df; delim=" ", writeheader=false)
