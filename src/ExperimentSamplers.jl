@@ -131,7 +131,6 @@ function smc_bootstrap(cpu_rng, params, posterior)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     t_sym_proposal = symmetric_proposal(t_sym, posterior)
     r_sym_proposal = symmetric_proposal(r_sym, posterior)
-    # BUG this has been ForwardProposalKernel... ReRun
     t_sym_kernel = BootstrapKernel(t_sym_proposal)
     r_sym_kernel = BootstrapKernel(r_sym_proposal)
 

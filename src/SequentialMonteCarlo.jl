@@ -145,7 +145,7 @@ struct AdaptiveKernel{R,K}
     rng::R
     kernel::K
 end
-# TODO Should I enforce symmetric proposal model in constructor? How?
+# TODO I think it should be possible to implement an AdaptiveProposal and not do these hacks
 
 function propose(kernel::AdaptiveKernel, old_state::SmcState, n_particles)
     internal = kernel.kernel
