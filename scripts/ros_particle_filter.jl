@@ -3,6 +3,9 @@
 # All rights reserved. 
 
 using Accessors
+using CSV
+using DataFrames
+using DrWatson
 using FileIO
 using LinearAlgebra
 using MCMCDepth
@@ -124,4 +127,27 @@ begin
     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
     display(fig)
 end
-# fig = plot_pose_density(final_state.sample)
+fig = plot_pose_density(final_state.sample)
+
+# TODO export TUM csv or rosbag
+# extract timestamps
+function to_secs(time::ROSTime)
+    secs = Float64(time.secs)
+    nsecs = time.nsecs * 1e-9
+    secs + nsecs
+end
+ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
+
+timestamp = img_bag["/camera/depth/camera_info"] .|> ros_time_secs
+x, y, z, q_x, q_y, q_z, q_w = [similar(timestamp) for _ in 1:7];
+for (idx, state) in enumerate(states)
+    _, best_idx = findmax(loglikelihood(state.sample))
+    x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
+    q_w[idx] = real(state.sample.variables.r[best_idx])
+    q_x[idx], q_y[idx], q_z[idx] = imag_part(state.sample.variables.r[best_idx])
+end
+# TODO save via DrWatson
+df_dict = @dict timestamp x y z q_x q_y q_z q_w
+# TUM stores q_w last
+df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=q_x, q_y=q_y, q_z=q_z, q_w=q_w)
+CSV.write("data/exp_raw/pf/test.txt", df)
