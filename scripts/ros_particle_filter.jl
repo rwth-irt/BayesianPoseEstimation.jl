@@ -34,7 +34,7 @@ pose = to_pose(t, R)
 
 # Context
 parameters = Parameters()
-# TODO lower to 50 after crop
+# TODO irt332 almost no difference from 50 to 100
 @reset parameters.width = 50
 @reset parameters.height = 50
 @reset parameters.depth = 300
