@@ -161,15 +161,6 @@ end
 
 pixel_normal(σ::T, μ::T) where {T<:Real} = KernelNormal(μ, σ)
 
-"""
-    render_fn(render_context, scene, object_id, t, r)
-Function can be conditioned on the render_context, scene & object_id to be used in a model node to render different poses for t & r.
-"""
-function render_fn(render_context::OffscreenContext{T}, scene, t, r) where {T}
-    p = to_pose(t, r)
-    render(render_context, scene, p)
-end
-
 function position_prior(params, experiment, rng)
     t = BroadcastedNode(:t, rng, KernelNormal, experiment.prior_t, params.σ_t)
     r = BroadcastedNode(:r, rng, QuaternionUniform, params.float_type)

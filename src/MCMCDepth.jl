@@ -183,6 +183,11 @@ export smc_forward
 export smc_inference
 export smc_mh
 
+# Particle filtering
+export ros_depth_img
+export ros_pose
+export run_coordinate_pf
+
 # Evaluation
 export adds_row
 export vsd_row

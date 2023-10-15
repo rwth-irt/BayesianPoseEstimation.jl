@@ -2,6 +2,31 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using PoseErrors
+
+"""
+    render_fn(render_context, scene, t, r)
+Function can be conditioned on the `render_context` and `scene` to be used in a model node to render different poses for t & r.
+"""
+function render_fn(render_context::OffscreenContext{T}, scene, t, r) where {T}
+    p = to_pose(t, r)
+    render(render_context, scene, p)
+end
+
+"""
+    render_crop_fn(render_context, scene, object_id, t, r)
+Function can be conditioned on the `render_context`, `scene`, and object `diameter` to be used in a model node to render different poses for t & r.
+The images will be cropped to the center of the object and 1.5x the diameter.
+"""
+function render_crop_fn(render_context::OffscreenContext{T}, scene::Scene, diameter, t, r) where {T}
+    crop_cam = crop(scene.camera.object, t, diameter)
+    p = to_pose(t, r)
+    render(render_context, Scene(crop_cam, scene.meshes), p)
+end
+
+# Assumes that all positions are close
+SciGL.crop(camera::CvCamera, centers::AbstractMatrix, diameter) = crop(camera, centers[:, 1], diameter)
+
 """
     render_context(params)
 Generate a context from the MCMCDepth Parameters.
