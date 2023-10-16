@@ -81,28 +81,24 @@ function pf_inference(config)
 
     destroy_context(gl_context)
     # For DrWatson
-    @strdict states fps
+    @strdict states fps parameters
 end
 
 @progress "Particle Filters" for config in configs
     @produce_or_load(pf_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
 
-# # Looks much more reasonable for association models
-# MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
+# Convert results to TUM for processing in evo
+function parse_config(path)
+    config = my_parse_savename(path)
+    @unpack bag_name, sampler, posterior = config
+    bag_name, sampler, posterior
+end
+raw_df = collect_results(datadir("exp_raw", "pf"))
+transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior])
 
-# begin
-#     diss_defaults()
-#     idx = 800
-#     img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
-#     experiment = Experiment(experiment, img)
-#     depth_img = copy(img)
-#     depth_min = minimum(depth_img)
-#     depth_img[depth_img.>1] .= 0
-#     depth_img = depth_img / maximum(depth_img)
-#     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
-#     display(fig)
-# end
+# TODO rerun coordinate_pf should be approx half the fps
+row = first(raw_df)
 
 # # Load exp_raw and save this to exp_pro
 # # export TUM
@@ -127,4 +123,25 @@ end
 # mkpath(result_dir)
 # CSV.write(joinpath(result_dir, "coordinate_pf.tum"), df; delim=" ", writeheader=false)
 
-# import CairoMakie as MK
+import CairoMakie as MK
+states = row.states
+MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
+
+rosbag_dir = datadir("rosbags", row.bag_name)
+rosbag = load(joinpath(rosbag_dir, "original.bag"))
+camera = rosbag["/camera/depth/camera_info"] |> first |> CvCamera
+depth_imgs = @. rosbag["/camera/depth/image_rect_raw"] |> ros_depth_img
+mesh_file = joinpath(rosbag_dir, "track.obj")
+parameters = row.parameters
+begin
+    diss_defaults()
+    idx = 600
+    img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
+    experiment = Experiment(experiment, img)
+    depth_img = copy(img)
+    depth_min = minimum(depth_img)
+    depth_img[depth_img.>1] .= 0
+    depth_img = depth_img / maximum(depth_img)
+    fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
+    display(fig)
+end
