@@ -52,8 +52,8 @@ function pf_inference(config)
     parameters = Parameters()
     # Coordinate PF evaluates the likelihood twice
     if sampler == :bootstrap_pf
-        @reset parameters.n_particles = 800
-    elseif sampler == :coordinate_pf_pf
+        @reset parameters.n_particles = 1000
+    elseif sampler == :coordinate_pf
         @reset parameters.n_particles = 400
     end
     @reset parameters.relative_ess = 0.5
