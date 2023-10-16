@@ -1,17 +1,30 @@
 #!python
 import csv
+import os
 import rosbag
 import rospy
 from geometry_msgs.msg import TransformStamped
 from tf2_msgs.msg import TFMessage
 
-with rosbag.Bag("coordinate_pf.bag", "w") as outbag:
-    with rosbag.Bag(
-        "/home/rd/code/mcmc-depth-images/data/p2_li/p2_li_25_50.bag", "r"
-    ) as inbag:
+experiment = "p2_li_25_50"
+configuration = "coordinate_pf"
+data_dir = "/home/rd/code/mcmc-depth-images/data"
+exp_pro = os.path.join(data_dir, "exp_pro", "pf", experiment)
+exp_raw = os.path.join(data_dir, "exp_raw", "pf", experiment)
+
+original_bag = os.path.join(data_dir, "rosbags", experiment, "original.bag")
+pf_tum = os.path.join(exp_raw, configuration + ".tum")
+tf_bag = os.path.join(exp_pro, configuration + ".bag")
+
+if not os.path.exists(exp_pro):
+    # Create a new directory because it does not exist
+    os.makedirs(exp_pro)
+
+with rosbag.Bag(tf_bag, "w") as outbag:
+    with rosbag.Bag(original_bag, "r") as inbag:
         for topic, msg, t in inbag.read_messages(topics=["/tf", "/tf_static"]):
             outbag.write(topic, msg, t)
-    with open("coordinate_pf.txt", "r") as csv_file:
+    with open(pf_tum, "r") as csv_file:
         csv_reader = csv.DictReader(
             csv_file,
             fieldnames=["timestamp", "tx", "ty", "tz", "qx", "qy", "qz", "qw"],

@@ -4,6 +4,7 @@
 .ipynb_checkpoints/
 scratchpad/
 datasets/
+venv/
 
 _research/
 data/

@@ -2,6 +2,8 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# include("../src/MCMCDepth.jl")
+
 using Accessors
 using CSV
 using DataFrames
@@ -28,7 +30,7 @@ camera = img_bag["/camera/depth/camera_info"] |> first |> CvCamera #|> Camera
 
 depth_img = img_bag["/camera/depth/image_rect_raw"] |> first |> ros_depth_img
 
-row = CSV.File("data/p2_li/tf_camera_depth_optical_frame.tracked_object.tum", delim=" ", header=[:timestamp, :tx, :ty, :tz, :qx, :qy, :qz, :qw]) |> first
+row = CSV.File("data/p2_li/p2_li_25_50_tf_camera_depth_optical_frame.tracked_object.tum", delim=" ", header=[:timestamp, :tx, :ty, :tz, :qx, :qy, :qz, :qw]) |> first
 t = [row.tx, row.ty, row.tz]
 R = Quaternion(row.qw, row.qx, row.qy, row.qz)
 
@@ -37,7 +39,7 @@ parameters = Parameters()
 # TODO irt332 almost no difference from 50 to 100
 @reset parameters.width = 50
 @reset parameters.height = 50
-@reset parameters.depth = 300
+@reset parameters.depth = 400
 gl_context = render_context(parameters)
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
@@ -69,7 +71,7 @@ experiment = Experiment(gl_context, scene, prior_o, t, R, first(depth_imgs))
 
 elaps = @elapsed begin
     # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
-    states, final_state = run_coordinate_pf(cpu_rng, dev_rng, simple_posterior, parameters, experiment, diameter, depth_imgs)
+    states, final_state = run_coordinate_pf(cpu_rng, dev_rng, smooth_posterior, parameters, experiment, diameter, depth_imgs)
 end
 println("tracking rate: $(length(depth_imgs) / elaps)Hz")
 # Looks much more reasonable for association models
@@ -77,7 +79,7 @@ MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
 begin
     diss_defaults()
-    idx = 1000
+    idx = 800
     img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
     experiment = Experiment(experiment, img)
     depth_img = copy(img)
@@ -87,9 +89,6 @@ begin
     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
     display(fig)
 end
-
-fig = plot_pose_density(final_state.sample)
-
 
 # export TUM
 to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
@@ -111,4 +110,4 @@ df_dict = @dict timestamp x y z qx qy qz qw
 
 df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
 # TODO filename
-CSV.write("data/exp_raw/pf/p2_li_25_50_coordinate.tum", df; delim=" ", writeheader=false)
+CSV.write("data/exp_raw/pf/p2_li_25_50/coordinate_pf.tum", df; delim=" ", writeheader=false)
