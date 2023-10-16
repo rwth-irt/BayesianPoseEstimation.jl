@@ -49,7 +49,7 @@ function bootstrap_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, 
     state = nothing
     states = Vector{SmcState}()
     for depth_img in depth_imgs
-        resize_experiment(experiment, depth_img)
+        experiment = resize_experiment(experiment, depth_img)
         prior = pf_crop_prior(params, experiment, cpu_rng, diameter)
         posterior = posterior_fn(params, experiment, prior, dev_rng)
         # NOTE component wise sampling is king, running twice allows much lower particle count

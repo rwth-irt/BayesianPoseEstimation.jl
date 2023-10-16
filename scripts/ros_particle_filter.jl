@@ -2,6 +2,7 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# TODO test other experiments before merge
 # include("../src/MCMCDepth.jl")
 
 using Accessors
@@ -22,7 +23,6 @@ using TerminalLoggers
 using Logging: global_logger
 global_logger(TerminalLogger(right_justify=120))
 
-# TODO doc make sure to decompress the data or it will be painfully slow
 result_dir = datadir("exp_raw", "pf")
 bag_name = ["p2_li_0", "p2_li_25_50"]
 sampler = [:coordinate_pf, :bootstrap_pf]
