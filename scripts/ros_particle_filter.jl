@@ -17,6 +17,7 @@ using Quaternions
 using Random
 using RobotOSData
 using SciGL
+import CairoMakie as MK
 
 using ProgressLogging
 using TerminalLoggers
@@ -102,39 +103,46 @@ function parse_config(path)
     @unpack bag_name, sampler, posterior = config
     bag_name, sampler, posterior
 end
+to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
+ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
+
 raw_df = collect_results(datadir("exp_raw", "pf"))
 transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior])
 
-# TODO rerun coordinate_pf should be approx half the fps
+exp_pro = datadir("exp_pro", "pf")
+mkpath(exp_pro)
+
+# TODO Loop
 row = raw_df[1, :]
 
-# # Load exp_raw and save this to exp_pro
-# # export TUM
-# to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
-# ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
+rosbag_dir = datadir("rosbags", row.bag_name)
+rosbag = load(joinpath(rosbag_dir, "original.bag"))
 
-# timestamp = rosbag["/camera/depth/camera_info"] .|> ros_time_secs
-# duration = last(timestamp) - first(timestamp)
-# bag_fps = length(timestamp) / duration
+timestamp = rosbag["/camera/depth/camera_info"] .|> ros_time_secs
+duration = last(timestamp) - first(timestamp)
+bag_fps = length(timestamp) / duration
 
-# x, y, z, qx, qy, qz, qw = [similar(timestamp) for _ in 1:7];
-# for (idx, state) in enumerate(states)
-#     _, best_idx = findmax(loglikelihood(state.sample))
-#     x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
-#     qw[idx] = real(state.sample.variables.r[best_idx])
-#     qx[idx], qy[idx], qz[idx] = imag_part(state.sample.variables.r[best_idx])
-# end
+x, y, z, qx, qy, qz, qw = [similar(timestamp) for _ in 1:7];
+for (idx, state) in enumerate(row.states)
+    _, best_idx = findmax(loglikelihood(state.sample))
+    x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
+    qw[idx] = real(state.sample.variables.r[best_idx])
+    qx[idx], qy[idx], qz[idx] = imag_part(state.sample.variables.r[best_idx])
+end
+df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
+# TODO save filename
+tum_file, _ = row.path |> basename |> splitext
+tum_file *= ".tum"
+CSV.write(joinpath(exp_pro, tum_file), df; delim=" ", writeheader=false)
 
-# df_dict = @dict timestamp x y z qx qy qz qw
 
-# df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
-# mkpath(result_dir)
-# CSV.write(joinpath(result_dir, "coordinate_pf.tum"), df; delim=" ", writeheader=false)
-
-import CairoMakie as MK
-# ESS
-states = row.states
-MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
+# Plot ESS
+begin
+    # NOTE looks like smooth_posterior degrades ESS / really focuses on one
+    # NOTE coordinate PF has way less sample degeneration
+    states = row.states
+    MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
+end
 
 # Poses ontop of depth image
 begin
@@ -150,7 +158,7 @@ begin
     experiment = Experiment(gl_context, scene, 0.5, fill(0, 3), one(Quaternion), first(depth_imgs))
 
     diss_defaults()
-    idx = 500
+    idx = 600
     img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
     experiment = Experiment(experiment, img)
     depth_img = copy(img)
