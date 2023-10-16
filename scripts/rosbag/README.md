@@ -28,7 +28,7 @@ Analysis in `world` frame as the object was static and only the robot was moving
 * data/
   * rosbags/
     * {experiment}>/
-      * original.bag
+      * original.bag - `rosbag decompress original.bag` for improved performance
       * tf_camera_depth_optical_frame.tracked_object.tum
       * track.obj
   * exp_raw/pf/
