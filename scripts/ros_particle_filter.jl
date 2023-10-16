@@ -27,7 +27,7 @@ global_logger(TerminalLogger(right_justify=120))
 result_dir = datadir("exp_raw", "pf")
 bag_name = ["p2_li_0", "p2_li_25_50"]
 sampler = [:coordinate_pf, :bootstrap_pf]
-posterior = [:simple_posterior, :smooth_posterior]
+posterior = [:simple_posterior, :association_posterior, :smooth_posterior]
 configs = dict_list(@dict bag_name sampler posterior)
 
 function pf_inference(config)
@@ -105,16 +105,22 @@ function parse_config(path)
 end
 to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
 ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
-
 raw_df = collect_results(datadir("exp_raw", "pf"))
 transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior])
+
+# Setup python environment for evo
+run(`bash -c """cd scripts/rosbag \
+&& python3 -m venv venv \
+&& source venv/bin/activate \
+&& pip install -r requirements.txt"""`)
 
 exp_pro = datadir("exp_pro", "pf")
 mkpath(exp_pro)
 
 for row in eachrow(raw_df)
     rosbag_dir = datadir("rosbags", row.bag_name)
-    rosbag = load(joinpath(rosbag_dir, "original.bag"))
+    bag_file = joinpath(rosbag_dir, "original.bag")
+    rosbag = load(bag_file)
 
     timestamp = rosbag["/camera/depth/camera_info"] .|> ros_time_secs
     duration = last(timestamp) - first(timestamp)
@@ -130,8 +136,15 @@ for row in eachrow(raw_df)
     df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
     tum_file, _ = row.path |> basename |> splitext
     tum_file *= ".tum"
-    CSV.write(joinpath(exp_pro, tum_file), df; delim=" ", writeheader=false)
+    tum_file = joinpath(exp_pro, tum_file)
+    println(tum_file)
+    CSV.write(tum_file, df; delim=" ", writeheader=false)
+
+    # combine results
+    run(`bash -c "cd scripts/rosbag && source venv/bin/activate && python tf_bag.py $bag_file $tum_file"`)
 end
+
+# TODO plot translation and orientation errors aligned to origin
 
 # Plot ESS
 begin

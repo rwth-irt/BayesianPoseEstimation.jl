@@ -17,7 +17,7 @@ source venv/bin/activate
 ```
 
 Inference in the `camera_depth_optical_frame`.
-* rosbag -> Julia: `camera_bag.sh <data.bag>` reads the tf data from a rosbag and writes the pose messages to another bag in the current working directory
+* rosbag -> `ros_particle_filter.jl`: `camera_bag.sh <data.bag>` reads the tf data from a rosbag and writes the pose messages to another bag in the current working directory
 
 Analysis in `world` frame as the object was static and only the robot was moving.
 * Julia -> rosbag: `tf_bag.py` reads the TUM formatted results from Julia TUM export and the original bag.
