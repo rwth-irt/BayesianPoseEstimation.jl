@@ -9,11 +9,13 @@ using RobotOSData
 # TODO implement standard pf
 
 """
-    run_coordinate_pf(cpu_rng, dev_rng, posterior_fn, params, experiment, depth_imgs; [collect_vars=(:t, :r)])
+    coordinate_pf(cpu_rng, dev_rng, posterior_fn, params, experiment, depth_imgs; [collect_vars=(:t, :r)])
 Run the particle filter on the `depth_imgs`.
 As the model has to be conditioned on new data at every step, a new experiment and posterior model is created at each timestep.
+
+Idea from Block sampling, similar publication: Wüthrich 2015, The Coordinate Particle Filter - a novel Particle Filter for high dimensional systems
 """
-function run_coordinate_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, params::Parameters, experiment::Experiment, diameter, depth_imgs; collect_vars=(:t, :r))
+function coordinate_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, params::Parameters, experiment::Experiment, diameter, depth_imgs; collect_vars=(:t, :r))
     state = nothing
     states = Vector{SmcState}()
     for depth_img in depth_imgs
@@ -37,10 +39,41 @@ function run_coordinate_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior
     states, state
 end
 
+# TODO actually change it
+"""
+    bootstrap_pf(cpu_rng, dev_rng, posterior_fn, params, experiment, depth_imgs; [collect_vars=(:t, :r)])
+Run the particle filter on the `depth_imgs`.
+As the model has to be conditioned on new data at every step, a new experiment and posterior model is created at each timestep.
+"""
+function bootstrap_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, params::Parameters, experiment::Experiment, diameter, depth_imgs; collect_vars=(:t, :r))
+    state = nothing
+    states = Vector{SmcState}()
+    for depth_img in depth_imgs
+        resize_experiment(experiment, depth_img)
+        prior = pf_crop_prior(params, experiment, cpu_rng, diameter)
+        posterior = posterior_fn(params, experiment, prior, dev_rng)
+        # NOTE component wise sampling is king, running twice allows much lower particle count
+        sampler = bootstrap_pf_sampler(cpu_rng, params, posterior)
+        if isnothing(state)
+            _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
+        else
+            _, state = AbstractMCMC.step(cpu_rng, posterior, sampler, state)
+        end
+        push!(states, collect_variables(state, collect_vars))
+    end
+    states, state
+end
+
 function crop_experiment(experiment::Experiment, depth_img, t, diameter)
     _, cropped = crop(experiment.scene.camera.object, depth_img, t, diameter)
     width, height = size(experiment.gl_context)
     resized = depth_resize(cropped, width, height)
+    Experiment(experiment, resized)
+end
+
+function resize_experiment(experiment::Experiment, depth_img)
+    width, height = size(experiment.gl_context)
+    resized = depth_resize(depth_img, width, height)
     Experiment(experiment, resized)
 end
 
@@ -56,7 +89,7 @@ function coordinate_pf_sampler(cpu_rng, params, posterior)
         SequentialMonteCarlo(r_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles)))
 end
 
-function pf_sampler(cpu_rng, params, posterior)
+function bootstrap_pf_sampler(cpu_rng, params, posterior)
     # tempering does not matter for bootstrap kernel
     temp_schedule = ConstantSchedule()
     # NOTE not component wise

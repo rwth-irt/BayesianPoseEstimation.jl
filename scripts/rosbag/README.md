@@ -32,11 +32,10 @@ Analysis in `world` frame as the object was static and only the robot was moving
       * tf_camera_depth_optical_frame.tracked_object.tum
       * track.obj
   * exp_raw/pf/
-    * {experiment}
-      * {configuration}.tum
+    * {configuration}.jld2
   * exp_pro/pf/
-    * {experiment}
-      * {configuration}.bag
+    * {configuration}.tum
+    * {configuration}.bag
 
 # Blender models
 Re-export the DAE files in Blender to obj with Y-forward and Z-up
