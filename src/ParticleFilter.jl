@@ -50,9 +50,8 @@ function bootstrap_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn, 
     states = Vector{SmcState}()
     for depth_img in depth_imgs
         experiment = resize_experiment(experiment, depth_img)
-        prior = pf_crop_prior(params, experiment, cpu_rng, diameter)
+        prior = pf_prior(params, experiment, cpu_rng)
         posterior = posterior_fn(params, experiment, prior, dev_rng)
-        # NOTE component wise sampling is king, running twice allows much lower particle count
         sampler = bootstrap_pf_sampler(cpu_rng, params, posterior)
         if isnothing(state)
             _, state = AbstractMCMC.step(cpu_rng, posterior, sampler)
@@ -96,7 +95,7 @@ function bootstrap_pf_sampler(cpu_rng, params, posterior)
     t_sym = BroadcastedNode(:t, cpu_rng, KernelNormal, 0, params.proposal_σ_t)
     r_sym = BroadcastedNode(:r, cpu_rng, KernelNormal, 0, params.proposal_σ_r)
     # TODO it is possible to use this interface but I really have to bend it to my will... redesign!
-    tr_proposal = Proposal(propose_tr_dyn, transition_probability_symmetric, (; t=t_sym, r=r_sym), parents(posterior.prior, :r), (; t=ZeroIdentity(), r=ZeroIdentity()), bijector(posterior))
+    tr_proposal = Proposal(propose_tr_dyn, transition_probability_symmetric, (; t=t_sym, r=r_sym), parents(posterior.prior, :t), (; t=ZeroIdentity(), r=ZeroIdentity()), bijector(posterior))
     tr_kernel = BootstrapKernel(tr_proposal)
     SequentialMonteCarlo(tr_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
 end
@@ -106,7 +105,7 @@ end
 Returns a BayesNet for μ(t,r) for an approximately known position and orientation.
 Uses the proposal standard deviations.
 """
-function pf_crop_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG)
+function pf_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG)
     t_dot = BroadcastedNode(:t_dot, cpu_rng, KernelNormal, zeros(params.float_type, 3), params.proposal_σ_t)
     r_dot = BroadcastedNode(:r_dot, cpu_rng, KernelNormal, zeros(params.float_type, 3), params.proposal_σ_r)
 
@@ -151,7 +150,13 @@ struct Dynamics{name}
     evaluation
 end
 
-Dynamics(name::Symbol, rng::AbstractRNG, params::Parameters, posterior::PosteriorModel) = Dynamics{name}(rng, params.velocity_decay, params.proposal_σ_t, bijector(posterior), parents(posterior.prior, name))
+function Dynamics(name, rng::AbstractRNG, params::Parameters, posterior::PosteriorModel)
+    if name == :t
+        Dynamics{name}(rng, params.velocity_decay, params.proposal_σ_t, bijector(posterior), parents(posterior.prior, name))
+    elseif name == :r
+        Dynamics{name}(rng, params.velocity_decay, params.proposal_σ_r, bijector(posterior), parents(posterior.prior, name))
+    end
+end
 
 transition_probability(dynamics::Dynamics, new_sample, previous_sample) = transition_probability_symmetric(dynamics, new_sample, previous_sample)
 
@@ -163,7 +168,6 @@ function propose(dynamics::Dynamics{:t}, sample, dims...)
     @reset sample.variables.t_dot = dynamics.decay * t_d + t_dd
     # Constant acceleration integration
     @reset sample.variables.t = t + t_d + 0.5 * t_dd
-    @reset sample.variables.t = t + t_dd
     # Evaluate rendering and possibly association
     model_sample, _ = to_model_domain(sample, dynamics.bijectors)
     evaluated = evaluate(dynamics.evaluation, variables(model_sample))
@@ -195,7 +199,6 @@ function propose_tr_dyn(proposal, sample, dims...)
     @reset sample.variables.t_dot = 0.9 * t_d + t_dd
     # Constant acceleration integration
     @reset sample.variables.t = t + t_d + 0.5 * t_dd
-    @reset sample.variables.t = t + t_dd
 
     r = sample.variables.r
     r_d = sample.variables.r_dot

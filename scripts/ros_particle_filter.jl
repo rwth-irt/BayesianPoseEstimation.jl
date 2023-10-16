@@ -50,7 +50,12 @@ function pf_inference(config)
 
     # Context
     parameters = Parameters()
-    @reset parameters.n_particles = 400
+    # Coordinate PF evaluates the likelihood twice
+    if sampler == :bootstrap_pf
+        @reset parameters.n_particles = 800
+    elseif sampler == :coordinate_pf_pf
+        @reset parameters.n_particles = 400
+    end
     @reset parameters.relative_ess = 0.5
     # NOTE low value crucial for best performance
     prior_o = 0.5f0
@@ -73,8 +78,10 @@ function pf_inference(config)
 
     experiment = Experiment(gl_context, scene, prior_o, t, R, first(depth_imgs))
 
+    # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
+    # avoid timing pre-compilation
+    eval(sampler)(cpu_rng, dev_rng, eval(posterior), parameters, experiment, diameter, depth_imgs[1:2])
     elaps = @elapsed begin
-        # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
         states, final_state = eval(sampler)(cpu_rng, dev_rng, eval(posterior), parameters, experiment, diameter, depth_imgs)
     end
     fps = length(depth_imgs) / elaps
@@ -84,6 +91,7 @@ function pf_inference(config)
     @strdict states fps parameters
 end
 
+# RUN it
 @progress "Particle Filters" for config in configs
     @produce_or_load(pf_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
@@ -98,7 +106,7 @@ raw_df = collect_results(datadir("exp_raw", "pf"))
 transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior])
 
 # TODO rerun coordinate_pf should be approx half the fps
-row = first(raw_df)
+row = raw_df[1, :]
 
 # # Load exp_raw and save this to exp_pro
 # # export TUM
@@ -124,18 +132,25 @@ row = first(raw_df)
 # CSV.write(joinpath(result_dir, "coordinate_pf.tum"), df; delim=" ", writeheader=false)
 
 import CairoMakie as MK
+# ESS
 states = row.states
 MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
 
-rosbag_dir = datadir("rosbags", row.bag_name)
-rosbag = load(joinpath(rosbag_dir, "original.bag"))
-camera = rosbag["/camera/depth/camera_info"] |> first |> CvCamera
-depth_imgs = @. rosbag["/camera/depth/image_rect_raw"] |> ros_depth_img
-mesh_file = joinpath(rosbag_dir, "track.obj")
-parameters = row.parameters
+# Poses ontop of depth image
 begin
+    rosbag_dir = datadir("rosbags", row.bag_name)
+    rosbag = load(joinpath(rosbag_dir, "original.bag"))
+
+    depth_imgs = @. rosbag["/camera/depth/image_rect_raw"] |> ros_depth_img
+    parameters = row.parameters
+    gl_context = render_context(parameters)
+    mesh = upload_mesh(gl_context, joinpath(rosbag_dir, "track.obj"))
+    camera = rosbag["/camera/depth/camera_info"] |> first |> CvCamera
+    scene = Scene(camera, [mesh])
+    experiment = Experiment(gl_context, scene, 0.5, fill(0, 3), one(Quaternion), first(depth_imgs))
+
     diss_defaults()
-    idx = 600
+    idx = 500
     img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
     experiment = Experiment(experiment, img)
     depth_img = copy(img)
@@ -144,4 +159,6 @@ begin
     depth_img = depth_img / maximum(depth_img)
     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
     display(fig)
+
+    destroy_context(gl_context)
 end
