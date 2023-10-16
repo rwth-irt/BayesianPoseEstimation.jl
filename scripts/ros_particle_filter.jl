@@ -112,29 +112,26 @@ transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :poster
 exp_pro = datadir("exp_pro", "pf")
 mkpath(exp_pro)
 
-# TODO Loop
-row = raw_df[1, :]
+for row in eachrow(raw_df)
+    rosbag_dir = datadir("rosbags", row.bag_name)
+    rosbag = load(joinpath(rosbag_dir, "original.bag"))
 
-rosbag_dir = datadir("rosbags", row.bag_name)
-rosbag = load(joinpath(rosbag_dir, "original.bag"))
+    timestamp = rosbag["/camera/depth/camera_info"] .|> ros_time_secs
+    duration = last(timestamp) - first(timestamp)
+    bag_fps = length(timestamp) / duration
 
-timestamp = rosbag["/camera/depth/camera_info"] .|> ros_time_secs
-duration = last(timestamp) - first(timestamp)
-bag_fps = length(timestamp) / duration
-
-x, y, z, qx, qy, qz, qw = [similar(timestamp) for _ in 1:7];
-for (idx, state) in enumerate(row.states)
-    _, best_idx = findmax(loglikelihood(state.sample))
-    x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
-    qw[idx] = real(state.sample.variables.r[best_idx])
-    qx[idx], qy[idx], qz[idx] = imag_part(state.sample.variables.r[best_idx])
+    x, y, z, qx, qy, qz, qw = [similar(timestamp) for _ in 1:7]
+    for (idx, state) in enumerate(row.states)
+        _, best_idx = findmax(loglikelihood(state.sample))
+        x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
+        qw[idx] = real(state.sample.variables.r[best_idx])
+        qx[idx], qy[idx], qz[idx] = imag_part(state.sample.variables.r[best_idx])
+    end
+    df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
+    tum_file, _ = row.path |> basename |> splitext
+    tum_file *= ".tum"
+    CSV.write(joinpath(exp_pro, tum_file), df; delim=" ", writeheader=false)
 end
-df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
-# TODO save filename
-tum_file, _ = row.path |> basename |> splitext
-tum_file *= ".tum"
-CSV.write(joinpath(exp_pro, tum_file), df; delim=" ", writeheader=false)
-
 
 # Plot ESS
 begin
