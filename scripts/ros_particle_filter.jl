@@ -190,7 +190,7 @@ baseline_tum = "scripts/rosbag/tf_world.tracked_object.tum"
 isfile(julia_tum) ? rm(julia_tum) : nothing
 isfile(baseline_tum) ? rm(baseline_tum) : nothing
 
-bag_file = "/home/rd/code/mcmc-depth-images/data/exp_pro/pf_no_crop/bag_name=p2_li_0,posterior=association_posterior,sampler=coordinate_pf.bag"
+bag_file = "/home/rd/code/mcmc-depth-images/data/exp_pro/pf_no_crop/bag_name=p2_li_25_50,posterior=simple_posterior,sampler=bootstrap_pf.bag"
 run(`bash -c "cd scripts/rosbag && source venv/bin/activate \
     && source /opt/ros/noetic/setup.bash \
     && evo_traj bag  $bag_file \
@@ -209,29 +209,35 @@ function load_tum(filename)
     first.(tuple_vec), getindex.(tuple_vec, 2), last.(tuple_vec)
 end
 
+function quat_dist(q1, q2)
+    v1 = [real(q1), imag_part(q1)...]
+    v2 = [real(q2), imag_part(q2)...]
+    acos(2 * dot(v1, v2)^2 - 1)
+end
+
 stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
 stamp_julia = stamp_julia .- first(stamp_julia)
 t_julia = t_julia .- (first(t_julia),)
+t_err_julia = norm.(t_julia)
+R_err_julia = quat_dist.(first(R_julia), R_julia)
 stamp_baseline, t_baseline, R_baseline = load_tum("scripts/rosbag/tf_world.tracked_object.tum")
 stamp_baseline = stamp_baseline .- first(stamp_baseline)
-t_baseline = t_baseline .- (first(t_baseline),)
+t_baseline = t_baseline .- (first(t_baseline), t_baseline)
+t_err_baseline = norm.(t_baseline)
+R_err_baseline = quat_dist.(first(R_baseline), R_baseline)
 
 
 # Plot em
 diss_defaults()
-fig = MK.Figure()
-axy = MK.Axis(fig[2, 1])
-axz = MK.Axis(fig[2, 2])
-axx = MK.Axis(fig[1, :])
-tx, ty, tz = getindex.(t_julia, 1), getindex.(t_julia, 2), getindex.(t_julia, 3)
-MK.lines!(axx, stamp_julia, tx; label="x Julia")
-MK.lines!(axy, stamp_julia, ty; label="y Julia")
-MK.lines!(axz, stamp_julia, tz; label="z Julia")
-tx, ty, tz = getindex.(t_baseline, 1), getindex.(t_baseline, 2), getindex.(t_baseline, 3)
-MK.lines!(axx, stamp_baseline, tx; label="x baseline")
-MK.lines!(axy, stamp_baseline, ty; label="xybaseline")
-MK.lines!(axz, stamp_baseline, tz; label="z baseline")
-MK.axislegend(axx, position=:rb)
+fig = MK.Figure(resolution=(DISS_WIDTH, DISS_WIDTH / 1.5))
+ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="replace automatically")
+MK.lines!(ax, stamp_baseline, t_err_baseline * 1e3; label="baseline")
+MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
+MK.axislegend(ax, position=:lt)
+
+ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")
+MK.lines!(ax, stamp_baseline, rad2deg.(R_err_baseline); label="baseline")
+MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
 display(fig)
 
 isfile(julia_tum) ? rm(julia_tum) : nothing
