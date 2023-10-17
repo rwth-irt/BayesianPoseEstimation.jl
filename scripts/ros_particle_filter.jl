@@ -100,6 +100,7 @@ end
     @produce_or_load(pf_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
 
+# TODO move to ExperimentUtils
 # Convert results to TUM for processing in evo
 function parse_config(path)
     config = my_parse_savename(path)
@@ -145,6 +146,46 @@ for row in eachrow(raw_df)
 
     # combine results
     run(`bash -c "cd scripts/rosbag && source venv/bin/activate && python tf_bag.py $bag_file $tum_file"`)
+
+    # Plot the results
+    julia_tum = "scripts/rosbag/tf_world.julia_pf.tum"
+    baseline_tum = "scripts/rosbag/tf_world.tracked_object.tum"
+    isfile(julia_tum) ? rm(julia_tum) : nothing
+    isfile(baseline_tum) ? rm(baseline_tum) : nothing
+
+    result_bag = first(splitext(tum_file)) * ".bag"
+    run(`bash -c "cd scripts/rosbag && source venv/bin/activate \
+        && source /opt/ros/noetic/setup.bash \
+        && evo_traj bag  $result_bag \
+        /tf:world.tracked_object /tf:world.julia_pf \
+        --save_as_tum --config evo_config.json"`)
+
+    stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
+    stamp_julia = stamp_julia .- first(stamp_julia)
+    t_julia = t_julia .- (first(t_julia),)
+    t_err_julia = norm.(t_julia)
+    R_err_julia = quat_dist.(first(R_julia), R_julia)
+    stamp_baseline, t_baseline, R_baseline = load_tum("scripts/rosbag/tf_world.tracked_object.tum")
+    stamp_baseline = stamp_baseline .- first(stamp_baseline)
+    t_baseline = t_baseline .- (first(t_baseline),)
+    t_err_baseline = norm.(t_baseline)
+    R_err_baseline = quat_dist.(first(R_baseline), R_baseline)
+
+    # Plot em
+    diss_defaults()
+    fig = MK.Figure(resolution=(DISS_WIDTH, DISS_WIDTH / 1.5))
+    ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="replace automatically")
+    MK.lines!(ax, stamp_baseline, t_err_baseline * 1e3; label="baseline")
+    MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
+    MK.axislegend(ax, position=:lt)
+
+    ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")
+    MK.lines!(ax, stamp_baseline, rad2deg.(R_err_baseline); label="baseline")
+    MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
+    display(fig)
+
+    isfile(julia_tum) ? rm(julia_tum) : nothing
+    isfile(baseline_tum) ? rm(baseline_tum) : nothing
 end
 
 # TODO plot translation and orientation errors aligned to origin
@@ -183,62 +224,3 @@ begin
 
     destroy_context(gl_context)
 end
-
-# Plot the results
-julia_tum = "scripts/rosbag/tf_world.julia_pf.tum"
-baseline_tum = "scripts/rosbag/tf_world.tracked_object.tum"
-isfile(julia_tum) ? rm(julia_tum) : nothing
-isfile(baseline_tum) ? rm(baseline_tum) : nothing
-
-bag_file = "/home/rd/code/mcmc-depth-images/data/exp_pro/pf_no_crop/bag_name=p2_li_25_50,posterior=simple_posterior,sampler=bootstrap_pf.bag"
-run(`bash -c "cd scripts/rosbag && source venv/bin/activate \
-    && source /opt/ros/noetic/setup.bash \
-    && evo_traj bag  $bag_file \
-    /tf:world.tracked_object /tf:world.julia_pf \
-    --save_as_tum --config evo_config.json"`)
-
-function load_tum_row(row)
-    t = [row.tx, row.ty, row.tz]
-    R = Quaternion(row.qw, row.qx, row.qy, row.qz)
-    row.timestamp, t, R
-end
-
-function load_tum(filename)
-    csv = CSV.File(filename; delim=" ", header=[:timestamp, :tx, :ty, :tz, :qx, :qy, :qz, :qw])
-    tuple_vec = load_tum_row.(csv)
-    first.(tuple_vec), getindex.(tuple_vec, 2), last.(tuple_vec)
-end
-
-function quat_dist(q1, q2)
-    v1 = [real(q1), imag_part(q1)...]
-    v2 = [real(q2), imag_part(q2)...]
-    acos(2 * dot(v1, v2)^2 - 1)
-end
-
-stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
-stamp_julia = stamp_julia .- first(stamp_julia)
-t_julia = t_julia .- (first(t_julia),)
-t_err_julia = norm.(t_julia)
-R_err_julia = quat_dist.(first(R_julia), R_julia)
-stamp_baseline, t_baseline, R_baseline = load_tum("scripts/rosbag/tf_world.tracked_object.tum")
-stamp_baseline = stamp_baseline .- first(stamp_baseline)
-t_baseline = t_baseline .- (first(t_baseline), t_baseline)
-t_err_baseline = norm.(t_baseline)
-R_err_baseline = quat_dist.(first(R_baseline), R_baseline)
-
-
-# Plot em
-diss_defaults()
-fig = MK.Figure(resolution=(DISS_WIDTH, DISS_WIDTH / 1.5))
-ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="replace automatically")
-MK.lines!(ax, stamp_baseline, t_err_baseline * 1e3; label="baseline")
-MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
-MK.axislegend(ax, position=:lt)
-
-ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")
-MK.lines!(ax, stamp_baseline, rad2deg.(R_err_baseline); label="baseline")
-MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
-display(fig)
-
-isfile(julia_tum) ? rm(julia_tum) : nothing
-isfile(baseline_tum) ? rm(baseline_tum) : nothing

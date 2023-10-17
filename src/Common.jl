@@ -2,6 +2,8 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using Quaternions
+
 """
     map_intersect(f, a, b, default)
 Maps the function `f` over the intersection of the keys of `a` and `b`.
@@ -126,3 +128,9 @@ If required, x is converted to an Array.
 to_cpu(x::AbstractArray) = Array(x)
 to_cpu(x::Array) = x
 to_cpu(x::Real) = x
+
+"""
+    quat_dist(q1, q2)
+Angular distance in radians (https://de.mathworks.com/help/fusion/ref/quaternion.dist.html).
+"""
+quat_dist(q1, q2) = acos(min(1, abs(real(q1 * conj(q2)))))

@@ -62,6 +62,7 @@ include("Evaluation.jl")
 export array_for_rng
 export map_intersect
 export norm_dims, normalize_dims!, normalize_dims
+export quat_dist
 export sum_and_dropdims
 export to_rotation, to_translation, to_pose
 export to_cpu
@@ -162,8 +163,9 @@ export plot_prob_img, plot_prob_img!
 
 # Experiment utils
 export bop_test_or_train
-export load_img_mesh
 export collect_variables
+export load_img_mesh
+export load_tum
 
 # Experiment models
 export association_posterior

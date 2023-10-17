@@ -2,8 +2,8 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+using CSV
 using DrWatson
-
 
 # TODO move this logic to PoseErrors which should check whether the gt files exist.
 """
@@ -38,3 +38,20 @@ Select a subset of the variables from the chain to save memory / storage.
 collect_variables(samples::AbstractVector{<:Sample}, var_names) = [@set s.variables = s.variables[var_names] for s in samples]
 
 collect_variables(state::SmcState, var_names) = @set state.sample.variables = state.sample.variables[var_names]
+
+
+"""
+    load_tum(filename)
+Loads vectors for (timestamp, translation, quaternions) from the TUM file.
+"""
+function load_tum(filename)
+    csv = CSV.File(filename; delim=" ", header=[:timestamp, :tx, :ty, :tz, :qx, :qy, :qz, :qw])
+    tuple_vec = load_tum_row.(csv)
+    first.(tuple_vec), getindex.(tuple_vec, 2), last.(tuple_vec)
+end
+
+function load_tum_row(row)
+    t = [row.tx, row.ty, row.tz]
+    R = Quaternion(row.qw, row.qx, row.qy, row.qz)
+    row.timestamp, t, R
+end
