@@ -26,7 +26,10 @@ global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
 bag_name = ["p2_li_0", "p2_li_25_50"]
+# NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
+# WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
+# NOTE simple most stable, association and smooth smoother.
 posterior = [:simple_posterior, :association_posterior, :smooth_posterior]
 configs = dict_list(@dict bag_name sampler posterior)
 

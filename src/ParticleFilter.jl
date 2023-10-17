@@ -6,8 +6,6 @@ using KernelDistributions
 using PoseErrors
 using RobotOSData
 
-# TODO implement standard pf
-
 """
     coordinate_pf(cpu_rng, dev_rng, posterior_fn, params, experiment, depth_imgs; [collect_vars=(:t, :r)])
 Run the particle filter on the `depth_imgs`.
@@ -21,11 +19,11 @@ function coordinate_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn,
     for depth_img in depth_imgs
         # Crop image
         if isnothing(state)
-            experiment = crop_experiment(experiment, depth_img, experiment.prior_t, diameter)
+            experiment = resize_experiment(experiment, depth_img)
         else
-            experiment = crop_experiment(experiment, depth_img, variables(state.sample).t[:, 1], diameter)
+            experiment = resize_experiment(experiment, depth_img)
         end
-        prior = pf_crop_prior(params, experiment, cpu_rng, diameter)
+        prior = pf_prior(params, experiment, cpu_rng)
         posterior = posterior_fn(params, experiment, prior, dev_rng)
         # NOTE component wise sampling is king, running twice allows much lower particle count
         sampler = coordinate_pf_sampler(cpu_rng, params, posterior)
@@ -39,7 +37,6 @@ function coordinate_pf(cpu_rng::AbstractRNG, dev_rng::AbstractRNG, posterior_fn,
     states, state
 end
 
-# TODO actually change it
 """
     bootstrap_pf(cpu_rng, dev_rng, posterior_fn, params, experiment, depth_imgs; [collect_vars=(:t, :r)])
 Run the particle filter on the `depth_imgs`.
@@ -124,6 +121,7 @@ Uses the proposal standard deviations.
 
 Crops the images during rendering centered at the current position estimate.
 Assumes that the variance of the position estimates is small compared to the object diameter.
+# WARN very jittery due to discretization errors maybe another interpolation method would help
 """
 function pf_crop_prior(params::Parameters, experiment::Experiment, cpu_rng::AbstractRNG, object_diameter)
     t_dot = BroadcastedNode(:t_dot, cpu_rng, KernelNormal, zeros(params.float_type, 3), params.proposal_σ_t)
