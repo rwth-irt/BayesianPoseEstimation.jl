@@ -44,6 +44,7 @@ function simple_posterior(params, experiment, μ_node, dev_rng)
     PosteriorModel(z_norm | experiment.depth_image)
 end
 
+# NOTE not truncated - do I truncate it in Diss?
 """
     association_posterior(params, experiment, μ_node, dev_rng)
 A posterior model which does calculate the pixel association probability `o`.
@@ -61,7 +62,6 @@ function association_posterior(params, experiment, μ_node, dev_rng)
     PosteriorModel(z_norm | experiment.depth_image)
 end
 
-# TODO add a simple_truncated and association_truncated?
 
 """
     smooth_posterior(params, experiment, μ_node, dev_rng)
