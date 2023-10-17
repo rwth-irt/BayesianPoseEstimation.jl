@@ -183,3 +183,56 @@ begin
 
     destroy_context(gl_context)
 end
+
+# Plot the results
+julia_tum = "scripts/rosbag/tf_world.julia_pf.tum"
+baseline_tum = "scripts/rosbag/tf_world.tracked_object.tum"
+isfile(julia_tum) ? rm(julia_tum) : nothing
+isfile(baseline_tum) ? rm(baseline_tum) : nothing
+
+bag_file = "/home/rd/code/mcmc-depth-images/data/exp_pro/pf_no_crop/bag_name=p2_li_0,posterior=association_posterior,sampler=coordinate_pf.bag"
+run(`bash -c "cd scripts/rosbag && source venv/bin/activate \
+    && source /opt/ros/noetic/setup.bash \
+    && evo_traj bag  $bag_file \
+    /tf:world.tracked_object /tf:world.julia_pf \
+    --save_as_tum --config evo_config.json"`)
+
+function load_tum_row(row)
+    t = [row.tx, row.ty, row.tz]
+    R = Quaternion(row.qw, row.qx, row.qy, row.qz)
+    row.timestamp, t, R
+end
+
+function load_tum(filename)
+    csv = CSV.File(filename; delim=" ", header=[:timestamp, :tx, :ty, :tz, :qx, :qy, :qz, :qw])
+    tuple_vec = load_tum_row.(csv)
+    first.(tuple_vec), getindex.(tuple_vec, 2), last.(tuple_vec)
+end
+
+stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
+stamp_julia = stamp_julia .- first(stamp_julia)
+t_julia = t_julia .- (first(t_julia),)
+stamp_baseline, t_baseline, R_baseline = load_tum("scripts/rosbag/tf_world.tracked_object.tum")
+stamp_baseline = stamp_baseline .- first(stamp_baseline)
+t_baseline = t_baseline .- (first(t_baseline),)
+
+
+# Plot em
+diss_defaults()
+fig = MK.Figure()
+axy = MK.Axis(fig[2, 1])
+axz = MK.Axis(fig[2, 2])
+axx = MK.Axis(fig[1, :])
+tx, ty, tz = getindex.(t_julia, 1), getindex.(t_julia, 2), getindex.(t_julia, 3)
+MK.lines!(axx, stamp_julia, tx; label="x Julia")
+MK.lines!(axy, stamp_julia, ty; label="y Julia")
+MK.lines!(axz, stamp_julia, tz; label="z Julia")
+tx, ty, tz = getindex.(t_baseline, 1), getindex.(t_baseline, 2), getindex.(t_baseline, 3)
+MK.lines!(axx, stamp_baseline, tx; label="x baseline")
+MK.lines!(axy, stamp_baseline, ty; label="xybaseline")
+MK.lines!(axz, stamp_baseline, tz; label="z baseline")
+MK.axislegend(axx, position=:rb)
+display(fig)
+
+isfile(julia_tum) ? rm(julia_tum) : nothing
+isfile(baseline_tum) ? rm(baseline_tum) : nothing
