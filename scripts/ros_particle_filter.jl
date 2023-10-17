@@ -174,7 +174,7 @@ for row in eachrow(raw_df)
     # Plot em
     diss_defaults()
     fig = MK.Figure(resolution=(DISS_WIDTH, DISS_WIDTH / 1.5))
-    ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="replace automatically")
+    ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="Sampler: $(row.sampler), model: $(row.posterior)")
     MK.lines!(ax, stamp_baseline, t_err_baseline * 1e3; label="baseline")
     MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
     MK.axislegend(ax, position=:lt)
@@ -183,6 +183,8 @@ for row in eachrow(raw_df)
     MK.lines!(ax, stamp_baseline, rad2deg.(R_err_baseline); label="baseline")
     MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
     display(fig)
+    mkpath(joinpath("plots", "pf"))
+    save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior).pdf"), fig)
 
     isfile(julia_tum) ? rm(julia_tum) : nothing
     isfile(baseline_tum) ? rm(baseline_tum) : nothing
