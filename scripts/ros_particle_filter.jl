@@ -2,13 +2,18 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO test other experiments before merge
-# include("../src/MCMCDepth.jl")
+"""
+Runs the particle filters on the at - Automatisierungstechnik test set.
+Running the evo_traj shell command gets stuck when used in run.sh.
+Since this script does not take too long, it should not matter. 
+"""
+
+using DrWatson
+@quickactivate("MCMCDepth")
 
 using Accessors
 using CSV
 using DataFrames
-using DrWatson
 using FileIO
 using LinearAlgebra
 using MCMCDepth
@@ -25,12 +30,12 @@ using Logging: global_logger
 global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
-bag_name = ["p2_li_0", "p2_li_25_50"]
+bag_name = ["p2_li_0", "p2_li_25_50", "p2_li_50_95"]
 # NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
 # NOTE simple most stable, association and smooth smoother.
-posterior = [:simple_posterior, :association_posterior, :smooth_posterior]
+posterior = [:simple_posterior, :association_posterior] #, :smooth_posterior]
 configs = dict_list(@dict bag_name sampler posterior)
 
 function pf_inference(config)
@@ -159,6 +164,7 @@ for row in eachrow(raw_df)
         && evo_traj bag  $result_bag \
         /tf:world.tracked_object /tf:world.julia_pf \
         --save_as_tum --config evo_config.json"`)
+    println("hello")
 
     stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
     stamp_julia = stamp_julia .- first(stamp_julia)
@@ -190,39 +196,37 @@ for row in eachrow(raw_df)
     isfile(baseline_tum) ? rm(baseline_tum) : nothing
 end
 
-# TODO plot translation and orientation errors aligned to origin
+# # Plot ESS
+# begin
+#     # NOTE looks like smooth_posterior degrades ESS / really focuses on one
+#     # NOTE coordinate PF has way less sample degeneration
+#     states = row.states
+#     MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
+# end
 
-# Plot ESS
-begin
-    # NOTE looks like smooth_posterior degrades ESS / really focuses on one
-    # NOTE coordinate PF has way less sample degeneration
-    states = row.states
-    MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
-end
+# # Poses ontop of depth image
+# begin
+#     rosbag_dir = datadir("rosbags", row.bag_name)
+#     rosbag = load(joinpath(rosbag_dir, "original.bag"))
 
-# Poses ontop of depth image
-begin
-    rosbag_dir = datadir("rosbags", row.bag_name)
-    rosbag = load(joinpath(rosbag_dir, "original.bag"))
+#     depth_imgs = @. rosbag["/camera/depth/image_rect_raw"] |> ros_depth_img
+#     parameters = row.parameters
+#     gl_context = render_context(parameters)
+#     mesh = upload_mesh(gl_context, joinpath(rosbag_dir, "track.obj"))
+#     camera = rosbag["/camera/depth/camera_info"] |> first |> CvCamera
+#     scene = Scene(camera, [mesh])
+#     experiment = Experiment(gl_context, scene, 0.5, fill(0, 3), one(Quaternion), first(depth_imgs))
 
-    depth_imgs = @. rosbag["/camera/depth/image_rect_raw"] |> ros_depth_img
-    parameters = row.parameters
-    gl_context = render_context(parameters)
-    mesh = upload_mesh(gl_context, joinpath(rosbag_dir, "track.obj"))
-    camera = rosbag["/camera/depth/camera_info"] |> first |> CvCamera
-    scene = Scene(camera, [mesh])
-    experiment = Experiment(gl_context, scene, 0.5, fill(0, 3), one(Quaternion), first(depth_imgs))
+#     diss_defaults()
+#     idx = 600
+#     img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
+#     experiment = Experiment(experiment, img)
+#     depth_img = copy(img)
+#     depth_min = minimum(depth_img)
+#     depth_img[depth_img.>1] .= 0
+#     depth_img = depth_img / maximum(depth_img)
+#     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
+#     display(fig)
 
-    diss_defaults()
-    idx = 600
-    img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
-    experiment = Experiment(experiment, img)
-    depth_img = copy(img)
-    depth_min = minimum(depth_img)
-    depth_img[depth_img.>1] .= 0
-    depth_img = depth_img / maximum(depth_img)
-    fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
-    display(fig)
-
-    destroy_context(gl_context)
-end
+#     destroy_context(gl_context)
+# end
