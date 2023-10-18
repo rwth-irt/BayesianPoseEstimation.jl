@@ -41,7 +41,7 @@ end
 Calculate the VSD (BOP18) error for a DataFrame row.
 Provide a SciGL `distance_offscreen_context` and the `δ` of the dataset.
 """
-function vsd_row(df_row, dist_context, δ)
+function vsd_row(df_row, dist_context::OffscreenContext, δ)
     if ismissing(df_row.t)
         # No prediction -> always wrong -> ∞ error
         Inf32
@@ -51,10 +51,26 @@ function vsd_row(df_row, dist_context, δ)
         es = es_pose(df_row)
         cv_camera = df_row.cv_camera
         width, height = size(dist_context.render_data)
-        depth_img = load_depth_image(df_row, width, height)
+        depth_img = to_device(dist_context, load_depth_image(df_row, width, height))
         dist_img = depth_to_distance(depth_img, cv_camera)
         # BOP19 and later use normalized version with multiple τ
         vsd_error(dist_context, cv_camera, mesh, dist_img, es, gt; δ=δ)
+    end
+end
+
+function vsd_depth_row(df_row, depth_context, δ)
+    if ismissing(df_row.t)
+        # No prediction -> always wrong -> ∞ error
+        Inf32
+    else
+        mesh = load_mesh_eval(df_row)
+        gt = gt_pose(df_row)
+        es = es_pose(df_row)
+        cv_camera = df_row.cv_camera
+        width, height = size(depth_context.render_data)
+        depth_img = to_device(depth_context, load_depth_image(df_row, width, height))
+        # BOP19 and later use normalized version with multiple τ
+        vsd_error(depth_context, cv_camera, mesh, depth_img, es, gt; δ=δ)
     end
 end
 
@@ -182,7 +198,7 @@ function calc_n_match_errors(dist_context, experiment_name, config)
     filter!(:gt_t => (x -> !ismissing(x)), df)
 
     # Calculate different error metrics
-    # Different VSD δ for visible surface in ITODD & steri
+    # Different VSD δ for visible surface in ITODD & Steri
     vsd_δ = contains(dataset, "itodd") || contains(dataset, "steri") ? ITODD_δ : BOP_δ |> Float32
     # WARN do not parallelize using ThreadsX, OpenGL is sequential
     df.vsd = map(row -> vsd_row(row, dist_context, vsd_δ), eachrow(df))

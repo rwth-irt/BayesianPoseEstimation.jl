@@ -30,11 +30,11 @@ struct Experiment{T}
 
         Automatically transfers `prior_o` `depth_image` to the device of the `gl_context`.
     """
-    function Experiment(gl_context::OffscreenContext{<:Any,<:Any,A}, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {A,T}
-        device_img = Base.typename(A).wrapper(depth_image)
+    function Experiment(gl_context::OffscreenContext, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {T}
+        device_img = to_device(gl_context, depth_image)
         # can also be a scalar
         if prior_o isa AbstractArray
-            prior_o = Base.typename(A).wrapper(prior_o)
+            prior_o = to_device(gl_context, prior_o)
         end
         indices = device_img .<= 0
         device_img[indices] .= typemax(T)

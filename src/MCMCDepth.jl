@@ -195,8 +195,10 @@ export ros_pose
 export adds_row
 export vsd_row
 export vsdbop_row
+export vsd_depth_row
 
 export evaluate_errors
+export match_obj_errors
 export mean_step_time
 export my_parse_savename, my_savename
 export step_time_50px, step_time_100px, step_time_200px
