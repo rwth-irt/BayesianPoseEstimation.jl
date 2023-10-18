@@ -69,6 +69,7 @@ function pf_inference(config)
     # NOTE low value crucial for best performance
     prior_o = 0.5f0
     @reset parameters.pixel_σ = 0.001
+    @reset parameters.associations_σ = parameters.pixel_σ
     @reset parameters.proposal_σ_t = fill(1e-3, 3)
     @reset parameters.proposal_σ_r = fill(1e-3, 3)
 
