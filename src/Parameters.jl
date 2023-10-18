@@ -3,6 +3,7 @@
 # All rights reserved. 
 
 using Accessors
+using Quaternions
 
 """
     Experiment
@@ -23,19 +24,29 @@ struct Experiment{T}
     depth_image
 
     """
-    Experiment(gl_context, scene, prior_o, prior_t, depth_image)
+    Experiment(gl_context, scene, prior_o, prior_t, prior_r, depth_image)
         Preprocesses the data before setting up the experiment:
         All pixels with depth 0 are replaced with infinity so all probability densities except the long tail are zero.
 
-        Automatically transfers `depth_image` to the device of the `gl_context`.
+        Automatically transfers `prior_o` `depth_image` to the device of the `gl_context`.
     """
     function Experiment(gl_context::OffscreenContext{<:Any,<:Any,A}, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {A,T}
         device_img = Base.typename(A).wrapper(depth_image)
+        # can also be a scalar
+        if prior_o isa AbstractArray
+            prior_o = Base.typename(A).wrapper(prior_o)
+        end
         indices = device_img .<= 0
         device_img[indices] .= typemax(T)
         new{T}(gl_context, scene, prior_o, prior_t, prior_r, device_img)
     end
 end
+
+"""
+    Experiment(gl_context, scene, prior_o, prior_t, depth_image)
+Defaults the prior_r to the identity quaternion.
+"""
+Experiment(gl_context::OffscreenContext, scene, prior_o, prior_t, depth_image::AbstractMatrix) = Experiment(gl_context, scene, prior_o, prior_t, one(Quaternion), depth_image)
 
 """
     Experiment(experiment, depth_image)

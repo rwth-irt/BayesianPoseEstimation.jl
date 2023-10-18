@@ -36,7 +36,7 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-sampler = [:smc_bootstrap, :smc_forward, :smc_mh]
+sampler = [:smc_bootstrap, :smc_mh]
 n_particles = [10, 50, 100, 250]
 pose_time = [0.05, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.9, 1.2]
 configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
@@ -202,6 +202,6 @@ function plot_sampler(sampler_name, recalls, times)
     save(joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"), fig)
 end
 
-for sampler_name in ["smc_bootstrap", "smc_forward", "smc_mh"]
+for sampler_name in ["smc_bootstrap", "smc_mh"]
     plot_sampler(sampler_name, recalls, times)
 end

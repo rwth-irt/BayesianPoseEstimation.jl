@@ -31,20 +31,19 @@ import CairoMakie as MK
 img_sizes = [25, 50, 100]
 for img_size in img_sizes
     experiment_name = "inference_time_$img_size"
-    sampler = [:mtm_sampler, :smc_bootstrap, :smc_forward, :smc_mh]
+    sampler = [:mtm_sampler, :smc_bootstrap, :smc_mh]
     configs = dict_list(@dict sampler)
 
     # Context
     BenchmarkTools.DEFAULT_PARAMETERS.seconds = 1
     CUDA.allowscalar(false)
     parameters = Parameters()
-    cpu_rng = Random.default_rng(parameters)
-    dev_rng = device_rng(parameters)
-
     @reset parameters.width = img_size
     @reset parameters.height = img_size
     @reset parameters.depth = 500
     @reset parameters.device = :CUDA
+    cpu_rng = Random.default_rng(parameters)
+    dev_rng = device_rng(parameters)
     gl_context = render_context(parameters)
 
     # Fake observation
@@ -60,7 +59,7 @@ for img_size in img_sizes
     scene = Scene(camera, [mesh])
     pose = Pose([0.0f0, 0.0f0, 2.5f0], QuatRotation{Float32}(0.8535534, 0.1464466, 0.3535534, 0.3535534))
     depth_img = render(gl_context, scene, pose) |> copy
-    mask_img = depth_img .> 0
+    mask_img = (depth_img .> 0) .|> Float32
 
     # Probabilistic model
     experiment = Experiment(gl_context, Scene(camera, [mesh]), mask_img, pose.translation.translation, depth_img)
@@ -71,7 +70,7 @@ for img_size in img_sizes
         cpu_rng = Random.default_rng(parameters)
         @unpack sampler = config
 
-        n_particles = [1, 10:10:500...]
+        n_particles = [2, 10:10:500...]
         trials = Vector{BenchmarkTools.Trial}(undef, length(n_particles))
         @progress "$sampler" for (idx, particles) in enumerate(n_particles)
             @reset parameters.n_particles = particles
@@ -94,7 +93,7 @@ for img_size in img_sizes
 
     # Visualize and save plot
     diss_defaults()
-    samplers = ["mtm_sampler", "smc_bootstrap", "smc_forward", "smc_mh"]
+    samplers = ["mtm_sampler", "smc_bootstrap", "smc_mh"]
     labels = ["MTM", "SMC bootstrap", "SMC forward", "SMC MH"]
 
     function draw_samplers!(axis, samplers, labels)

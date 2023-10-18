@@ -105,7 +105,6 @@ posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 parameters = smc_parameters()
 sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
-# sampler = smc_forward(cpu_rng, parameters, posterior)
 
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
