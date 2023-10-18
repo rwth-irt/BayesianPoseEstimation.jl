@@ -69,7 +69,7 @@ function pf_inference(config)
     # NOTE low value crucial for best performance
     prior_o = 0.5f0
     @reset parameters.pixel_σ = 0.001
-    @reset parameters.associations_σ = parameters.pixel_σ
+    @reset parameters.association_σ = parameters.pixel_σ
     @reset parameters.proposal_σ_t = fill(1e-3, 3)
     @reset parameters.proposal_σ_r = fill(1e-3, 3)
 
@@ -165,7 +165,6 @@ for row in eachrow(raw_df)
         && evo_traj bag  $result_bag \
         /tf:world.tracked_object /tf:world.julia_pf \
         --save_as_tum --config evo_config.json"`)
-    println("hello")
 
     stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
     stamp_julia = stamp_julia .- first(stamp_julia)

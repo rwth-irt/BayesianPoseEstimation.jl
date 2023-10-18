@@ -162,7 +162,7 @@ function run_hyperopt(config)
         @reset parameters.n_steps = floor(Int, 0.5 / step_time)
 
         # LHSampler requires that the candidate vectors have the length of the resources
-        resources = 2
+        resources = 100
         ho = @hyperopt for i = resources,
             sampler = LHSampler(),
             c_reg = LinRange(5, 50, resources),
