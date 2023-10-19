@@ -28,9 +28,11 @@ Analysis in `world` frame as the object was static and only the robot was moving
 * data/
   * rosbags/
     * {experiment}>/
-      * original.bag - `rosbag decompress original.bag` for improved performance
-      * tf_camera_depth_optical_frame.tracked_object.tum
-      * track.obj
+      * *at_result.bag* - contains the `pose/only_pf` and `pose/robot_pf` from the at paper (Übelhör 2020)
+      * *original.bag* - `rosbag decompress original.bag` for improved performance
+      * *pose_only_pf.tum* & *pose_robot_pf.tum* are extracted from *at_result.bag* via *at_to_tum.sh* in the world frame
+      * *tf_camera_depth_optical_frame.tracked_object.tum* the robot pf in the camera frame for initialization
+      * *track.obj* use this model for tracking
   * exp_raw/pf/
     * {configuration}.jld2
   * exp_pro/pf/

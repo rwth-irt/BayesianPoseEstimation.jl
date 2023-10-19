@@ -30,6 +30,7 @@ using Logging: global_logger
 global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
+# TODO p2_li_0 only contain half the data?
 bag_name = ["p2_li_0", "p2_li_25_50", "p2_li_50_95"]
 # NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
 # WARN do not crop - shaky due to discretization error
@@ -162,8 +163,7 @@ for row in eachrow(raw_df)
     result_bag = first(splitext(tum_file)) * ".bag"
     run(`bash -c "cd scripts/rosbag && source venv/bin/activate \
         && source /opt/ros/noetic/setup.bash \
-        && evo_traj bag  $result_bag \
-        /tf:world.tracked_object /tf:world.julia_pf \
+        && evo_traj bag  $result_bag /tf:world.julia_pf \
         --save_as_tum --config evo_config.json"`)
 
     stamp_julia, t_julia, R_julia = load_tum("scripts/rosbag/tf_world.julia_pf.tum")
@@ -171,22 +171,31 @@ for row in eachrow(raw_df)
     t_julia = t_julia .- (first(t_julia),)
     t_err_julia = norm.(t_julia)
     R_err_julia = quat_dist.(first(R_julia), R_julia)
-    stamp_baseline, t_baseline, R_baseline = load_tum("scripts/rosbag/tf_world.tracked_object.tum")
-    stamp_baseline = stamp_baseline .- first(stamp_baseline)
-    t_baseline = t_baseline .- (first(t_baseline),)
-    t_err_baseline = norm.(t_baseline)
-    R_err_baseline = quat_dist.(first(R_baseline), R_baseline)
+    stamp_robot, t_robot, R_robot = load_tum(joinpath("data", "rosbags", row.bag_name, "pose_robot_pf.tum"))
+    stamp_robot = stamp_robot .- first(stamp_robot)
+    t_robot = t_robot .- (first(t_robot),)
+    t_err_robot = norm.(t_robot)
+    R_err_robot = quat_dist.(first(R_robot), R_robot)
+    stamp_only, t_only, R_only = load_tum(joinpath("data", "rosbags", row.bag_name, "pose_only_pf.tum"))
+    stamp_only, t_only, R_only = stamp_only[5:end], t_only[5:end], R_only[5:end]
+    stamp_only = stamp_only .- first(stamp_only)
+    t_only = t_only .- (first(t_only),)
+    t_err_only = norm.(t_only)
+    R_err_only = quat_dist.(first(R_only), R_only)
+
 
     # Plot em
     diss_defaults()
     fig = MK.Figure(resolution=(DISS_WIDTH, DISS_WIDTH / 1.5))
     ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="Sampler: $(row.sampler), model: $(row.posterior)")
-    MK.lines!(ax, stamp_baseline, t_err_baseline * 1e3; label="baseline")
+    MK.lines!(ax, stamp_robot, t_err_robot * 1e3; label="at robot")
+    MK.lines!(ax, stamp_only, t_err_only * 1e3; label="at only")
     MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
     MK.axislegend(ax, position=:lt)
 
     ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")
-    MK.lines!(ax, stamp_baseline, rad2deg.(R_err_baseline); label="baseline")
+    MK.lines!(ax, stamp_robot, rad2deg.(R_err_robot); label="at robot")
+    MK.lines!(ax, stamp_only, rad2deg.(R_err_only); label="at only")
     MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
     display(fig)
     mkpath(joinpath("plots", "pf"))

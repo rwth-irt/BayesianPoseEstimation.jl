@@ -2,7 +2,7 @@
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "46f8ac0f486ac28faf3b6d1e0cef3ca687ae97f7"
+project_hash = "3875bc75ba094e7c21ec6175c3f710d226905ae0"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -791,17 +791,17 @@ git-tree-sha1 = "129acf094d168394e80ee1dc4bc06ec835e510a3"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
 version = "2.8.1+1"
 
+[[deps.HyperTuning]]
+deps = ["Distributed", "PrettyTables", "Printf", "Random", "Reexport", "SearchSpaces", "Statistics", "UnPack"]
+git-tree-sha1 = "228a7dffe96f5bcd1dcac253c2b3c3efdced0a0d"
+uuid = "ddfa78db-9111-4329-a6bd-d4ed85ceb229"
+version = "0.1.2"
+
 [[deps.HypergeometricFunctions]]
 deps = ["DualNumbers", "LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
 git-tree-sha1 = "f218fe3736ddf977e0e772bc9a586b2383da2685"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.23"
-
-[[deps.Hyperopt]]
-deps = ["Distributed", "Distributions", "LatinHypercubeSampling", "LinearAlgebra", "MacroTools", "MultiKDE", "Printf", "ProgressMeter", "Random", "RecipesBase", "Requires", "Setfield", "Statistics", "Test", "ThreadPools"]
-git-tree-sha1 = "d9297ef5114aa18b71148b5f9a9444084ac2006c"
-uuid = "93e5fe13-2215-51db-baaf-2e9a34fb2712"
-version = "0.5.6"
 
 [[deps.IfElse]]
 git-tree-sha1 = "debdd00ffef04665ccbb3e150747a77560e8fad1"
@@ -1049,12 +1049,6 @@ git-tree-sha1 = "f2355693d6778a178ade15952b7ac47a4ff97996"
 uuid = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 version = "1.3.0"
 
-[[deps.LatinHypercubeSampling]]
-deps = ["Random", "StableRNGs", "StatsBase", "Test"]
-git-tree-sha1 = "825289d43c753c7f1bf9bed334c253e9913997f8"
-uuid = "a5e1c1ea-c99a-51d3-a14d-a9a37257b02d"
-version = "1.9.0"
-
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
 uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
@@ -1273,12 +1267,6 @@ version = "0.3.4"
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2022.10.11"
-
-[[deps.MultiKDE]]
-deps = ["Distributions"]
-git-tree-sha1 = "8a48220d6d724d2b2bf3aaa95384eade42905031"
-uuid = "77543b7f-bd95-4024-91c1-46775346e0e7"
-version = "0.1.1"
 
 [[deps.Multisets]]
 git-tree-sha1 = "8d852646862c96e226367ad10c8af56099b4047e"
@@ -1717,6 +1705,12 @@ git-tree-sha1 = "30449ee12237627992a99d5e30ae63e4d78cd24a"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
 version = "1.2.0"
 
+[[deps.SearchSpaces]]
+deps = ["Combinatorics", "Random"]
+git-tree-sha1 = "6978155ac93d84bf6b5c9d85eeb518e6bb0a9db5"
+uuid = "eb7571c6-2196-4f03-99b8-52a5a35b3163"
+version = "0.1.3"
+
 [[deps.SentinelArrays]]
 deps = ["Dates", "Random"]
 git-tree-sha1 = "04bdff0b09c65ff3e06a05e3eb7b120223da3d39"
@@ -1835,12 +1829,6 @@ deps = ["Compat", "SHA", "Tables", "TupleTools"]
 git-tree-sha1 = "19df33ca14f24a3ad2df9e89124bd5f5cc8467a2"
 uuid = "c5dd0088-6c3f-4803-b00e-f31a60c170fa"
 version = "1.0.1"
-
-[[deps.StableRNGs]]
-deps = ["Random", "Test"]
-git-tree-sha1 = "3be7d49667040add7ee151fefaf1f8c04c8c8276"
-uuid = "860ef19b-820b-49d6-a774-d7a799459cd3"
-version = "1.0.0"
 
 [[deps.StackViews]]
 deps = ["OffsetArrays"]
