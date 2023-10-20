@@ -31,12 +31,12 @@ global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
 # TODO p2_li_0 only contain half the data?
-bag_name = ["p2_li_0", "p2_li_25_50", "p2_li_50_95"]
+bag_name = ["p2_li_25_50", "p2_li_50_95"] # , "p2_li_0"]
 # NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
 # NOTE simple most stable, association and smooth smoother.
-posterior = [:simple_posterior, :association_posterior] #, :smooth_posterior]
+posterior = [:simple_posterior, :smooth_posterior, :smooth_simple_posterior]
 configs = dict_list(@dict bag_name sampler posterior)
 
 function pf_inference(config)
@@ -61,8 +61,9 @@ function pf_inference(config)
     # Context
     parameters = Parameters()
     # Coordinate PF evaluates the likelihood twice
+    # Targets 90Hz of Intel Realsense cameras
     if sampler == :bootstrap_pf
-        @reset parameters.n_particles = 1000
+        @reset parameters.n_particles = 900
     elseif sampler == :coordinate_pf
         @reset parameters.n_particles = 400
     end
@@ -107,7 +108,6 @@ end
     @produce_or_load(pf_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
 
-# TODO move to ExperimentUtils
 # Convert results to TUM for processing in evo
 function parse_config(path)
     config = my_parse_savename(path)
@@ -127,6 +127,25 @@ run(`bash -c """cd scripts/rosbag \
 
 exp_pro = datadir("exp_pro", "pf")
 mkpath(exp_pro)
+
+function pf_title(sampler, posterior)
+    sampler_str = model_str = ""
+    if sampler == "bootstrap_pf"
+        sampler_str = "Sampler: bootstrap, "
+    elseif sampler == "coordinate_pf"
+        sampler_str = "sampler: coordinate, "
+    end
+    if posterior == "simple_posterior"
+        model_str = "exponential: unmodified, regularization: Lₚₓ"
+    elseif posterior == "association_posterior"
+        model_str = "exponential: unmodified, regularization: L₀"
+    elseif posterior == "smooth_posterior"
+        model_str = "exponential: smooth, regularization: Lₚₓ"
+    elseif posterior == "smooth_simple_posterior"
+        model_str = "exponential: smooth, regularization: L₀"
+    end
+    sampler_str * model_str
+end
 
 for row in eachrow(raw_df)
     rosbag_dir = datadir("rosbags", row.bag_name)
@@ -186,8 +205,8 @@ for row in eachrow(raw_df)
 
     # Plot em
     diss_defaults()
-    fig = MK.Figure(resolution=(DISS_WIDTH, DISS_WIDTH / 1.5))
-    ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title="Sampler: $(row.sampler), model: $(row.posterior)")
+    fig = MK.Figure(resolution=(DISS_WIDTH, 0.55 * DISS_WIDTH))
+    ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title=pf_title(row.sampler, row.posterior))
     MK.lines!(ax, stamp_robot, t_err_robot * 1e3; label="at robot")
     MK.lines!(ax, stamp_only, t_err_only * 1e3; label="at only")
     MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
