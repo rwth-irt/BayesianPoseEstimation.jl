@@ -9,11 +9,12 @@ using Accessors
 using BenchmarkTools
 using CUDA
 using DataFrames
-using Hyperopt
 using MCMCDepth
 using PoseErrors
 using Random
 using SciGL
+# Avoid conflicts
+import HyperTuning: HyperTuning, BCAPSampler, GridSampler, Scenario, history, best_parameters, (..), default_stop_criteria
 
 using Logging
 using ProgressLogging
@@ -24,10 +25,11 @@ CUDA.allowscalar(false)
 experiment_name = "smc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
-dataset = ["lm", "tless", "itodd", "steri"]
+dataset = ["lm", "itodd"] #, "tless", "steri"]
+optsampler = [:BCAPSampler]
 testset = "train_pbr"
 scene_id = 0
-configs = dict_list(@dict dataset testset scene_id)
+configs = dict_list(@dict dataset testset scene_id optsampler)
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
@@ -80,7 +82,7 @@ Returns (1 - VSD recall) as the costs for the hyperparameter optimization.
 Pass the scene_df to avoid loading it twice.
 """
 function cost_function(parameters, gl_context, config, scene_df)
-    @unpack dataset, testset, scene_id = config
+    HyperTuning.@unpack dataset, testset, scene_id = config
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     est_df = select(scene_df, :scene_id, :img_id, :obj_id)
     est_df.score = Vector{Float32}(undef, nrow(est_df))
@@ -148,7 +150,7 @@ run_hyperopt(config)
 """
 function run_hyperopt(config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id = config
+    @unpack dataset, testset, scene_id, optsampler = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
     # Finally destroy OpenGL context
@@ -161,23 +163,33 @@ function run_hyperopt(config)
         step_time = mean_step_time(rng, posterior, sampler)
         @reset parameters.n_steps = floor(Int, 0.5 / step_time)
 
-        # LHSampler requires that the candidate vectors have the length of the resources
-        resources = 100
-        ho = @hyperopt for i = resources,
-            sampler = LHSampler(),
-            c_reg = LinRange(5, 50, resources),
-            σ_t = LinRange(0.001, 0.1, resources),
-            proposal_σ_r = LinRange(0.01, 0.5, resources),
-            o_mask_is = LinRange(0.51, 0.99, resources)
-
-            println(i, "\t", c_reg, "\t", σ_t, "\t", proposal_σ_r, "\t", o_mask_is, "\t")
+        # Capture local parameters in this closure which suffices the HyperTuning interface
+        function objective(trial)
+            @unpack c_reg, σ_t, proposal_σ_r, pixel_σ = trial
             @reset parameters.c_reg = c_reg
             @reset parameters.σ_t = fill(σ_t, 3)
             @reset parameters.proposal_σ_r = fill(proposal_σ_r, 3)
-            @reset parameters.o_mask_is = o_mask_is
-            @show cost_function(parameters, gl_context, config, scene_df)
+            @reset parameters.pixel_σ = pixel_σ
+            @reset parameters.association_σ = pixel_σ
+            cost_function(parameters, gl_context, config, scene_df)
         end
-        Dict("hyperopt" => ho)
+        max_trials = 150
+        scenario = Scenario(
+            c_reg=(5.0 .. 100.0),
+            σ_t=(0.005 .. 0.1),
+            pixel_σ=(0.001 .. 0.1),
+            proposal_σ_r=(0.05 .. 1.0),
+            sampler=eval(optsampler)(),
+            max_trials=max_trials,
+            batch_size=1    # No support for multiple OpenGL contexts
+        )
+        @progress "optimizer $optsampler" for _ in 1:max_trials
+            if default_stop_criteria(scenario)
+                break
+            end
+            HyperTuning.optimize!(objective, scenario)
+        end
+        Dict("scenario" => scenario)
     finally
         # If not destroyed, weird stuff happens
         destroy_context(gl_context)
@@ -189,4 +201,12 @@ end
 end
 
 # TODO analyze and plot results
-# pro_df = collect_results(result_dir)
+pro_df = collect_results(result_dir)
+
+for row in eachrow(pro_df)
+    scenario = row.scenario
+    hist = history(scenario)
+    println(row.path)
+    show(best_parameters(scenario))
+end
+
