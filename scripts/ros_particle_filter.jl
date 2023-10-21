@@ -139,7 +139,7 @@ function pf_title(bag_name, sampler, posterior, fps)
         occ_string = "Occlusion: 50-95%, "
     end
     if sampler == "bootstrap_pf"
-        sampler_str = "jointly, "
+        sampler_str = "joint, "
     elseif sampler == "coordinate_pf"
         sampler_str = "block-wise, "
     end
