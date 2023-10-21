@@ -64,21 +64,22 @@ function pf_inference(config)
     # Coordinate PF evaluates the likelihood twice
     # Targets 90Hz of Intel Realsense cameras
     if sampler == :bootstrap_pf
-        @reset parameters.n_particles = 900
+        @reset parameters.n_particles = 800
     elseif sampler == :coordinate_pf
-        @reset parameters.n_particles = 420
+        @reset parameters.n_particles = 400
     end
     @reset parameters.relative_ess = 0.5
     # NOTE low value crucial for best performance
     prior_o = 0.5f0
     @reset parameters.pixel_σ = 0.001
-    @reset parameters.max_depth = 5
+    @reset parameters.min_depth = 0.15
+    @reset parameters.max_depth = 10
     @reset parameters.association_σ = parameters.pixel_σ
     @reset parameters.proposal_σ_t = fill(1e-3, 3)
     @reset parameters.proposal_σ_r = fill(1e-3, 3)
 
-    @reset parameters.width = 50
-    @reset parameters.height = 50
+    @reset parameters.width = 80
+    @reset parameters.height = 60
     @reset parameters.depth = parameters.n_particles
     gl_context = render_context(parameters)
 
@@ -224,9 +225,9 @@ for row in eachrow(raw_df)
     # NOTE looks like smooth_posterior degrades ESS / really focuses on one
     # NOTE coordinate PF has way less sample degeneration
     states = row.states
-    ax = MK.Axis(fig[2, 2]; xlabel="iteration", ylabel="Relative ESS")
+    ax = MK.Axis(fig[2, 2]; xlabel="iteration", ylabel="relative ESS", limits=(nothing, (0, 1)))
     MK.lines!(ax, 1:length(states), exp.(getproperty.(states, :log_relative_ess)); label="smc pf")
-    MK.axislegend(ax, position=:rt)
+    MK.axislegend(ax, position=:lt)
 
     # position
     ax = MK.Axis(fig[1, :]; ylabel="error / mm", title=pf_title(row.bag_name, row.sampler, row.posterior, row.fps))
