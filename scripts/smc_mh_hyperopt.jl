@@ -173,11 +173,11 @@ function run_hyperopt(config)
             @reset parameters.association_σ = pixel_σ
             cost_function(parameters, gl_context, config, scene_df)
         end
-        max_trials = 150
+        max_trials = 250
         scenario = Scenario(
             c_reg=(5.0 .. 100.0),
-            σ_t=(0.005 .. 0.1),
-            pixel_σ=(0.001 .. 0.1),
+            σ_t=(0.005 .. 0.5),
+            pixel_σ=(0.0001 .. 0.1),
             proposal_σ_r=(0.05 .. 1.0),
             sampler=eval(optsampler)(),
             max_trials=max_trials,

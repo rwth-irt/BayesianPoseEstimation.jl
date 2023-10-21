@@ -81,8 +81,8 @@ function coordinate_pf_sampler(cpu_rng, params, posterior)
     t_kernel = BootstrapKernel(t_proposal)
     r_kernel = BootstrapKernel(r_proposal)
     CoordinateSampler(
-        SequentialMonteCarlo(t_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles)),
-        SequentialMonteCarlo(r_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles)))
+        SequentialMonteCarlo(t_kernel, temp_schedule, params.n_particles, log(params.relative_ess)),
+        SequentialMonteCarlo(r_kernel, temp_schedule, params.n_particles, log(params.relative_ess)))
 end
 
 function bootstrap_pf_sampler(cpu_rng, params, posterior)
@@ -94,7 +94,7 @@ function bootstrap_pf_sampler(cpu_rng, params, posterior)
     # TODO it is possible to use this interface but I really have to bend it to my will... redesign!
     tr_proposal = Proposal(propose_tr_dyn, transition_probability_symmetric, (; t=t_sym, r=r_sym), parents(posterior.prior, :t), (; t=ZeroIdentity(), r=ZeroIdentity()), bijector(posterior))
     tr_kernel = BootstrapKernel(tr_proposal)
-    SequentialMonteCarlo(tr_kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+    SequentialMonteCarlo(tr_kernel, temp_schedule, params.n_particles, log(params.relative_ess))
 end
 
 """

@@ -18,6 +18,7 @@ using FileIO
 using LinearAlgebra
 using MCMCDepth
 using PoseErrors
+using Printf
 using Quaternions
 using Random
 using RobotOSData
@@ -36,7 +37,7 @@ bag_name = ["p2_li_25_50", "p2_li_50_95"] # , "p2_li_0"]
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
 # NOTE simple most stable, association and smooth smoother.
-posterior = [:simple_posterior, :smooth_posterior, :smooth_simple_posterior]
+posterior = [:simple_posterior, :smooth_posterior, :smooth_simple_posterior, :association_posterior]
 configs = dict_list(@dict bag_name sampler posterior)
 
 function pf_inference(config)
@@ -65,12 +66,13 @@ function pf_inference(config)
     if sampler == :bootstrap_pf
         @reset parameters.n_particles = 900
     elseif sampler == :coordinate_pf
-        @reset parameters.n_particles = 400
+        @reset parameters.n_particles = 420
     end
     @reset parameters.relative_ess = 0.5
     # NOTE low value crucial for best performance
     prior_o = 0.5f0
     @reset parameters.pixel_σ = 0.001
+    @reset parameters.max_depth = 5
     @reset parameters.association_σ = parameters.pixel_σ
     @reset parameters.proposal_σ_t = fill(1e-3, 3)
     @reset parameters.proposal_σ_r = fill(1e-3, 3)
@@ -128,23 +130,28 @@ run(`bash -c """cd scripts/rosbag \
 exp_pro = datadir("exp_pro", "pf")
 mkpath(exp_pro)
 
-function pf_title(sampler, posterior)
-    sampler_str = model_str = ""
+function pf_title(bag_name, sampler, posterior, fps)
+    occ_string = sampler_str = model_str = ""
+    if contains(bag_name, "25_50")
+        occ_string = "25-50% occlusion, "
+    elseif contains(bag_name, "50_95")
+        occ_string = "Occlusion: 50-95%, "
+    end
     if sampler == "bootstrap_pf"
-        sampler_str = "Sampler: bootstrap, "
+        sampler_str = "jointly, "
     elseif sampler == "coordinate_pf"
-        sampler_str = "sampler: coordinate, "
+        sampler_str = "block-wise, "
     end
     if posterior == "simple_posterior"
-        model_str = "exponential: unmodified, regularization: Lₚₓ"
+        model_str = "unmodified, "
     elseif posterior == "association_posterior"
-        model_str = "exponential: unmodified, regularization: L₀"
+        model_str = "unmodified & classification, "
     elseif posterior == "smooth_posterior"
-        model_str = "exponential: smooth, regularization: Lₚₓ"
+        model_str = "smooth truncated & classification, "
     elseif posterior == "smooth_simple_posterior"
-        model_str = "exponential: smooth, regularization: L₀"
+        model_str = "smooth truncated, "
     end
-    sampler_str * model_str
+    occ_string * sampler_str * model_str * "$(round(Int, fps))Hz"
 end
 
 for row in eachrow(raw_df)
@@ -206,20 +213,35 @@ for row in eachrow(raw_df)
     # Plot em
     diss_defaults()
     fig = MK.Figure(resolution=(DISS_WIDTH, 0.55 * DISS_WIDTH))
-    ax = MK.Axis(fig[1, 1]; ylabel="error / mm", title=pf_title(row.sampler, row.posterior))
+
+    # orientation
+    ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")
+    MK.lines!(ax, stamp_robot, rad2deg.(R_err_robot); label="previous robot")
+    MK.lines!(ax, stamp_only, rad2deg.(R_err_only); label="previous only")
+    MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
+
+    # ESS plots
+    # NOTE looks like smooth_posterior degrades ESS / really focuses on one
+    # NOTE coordinate PF has way less sample degeneration
+    states = row.states
+    ax = MK.Axis(fig[2, 2]; xlabel="iteration", ylabel="Relative ESS")
+    MK.lines!(ax, 1:length(states), exp.(getproperty.(states, :log_relative_ess)); label="smc pf")
+    MK.axislegend(ax, position=:rt)
+
+    # position
+    ax = MK.Axis(fig[1, :]; ylabel="error / mm", title=pf_title(row.bag_name, row.sampler, row.posterior, row.fps))
     MK.lines!(ax, stamp_robot, t_err_robot * 1e3; label="at robot")
     MK.lines!(ax, stamp_only, t_err_only * 1e3; label="at only")
     MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
     MK.axislegend(ax, position=:lt)
 
-    ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")
-    MK.lines!(ax, stamp_robot, rad2deg.(R_err_robot); label="at robot")
-    MK.lines!(ax, stamp_only, rad2deg.(R_err_only); label="at only")
-    MK.lines!(ax, stamp_julia, rad2deg.(R_err_julia); label="smc pf")
+
+    # Final adjustment, display, save
+    MK.colsize!(fig.layout, 2, MK.Auto(0.5))
     display(fig)
     mkpath(joinpath("plots", "pf"))
     save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior).pdf"), fig)
-
+    # Remove files
     isfile(julia_tum) ? rm(julia_tum) : nothing
     isfile(baseline_tum) ? rm(baseline_tum) : nothing
 end

@@ -114,7 +114,7 @@ function smc_forward(cpu_rng, params, posterior)
     kernels = (t_sym_kernel, r_sym_kernel)
     weights = Weights([params.w_t_sym, params.w_r_sym])
     samplers = map(kernels) do kernel
-        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess))
     end
     ComposedSampler(weights, samplers...)
 end
@@ -137,7 +137,7 @@ function smc_bootstrap(cpu_rng, params, posterior)
     kernels = (t_sym_kernel, r_sym_kernel)
     weights = Weights([params.w_t_sym, params.w_r_sym])
     samplers = map(kernels) do kernel
-        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess))
     end
     ComposedSampler(weights, samplers...)
 end
@@ -173,7 +173,7 @@ function smc_mh(cpu_rng, params, posterior)
     kernels = (t_sym_kernel, r_sym_kernel, r_ind_kernel)
     weights = Weights([params.w_t_sym, params.w_r_sym, params.w_r_ind])
     samplers = map(kernels) do kernel
-        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess * params.n_particles))
+        SequentialMonteCarlo(kernel, temp_schedule, params.n_particles, log(params.relative_ess))
     end
     ComposedSampler(weights, samplers...)
 end

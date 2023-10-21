@@ -64,7 +64,6 @@ function association_posterior(params, experiment, μ_node, dev_rng)
     PosteriorModel(z_norm | experiment.depth_image)
 end
 
-
 """
     smooth_posterior(params, experiment, μ_node, dev_rng)
 A posterior model which does calculate the pixel association probability `o`.
@@ -77,8 +76,8 @@ function smooth_posterior(params, experiment, μ_node, dev_rng)
     o_fn = smooth_association_fn(params)
     # condition on data via closure
     o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (μ_node,))
-    pixel_model = smooth_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, pixel_model, (μ_node, o))
+    z_i = smooth_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
+    z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
     # NOTE seems to perform better with SimpleImageRegularization for easy scenarios but ImageLikelihoodNormalizer seems beneficial if occlusions are present
     z_norm = ModifierNode(z, dev_rng, ImageLikelihoodNormalizer | params.c_reg)
     PosteriorModel(z_norm | experiment.depth_image)
@@ -86,18 +85,15 @@ end
 
 """
     smooth_simple_posterior(params, experiment, μ_node, dev_rng)
-A posterior model which does calculate the pixel association probability `o`.
+A simple posterior model which does not calculate the pixel association probability `o` but uses a fixed prior via `params.o`.
 The pixel tail distribution is a mixture of a smoothed exponential and uniform distribution.
 Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 Uses the `SimpleImageRegularization` which considers the number of pixels in the image.
 """
 function smooth_simple_posterior(params, experiment, μ_node, dev_rng)
-    # Analytic pixel association is only a deterministic function and not a Gibbs sampler in the traditional sense. Gibbs sampler would call rand(q(o|t,r,μ)) and not fn(μ,z). Probably "collapsed Gibbs" is the correct expression for it.
-    o_fn = smooth_association_fn(params)
-    # condition on data via closure
-    o = DeterministicNode(:o, μ -> o_fn.(experiment.prior_o, μ, experiment.depth_image), (μ_node,))
-    pixel_model = smooth_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
-    z = BroadcastedNode(:z, dev_rng, pixel_model, (μ_node, o))
+    o = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
+    z_i = smooth_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
+    z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o))
     z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization | params.c_reg)
     PosteriorModel(z_norm | experiment.depth_image)
 end

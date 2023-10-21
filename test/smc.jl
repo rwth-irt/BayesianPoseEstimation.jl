@@ -44,7 +44,7 @@ kernels = (ForwardProposalKernel(proposal), BootstrapKernel(proposal), MhKernel(
 @testset "SMC kernel: $(kernel |> typeof |> nameof)" for kernel in kernels
   n_steps = 42
   n_particles = 6
-  smc = SequentialMonteCarlo(kernel, LinearSchedule(n_steps), n_particles, log(0.5 * n_particles))
+  smc = SequentialMonteCarlo(kernel, LinearSchedule(n_steps), n_particles, log(0.5))
 
   sample, state = @inferred AbstractMCMC.step(rng, posterior_model, smc)
 
@@ -80,7 +80,7 @@ end;
 
 n_steps = 42
 n_particles = 6
-smc = SequentialMonteCarlo(kernel, LinearSchedule(n_steps), n_particles, log(0.5 * n_particles))
+smc = SequentialMonteCarlo(kernel, LinearSchedule(n_steps), n_particles, log(0.5))
 
 @testset "adaptive_mvnormal" begin
   _, state = @inferred AbstractMCMC.step(rng, posterior_model, smc)
