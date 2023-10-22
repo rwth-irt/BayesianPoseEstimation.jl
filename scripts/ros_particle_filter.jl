@@ -49,13 +49,14 @@ parameters = Parameters()
 gl_context = render_context(parameters)
 @reset parameters.relative_ess = 0.5
 # NOTE low value crucial for best performance
-prior_o = 0.5f0
+prior_o = 0.9f0
 @reset parameters.pixel_σ = 0.001
 @reset parameters.min_depth = 0.15
 @reset parameters.max_depth = 10
 @reset parameters.association_σ = parameters.pixel_σ
 @reset parameters.proposal_σ_t = fill(1e-3, 3)
 @reset parameters.proposal_σ_r = fill(1e-3, 3)
+@reset parameters.velocity_decay = 0.5
 
 function pf_inference(config, gl_context, parameters)
     # Extract config and load dataset to memory so disk is no bottleneck
