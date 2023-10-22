@@ -77,7 +77,7 @@ function pf_inference(config, gl_context, parameters)
     if sampler == :bootstrap_pf
         @reset parameters.n_particles = 800
     elseif sampler == :coordinate_pf
-        @reset parameters.n_particles = 425
+        @reset parameters.n_particles = 400
     end
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
