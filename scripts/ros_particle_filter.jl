@@ -136,7 +136,7 @@ function pf_title(bag_name, sampler, posterior, fps)
     if contains(bag_name, "25_50")
         occ_string = "25-50% occlusion, "
     elseif contains(bag_name, "50_95")
-        occ_string = "Occlusion: 50-95%, "
+        occ_string = "50-95% occlusion, "
     end
     if sampler == "bootstrap_pf"
         sampler_str = "joint, "
