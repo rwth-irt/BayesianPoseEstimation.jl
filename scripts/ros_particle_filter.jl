@@ -40,7 +40,23 @@ sampler = [:coordinate_pf, :bootstrap_pf]
 posterior = [:simple_posterior, :smooth_posterior, :smooth_simple_posterior, :association_posterior]
 configs = dict_list(@dict bag_name sampler posterior)
 
-function pf_inference(config)
+# WARN frequent destruction and recreation of gl_context leads to weird behavior (nothing is rendered?)
+parameters = Parameters()
+@reset parameters.width = 80
+@reset parameters.height = 60
+@reset parameters.depth = 1_000
+gl_context = render_context(parameters)
+@reset parameters.relative_ess = 0.5
+# NOTE low value crucial for best performance
+prior_o = 0.5f0
+@reset parameters.pixel_σ = 0.001
+@reset parameters.min_depth = 0.15
+@reset parameters.max_depth = 10
+@reset parameters.association_σ = parameters.pixel_σ
+@reset parameters.proposal_σ_t = fill(1e-3, 3)
+@reset parameters.proposal_σ_r = fill(1e-3, 3)
+
+function pf_inference(config, gl_context, parameters)
     # Extract config and load dataset to memory so disk is no bottleneck
     @unpack bag_name, sampler, posterior = config
 
@@ -56,41 +72,22 @@ function pf_inference(config)
     t = [csv_row.tx, csv_row.ty, csv_row.tz]
     R = Quaternion(csv_row.qw, csv_row.qx, csv_row.qy, csv_row.qz)
 
-    # File of 3D model for tracking
-    mesh_file = joinpath(rosbag_dir, "track.obj")
-
-    # Context
-    parameters = Parameters()
     # Coordinate PF evaluates the likelihood twice
     # Targets 90Hz of Intel Realsense cameras
     if sampler == :bootstrap_pf
         @reset parameters.n_particles = 800
     elseif sampler == :coordinate_pf
-        @reset parameters.n_particles = 400
+        @reset parameters.n_particles = 425
     end
-    @reset parameters.relative_ess = 0.5
-    # NOTE low value crucial for best performance
-    prior_o = 0.5f0
-    @reset parameters.pixel_σ = 0.001
-    @reset parameters.min_depth = 0.15
-    @reset parameters.max_depth = 10
-    @reset parameters.association_σ = parameters.pixel_σ
-    @reset parameters.proposal_σ_t = fill(1e-3, 3)
-    @reset parameters.proposal_σ_r = fill(1e-3, 3)
-
-    @reset parameters.width = 80
-    @reset parameters.height = 60
-    @reset parameters.depth = parameters.n_particles
-    gl_context = render_context(parameters)
-
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
 
+    # File of 3D model for tracking
+    mesh_file = joinpath(rosbag_dir, "track.obj")
     mesh = load(mesh_file)
     diameter = model_diameter(mesh)
     scene_mesh = upload_mesh(gl_context, mesh)
     scene = Scene(camera, [scene_mesh])
-
     experiment = Experiment(gl_context, scene, prior_o, t, R, first(depth_imgs))
 
     # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
@@ -101,15 +98,16 @@ function pf_inference(config)
     end
     fps = length(depth_imgs) / elaps
 
-    destroy_context(gl_context)
     # For DrWatson
     @strdict states fps parameters
 end
 
 # RUN it
+pf_closure(config) = pf_inference(config, gl_context, parameters)
 @progress "Particle Filters" for config in configs
-    @produce_or_load(pf_inference, config, result_dir; filename=c -> savename(c; connector=","))
+    @produce_or_load(pf_closure, config, result_dir; filename=c -> savename(c; connector=","))
 end
+destroy_context(gl_context)
 
 # Convert results to TUM for processing in evo
 function parse_config(path)
