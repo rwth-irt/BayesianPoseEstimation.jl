@@ -23,6 +23,7 @@ using Quaternions
 using Random
 using RobotOSData
 using SciGL
+using StatsBase
 import CairoMakie as MK
 
 using ProgressLogging
@@ -164,10 +165,11 @@ for row in eachrow(raw_df)
 
     x, y, z, qx, qy, qz, qw = [similar(timestamp) for _ in 1:7]
     for (idx, state) in enumerate(row.states)
-        _, best_idx = findmax(loglikelihood(state.sample))
-        x[idx], y[idx], z[idx] = state.sample.variables.t[:, best_idx]
-        qw[idx] = real(state.sample.variables.r[best_idx])
-        qx[idx], qy[idx], qz[idx] = imag_part(state.sample.variables.r[best_idx])
+        t_mean = mean(state.sample.variables.t, weights(exp.(state.log_weights)); dims=2)
+        q_mean = mean(state.sample.variables.r, weights(exp.(state.log_weights)))
+        x[idx], y[idx], z[idx] = t_mean
+        qw[idx] = real(q_mean)
+        qx[idx], qy[idx], qz[idx] = imag_part(q_mean)
     end
     df = DataFrame(timestamp=timestamp, x=x, y=y, z=z, q_x=qx, q_y=qy, q_z=qz, q_w=qw)
     tum_file, _ = row.path |> basename |> splitext
