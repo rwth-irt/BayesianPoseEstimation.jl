@@ -103,8 +103,8 @@ Returns (Axis, Heatmap)
 
 See also [`plot_depth_img`](@ref)
 """
-function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels", kwargs...)
-    ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel)
+function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels", aspect=1, kwargs...)
+    ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, aspect=aspect)
     depth_hm = plot_depth_img!(ax, img, kwargs...)
     heatmap_colorbar!(figure, depth_hm; label=colorbar_label)
     ax, depth_hm
@@ -130,8 +130,8 @@ Returns (Axis, Heatmap)
 
 See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
 """
-function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="", kwargs...)
-    ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title)
+function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="", aspect=1, kwargs...)
+    ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title, aspect=aspect)
     # Plot the image as background
     MK.image!(ax, img; aspect=1)
     hm = plot_depth_img!(ax, depth_img; alpha=0.5, kwargs...)
@@ -140,11 +140,23 @@ end
 
 """
     plot_depth_ontop(img, depth_img; kwargs...)
-See [`plot_depth_ontop!`](@ref), also [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
+See [`plot_depth_ontop!`](@ref).
 """
 function plot_depth_ontop(img, depth_img; kwargs...)
     fig = MK.Figure()
     ax, hm = plot_depth_ontop!(fig, img, depth_img; kwargs...)
+    FigureAxisPlot(fig, ax, hm)
+end
+
+"""
+    plot_scene_ontop!(gl_context, scene, img)
+Plot a scene as depth image on top of another image.
+
+See also [`plot_depth_ontop`](@ref), [`plot_best_pose`](@ref).
+"""
+function plot_scene_ontop!(fig, gl_context, scene, img; kwargs...)
+    render_img = draw(gl_context, scene)
+    ax, hm = plot_depth_ontop!(fig, img, render_img; kwargs...)
     FigureAxisPlot(fig, ax, hm)
 end
 
@@ -154,9 +166,9 @@ Plot a scene as depth image on top of another image.
 
 See also [`plot_depth_ontop`](@ref), [`plot_best_pose`](@ref).
 """
-function plot_scene_ontop(gl_context, scene, img)
+function plot_scene_ontop(gl_context, scene, img; kwargs...)
     render_img = draw(gl_context, scene)
-    plot_depth_ontop(img, render_img)
+    plot_depth_ontop(img, render_img; kwargs...)
 end
 
 """
@@ -225,11 +237,14 @@ plotable_matrix(final_sample::Sample, var_name, len=last(size(variables(final_sa
     density_variable(chain, var_name; [labels])
 Creates a density plot for the given variable.
 """
-function density_variable!(axis, chain, var_name; labels=nothing)
+function density_variable!(axis, chain, var_name; labels=nothing, weights=nothing)
     M = plotable_matrix(chain, var_name)
+    if weights === nothing
+        weights = ones(size(M)[2])
+    end
     for (idx, values) in enumerate(eachrow(M))
         lbl = isnothing(labels) ? nothing : labels[idx]
-        MK.density!(axis, values; label=lbl)
+        MK.density!(axis, values; label=lbl, weights=weights)
     end
 end
 
@@ -245,12 +260,12 @@ function scatter_variable!(axis, chain, var_name, len=100; labels=nothing)
     end
 end
 
-function plot_pose_density(sample)
+function plot_pose_density(sample; weights=nothing)
     fig = MK.Figure(; resolution=(DISS_WIDTH, 1 / 4 * DISS_WIDTH))
     ax_t = MK.Axis(fig[1, 1]; xlabel="position / m", ylabel="density")
-    density_variable!(ax_t, sample, :t; labels=["x" "y" "z"])
+    density_variable!(ax_t, sample, :t; labels=["x" "y" "z"], weights=weights)
     ax_r = MK.Axis(fig[1, 2]; xlabel="orientation / rad", ylabel="density")
-    density_variable!(ax_r, sample, :r; labels=["x" "y" "z"])
+    density_variable!(ax_r, sample, :r; labels=["x" "y" "z"], weights=weights)
     MK.axislegend(ax_t; position=:ct)
     fig
 end
