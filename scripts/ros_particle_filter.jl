@@ -211,7 +211,6 @@ for row in eachrow(raw_df)
     t_err_only = norm.(t_only)
     R_err_only = quat_dist.(first(R_only), R_only)
 
-
     # Plot em
     diss_defaults()
     fig = MK.Figure(resolution=(DISS_WIDTH, 0.55 * DISS_WIDTH))

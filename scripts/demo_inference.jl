@@ -14,29 +14,23 @@ import CairoMakie as MK
 CUDA.allowscalar(false)
 diss_defaults()
 
-function mtm_parameters()
-    parameters = Parameters()
+function mtm_parameters(parameters=Parameters())
     # NOTE optimal parameter values of pixel_σ and c_reg seem to be inversely correlated. Moreover, different values seem to be optimal when using analytic association
-    @reset parameters.seed = rand(RandomDevice(), UInt32)
     @reset parameters.n_steps = 500
     @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 1
     @reset parameters.n_particles = 10
 end
 
-function mh_parameters()
-    parameters = Parameters()
-    @reset parameters.seed = rand(RandomDevice(), UInt32)
+function mh_parameters(parameters=Parameters())
     @reset parameters.n_steps = 250
     # NOTE burn in not required/even harmful if maximum likelihood/posteriori is the goal
     @reset parameters.n_burn_in = 0
     @reset parameters.n_thinning = 5
 end
 
-function smc_parameters()
-    parameters = Parameters()
+function smc_parameters(parameters=Parameters())
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher c_reg than more particles (FP, Bootstrap)
-    @reset parameters.seed = rand(RandomDevice(), UInt32)
     # NOTE FP & Bootstrap do not allow independent moves so they profit from a large number of particles. They are also resampling dominated instead of acceptance.
     # NOTE Why is MTM so much worse? One reason might have been that tempering was not implemented.
     @reset parameters.n_steps = 200
@@ -46,8 +40,9 @@ function smc_parameters()
 end
 
 parameters = smc_parameters()
-@reset parameters.width = 50;
-@reset parameters.height = 50;
+# Inference 25x25 seems sufficient, visualization requires more
+@reset parameters.width = 100;
+@reset parameters.height = 100;
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
@@ -69,7 +64,7 @@ gl_context = render_context(parameters)
 
 # Clutter and occlusions
 df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-row = df[298, :]
+row = df[204, :]
 
 # Experiment setup
 camera = crop_camera(row)
@@ -96,13 +91,14 @@ plot_scene_ontop(gl_context, scene, color_img)
 prior = point_prior(parameters, experiment, cpu_rng)
 
 # NOTE no association → prior_o has strong influence
-# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE flat prior_o .= 0.5 seems to require the association and truncation
+# NOTE only smooth_posterior seems to succeed with the T-LESS scene
 posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
-parameters = smc_parameters()
+parameters = smc_parameters(parameters)
 sampler = smc_mh(cpu_rng, parameters, posterior)
 # sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 
@@ -111,13 +107,18 @@ sampler = smc_mh(cpu_rng, parameters, posterior)
 @time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 # NOTE evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
 fig = plot_logevidence(states)
+MK.save(joinpath("plots", "evidence_smc_clutter.pdf"), fig)
 # Plot state which uses the weights
-fig = plot_pose_density(final_state.sample)
+fig = plot_pose_density(final_state)
 MK.save(joinpath("plots", "density_smc_clutter.pdf"), fig)
-fig, _, plot1 = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
+
+MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
+fig = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
+display(fig)
 MK.save(joinpath("plots", "best_smc_clutter.pdf"), fig)
-fig, _, plot2 = plot_prob_img(mean_image(final_state.sample, :o))
-MK.save(joinpath("plots", "prob_img_clutter.pdf"), fig)
+fig = plot_prob_img(mean_image(final_state.sample, :o))
+MK.save(joinpath("plots", "prob_img_smc_clutter.pdf"), fig)
+diss_defaults()
 
 # TODO animate Makie
 # step_size = length(states) ÷ 100
@@ -128,7 +129,7 @@ MK.save(joinpath("plots", "prob_img_clutter.pdf"), fig)
 # gif(anim, "smc.gif", fps=15)
 
 # MCMC samplers
-parameters = mh_parameters()
+parameters = mh_parameters(parameters)
 sampler = mh_sampler(cpu_rng, parameters, posterior)
 # sampler = mh_local_sampler(cpu_rng, parameters, posterior)
 # parameters = mtm_parameters()
@@ -138,10 +139,14 @@ sampler = mh_sampler(cpu_rng, parameters, posterior)
 @time chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
 fig = plot_pose_chain(chain, 50)
 MK.save(joinpath("plots", "density_mcmc_clutter.pdf"), fig)
+
 # plot_logprob(chain, 50)
+MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 # plot_prob_img(mean_image(chain, :o))
 fig = plot_best_pose(chain, experiment, color_img)
+display(fig)
 MK.save(joinpath("plots", "best_mcmc_clutter.pdf"), fig)
+diss_defaults()
 
 # TODO animate Makie
 # step_size = length(chain) ÷ 100
