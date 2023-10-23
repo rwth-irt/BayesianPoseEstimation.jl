@@ -116,7 +116,7 @@ MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 fig = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
 display(fig)
 MK.save(joinpath("plots", "best_smc_clutter.pdf"), fig)
-fig = plot_prob_img(mean_image(final_state.sample, :o))
+fig = plot_prob_img(mean_image(final_state, :o))
 MK.save(joinpath("plots", "prob_img_smc_clutter.pdf"), fig)
 diss_defaults()
 
