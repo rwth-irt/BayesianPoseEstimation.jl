@@ -13,7 +13,7 @@ const DISS_WIDTH = 422.52348
 change_alpha(color; alpha=0.4) = @reset color.alpha = alpha
 DENSITY_PALETTE = change_alpha.(MK.Makie.wong_colors())
 WONG2 = [MK.Makie.wong_colors()[4:7]..., MK.Makie.wong_colors()[1:3]...]
-WONG2_ALPHA = change_alpha.(WONG2; alpha=0.2)
+WONG2_ALPHA = change_alpha.(WONG2; alpha=0.1)
 
 function diss_defaults()
     # GLMakie uses the original GLAbstractions, I hijacked GLAbstractions for my purposes

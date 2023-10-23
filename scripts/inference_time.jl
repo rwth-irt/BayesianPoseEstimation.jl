@@ -94,7 +94,7 @@ for img_size in img_sizes
     # Visualize and save plot
     diss_defaults()
     samplers = ["mtm_sampler", "smc_bootstrap", "smc_mh"]
-    labels = ["MTM", "SMC bootstrap", "SMC forward", "SMC MH"]
+    labels = ["MTM", "SMC bootstrap", "SMC MH"]
 
     function draw_samplers!(axis, samplers, labels)
         for (s, l) in zip(samplers, labels)
@@ -107,12 +107,12 @@ for img_size in img_sizes
         end
     end
 
-    fig = MK.Figure()
+    fig = MK.Figure(resolution=(DISS_WIDTH, 0.4 * DISS_WIDTH))
     ax = MK.Axis(fig[1, 1]; xlabel="number of particles", ylabel="mean step time / s")
     draw_samplers!(ax, samplers, labels)
     MK.axislegend(ax; position=:rb)
 
-    ax2 = MK.Axis(fig; bbox=MK.BBox(100, 190, 145, 198), xticks=[0, 10, 20, 30], yticks=[0, 0.001, 0.002])
+    ax2 = MK.Axis(fig; bbox=MK.BBox(80, 170, 105, 158), xticks=[0, 10, 20, 30], yticks=[0, 0.001, 0.002])
     draw_samplers!(ax2, samplers, labels)
     MK.limits!(ax2, 0, 30, 0, 0.002)
 
