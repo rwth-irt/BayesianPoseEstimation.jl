@@ -80,7 +80,7 @@ function img_fig_axis()
     fig, ax
 end
 
-heatmap_colorbar!(fig, depth_hm; label="depth / m", kwargs...) = MK.Colorbar(fig[:, end+1], depth_hm; label=label, kwargs...)
+heatmap_colorbar!(fig, ax, hm; label="depth / m", kwargs...) = MK.Colorbar(fig[:, end+1], hm; label=label, height=MK.@lift(MK.Fixed($(MK.pixelarea(ax.scene)).widths[2])), kwargs...)
 
 """
     plot_prob_img
@@ -89,8 +89,10 @@ Clips zero → black, one → white.
 """
 function plot_prob_img(img)
     fig, ax = img_fig_axis()
-    prob_hm = plot_prob_img!(ax, img)
-    FigureAxisPlot(fig, ax, prob_hm)
+    hm = plot_prob_img!(ax, img)
+    # Align the colorbar
+    heatmap_colorbar!(fig, ax, hm; label="class probability")
+    FigureAxisPlot(fig, ax, hm)
 end
 
 """
@@ -105,9 +107,9 @@ See also [`plot_depth_img`](@ref)
 """
 function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels", aspect=1, kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, aspect=aspect)
-    depth_hm = plot_depth_img!(ax, img, kwargs...)
-    heatmap_colorbar!(figure, depth_hm; label=colorbar_label)
-    ax, depth_hm
+    hm = plot_depth_img!(ax, img, kwargs...)
+    heatmap_colorbar!(figure, ax, hm; label=colorbar_label)
+    ax, hm
 end
 
 """
