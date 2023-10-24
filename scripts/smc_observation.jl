@@ -1,6 +1,6 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
-# All rights reserved. 
+# All rights reserved.
 
 # TODO which section in Diss?
 
@@ -14,6 +14,7 @@ using DataFrames
 using MCMCDepth
 using PoseErrors
 using Logging
+using Printf
 using Random
 using SciGL
 using Statistics
@@ -32,17 +33,17 @@ experiment_name = "smc_observation"
 result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "tless", "itodd"]
 pixel = [:no_exp, :exp, :smooth]
-# Classification and regularization: 
+o_prior = [:flat, :mask]
+# Classification and regularization:
 # :no - no classification, simple regularization
 # :simple - classification, simple regularization
 # :class - classification, L0 regularization
 classification = [:no, :simple, :class]
 testset = "train_pbr"
 scene_id = [0:4...]
-configs = dict_list(@dict dataset testset scene_id pixel classification)
+configs = dict_list(@dict dataset testset scene_id pixel classification o_prior)
 
 """
-
 Returns `pixel_fn(μ, o)` and `class_fn(prior_o, μ, z)`
 """
 function pixel_model(pixel, parameters)
@@ -93,18 +94,23 @@ function pixel_model(pixel, parameters)
 end
 
 """
-    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
 Assembles the posterior model and the sampler from the loaded images, mesh, and DataFrame row.
 """
-function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, pixel, classification)
+function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
+    @unpack classification, pixel, o_prior = config
     # Context
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
 
     # Setup experiment
     camera = crop_camera(df_row)
-    prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height)
-    prior_o[mask_img] .= parameters.o_mask_is
+    if o_prior == :flat
+        prior_o = parameters.float_type(0.5)
+    elseif o_prior == :mask
+        prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height)
+        prior_o[mask_img] .= parameters.o_mask_is
+    end
     # Prior t from mask is imprecise no need to bias
     prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
     experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
@@ -135,9 +141,9 @@ end
     timed_inference
 Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded.
 """
-function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, pixel, classification)
+function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
     timed = @elapsed begin
-        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, pixel, classification)
+        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
 
         _, final_state = smc_inference(rng, posterior, sampler, parameters)
         # Extract best pose and score
@@ -155,7 +161,7 @@ scene_inference(gl_context, config)
 """
 function scene_inference(gl_context, config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id, pixel, classification = config
+    @unpack dataset, testset, scene_id = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
 
@@ -169,7 +175,7 @@ function scene_inference(gl_context, config)
     # Benchmark model sampler configuration to adapt number of steps - also avoids timing pre-compilation
     df_row = first(scene_df)
     depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-    rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, pixel, classification)
+    rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
     step_time = mean_step_time(rng, posterior, sampler)
     # time budget of 0.5 seconds
     @reset parameters.n_steps = floor(Int, parameters.time_budget / step_time)
@@ -179,7 +185,7 @@ function scene_inference(gl_context, config)
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
-        t, R, score, timed = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, pixel, classification)
+        t, R, score, timed = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         result_df[idx, :].score = score
         result_df[idx, :].R = R
         result_df[idx, :].t = t
@@ -202,38 +208,69 @@ destroy_context(gl_context)
 evaluate_errors(experiment_name)
 function parse_config(path)
     config = my_parse_savename(path)
-    @unpack pixel, classification, dataset = config
-    pixel, classification, dataset
+    @unpack pixel, classification, dataset, o_prior = config
+    pixel, classification, o_prior, dataset
+end
+# Pretty print experiment names, "smooth" and "exp" are fine
+pixel_label(s) = s == "no_exp" ? "no" : s
+function classification_label(s)
+    if s == "no"
+        "no, Lₚₓ"
+    elseif s == "simple"
+        "yes, Lₚₓ"
+    elseif s == "class"
+        "yes, L₀"
+    end
 end
 
 # Calculate recalls
 pro_df = collect_results(datadir("exp_pro", experiment_name, "errors"))
-transform!(pro_df, :path => ByRow(parse_config) => [:pixel, :classification, :dataset])
+transform!(pro_df, :path => ByRow(parse_config) => [:pixel, :classification, :o_prior, :dataset])
 # Threshold errors
 transform!(pro_df, :adds => ByRow(x -> threshold_errors(x, ADDS_θ)) => :adds_thresh)
 transform!(pro_df, :vsd => ByRow(x -> threshold_errors(x, BOP18_θ)) => :vsd_thresh)
 transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRESHOLDS)) => :vsdbop_thresh)
 
 # Recall by pixel model and classification
-groups = groupby(pro_df, [:pixel, :classification])
+groups = groupby(pro_df, [:pixel, :classification, :o_prior])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 CSV.write(datadir("exp_pro", experiment_name, "pixel_classification_recall.csv"), recalls)
 display(recalls)
 
+fig = MK.Figure(resolution=(DISS_WIDTH, 0.5 * DISS_WIDTH))
 # Heatmap for table
-groups = groupby(recalls, :classification)
-res = [sort!(group, :pixel).vsd_recall for group in groups]
-mat = reduce(hcat, res)
+for (idx, group) in enumerate(groupby(recalls, :o_prior))
+    # into matrix shape
+    vsd_df = unstack(group, :classification, :pixel, :vsd_recall)
+    # increasing complexity
+    select!(vsd_df, [:classification, :no_exp, :exp, :smooth])
+    permute!(vsd_df, [2, 3, 1])
+    data = Array(vsd_df[:, 2:end])
+    # title
+    prior_type = first(group.o_prior)
+    if prior_type == "mask"
+        title = "Mask prior"
+    elseif prior_type == "flat"
+        title = "Flat prior"
+    end
+    # labeling
+    column_names = pixel_label.(names(vsd_df, 2:4))
+    row_names = classification_label.(vsd_df.classification)
+    xticks = (eachindex(column_names), column_names)
+    yticks = (eachindex(row_names), row_names)
 
-column_names = unique(recalls.pixel)
-xticks = (eachindex(column_names), column_names)
-row_names = unique(recalls.classification)
-yticks = (eachindex(row_names), row_names)
-
-fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
-ax = MK.Axis(fig[1, 1]; xticks=xticks, yticks=yticks, aspect=1)
-fig
-hm = MK.heatmap!(ax, mat)
-MK.Colorbar(fig[1, 2], hm)
+    # Plot
+    ax = MK.Axis(fig[1, 2*idx-1]; title=title, xticks=xticks, yticks=yticks, xlabel="pixel model", ylabel="class. & regul.", aspect=1)
+    hm = MK.heatmap!(ax, data')
+    data_string(data) = @sprintf("%.3f", data)
+    MK.text!(ax,
+        data_string.(vec(data)),
+        position=[MK.Point2f(x, y) for x in eachindex(column_names) for y in eachindex(row_names)],
+        align=(:center, :center)
+    )
+    MK.Colorbar(fig[1, 2*idx], hm; height=MK.@lift(MK.Fixed($(MK.pixelarea(ax.scene)).widths[2])))
+end
 MK.colsize!(fig.layout, 1, MK.Aspect(1, 1.0))
-fig
+MK.colsize!(fig.layout, 3, MK.Aspect(1, 1.0))
+save(joinpath("plots", "$(experiment_name).pdf"), fig)
+display(fig)
