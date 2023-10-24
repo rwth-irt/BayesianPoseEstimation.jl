@@ -171,3 +171,55 @@ groups = groupby(pro_df, [:prior, :dataset])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 CSV.write(datadir("exp_pro", experiment_name, "prior_dataset_recall.csv"), recalls)
 display(recalls)
+
+
+function fig_xtick(dataset)
+    if dataset == "itodd"
+        "ITODD"
+    elseif dataset == "lm"
+        "LM"
+    elseif dataset == "tless"
+        "T-LESS"
+    end
+end
+
+function fig_label(group)
+    prior = first(group.prior)
+    if prior == "mask"
+        "mask"
+    elseif prior == "point"
+        "point"
+    elseif prior == "point_mask"
+        "both"
+    end
+end
+
+fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
+# Dataset names on x-axis
+xticks = (1:3, fig_xtick.(sort(unique(pro_df.dataset))))
+
+ax = MK.Axis(fig[1, 1]; title="ADDS", xticks=xticks, limits=(nothing, (0.5, 1)))
+groups = groupby(recalls, [:prior])
+for group in groups
+    group = sort!(group, :dataset)
+    MK.scatterlines!(ax, group.adds_recall; label=fig_label(group))
+end
+
+ax = MK.Axis(fig[1, 2]; title="VSDBOP", xticks=xticks, limits=(nothing, (0.5, 1)))
+groups = groupby(recalls, [:prior])
+for group in groups
+    group = sort!(group, :dataset)
+    MK.scatterlines!(ax, group.vsdbop_recall; label=fig_label(group))
+end
+
+ax = MK.Axis(fig[1, 3]; title="VSD", xticks=xticks, limits=(nothing, (0.5, 1)))
+groups = groupby(recalls, [:prior])
+for group in groups
+    group = sort!(group, :dataset)
+    MK.scatterlines!(ax, group.vsd_recall; label=fig_label(group))
+end
+
+MK.Legend(fig[1, 4], ax)
+save(joinpath("plots", "$(experiment_name).pdf"), fig)
+display(fig)
+

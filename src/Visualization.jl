@@ -27,6 +27,7 @@ function diss_defaults()
         Legend=(; patchsize=(5, 5), padding=(5, 5, 5, 5), framewidth=0.7),
         Lines=(; linewidth=1),
         Scatter=(; markersize=4),
+        ScatterLines=(; markersize=5, linewidth=1),
         VLines=(; cycle=[:color => :wong2], linestyle=:dash, linewidth=1),
         VSpan=(; cycle=[:color => :wong2_alpha]),
         fontsize=11, # Latex "small" for normal 12
