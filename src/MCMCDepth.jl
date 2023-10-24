@@ -130,8 +130,10 @@ export smc_step
 
 # Models
 export ImageLikelihoodNormalizer
+export SimpleImageRegularization
 
 export expected_pixel_count
+export marginalized_association
 export nonzero_pixels
 export pixel_association_fn
 export pixel_mixture

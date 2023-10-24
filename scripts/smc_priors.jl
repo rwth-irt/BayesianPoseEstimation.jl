@@ -117,7 +117,7 @@ function scene_inference(gl_context, config)
     rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, df_row, prior)
     step_time = mean_step_time(rng, posterior, sampler)
     # Compute budget of 5sec
-    @reset parameters.n_steps = floor(Int, 0.5 / step_time)
+    @reset parameters.n_steps = floor(Int, parameters.time_budget / step_time)
 
     # Run inference per detection
     @progress "dataset: $(dataset), testset: $(testset), scene_id : $(scene_id)" for (idx, df_row) in enumerate(eachrow(scene_df))
@@ -138,7 +138,7 @@ parameters = Parameters()
 # Avoid recreating the context in scene_inference by conditioning on it / closure
 gl_context = render_context(parameters)
 gl_scene_inference = scene_inference | gl_context
-@progress "SMC Benchmark" for config in configs
+@progress "SMC priors" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
 destroy_context(gl_context)
@@ -171,7 +171,6 @@ groups = groupby(pro_df, [:prior, :dataset])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
 CSV.write(datadir("exp_pro", experiment_name, "prior_dataset_recall.csv"), recalls)
 display(recalls)
-
 
 function fig_xtick(dataset)
     if dataset == "itodd"

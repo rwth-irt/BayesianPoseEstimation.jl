@@ -93,6 +93,7 @@ Deliberately not strongly typed because the strongly typed structs are construct
 * `seed` Seed of the rng
 * `algorithm` Symbol of the inference algorithm
 * `n_samples` Number of samples in the chain
+* `time_budget` Inference time budget in seconds - calc n_samples via benchmark
 * `n_burn_in` Number of samples before recording the chain
 * `n_thinning` Record only every n_thinning sample to the chain
 * `n_particles` For particle / multiple try algorithms
@@ -133,6 +134,7 @@ Base.@kwdef struct Parameters
     device = :CUDA
     seed = 8418387917544508114
     n_steps = 3_000
+    time_budget = 0.5
     n_burn_in = 0
     n_thinning = 0
     n_particles = 100
