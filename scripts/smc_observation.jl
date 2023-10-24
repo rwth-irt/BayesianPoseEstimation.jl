@@ -38,7 +38,7 @@ pixel = [:no_exp, :exp, :smooth]
 # :class - classification, L0 regularization
 classification = [:no, :simple, :class]
 testset = "train_pbr"
-scene_id = 0 # TODO [0:4...]
+scene_id = [0:4...]
 configs = dict_list(@dict dataset testset scene_id pixel classification)
 
 """
@@ -59,7 +59,7 @@ function pixel_model(pixel, parameters)
             BinaryMixture(normal, tail, o, one(o) - o)
         end
         class_fn = (o, μ, z) -> begin
-            # TODO why condition inside marginalized_association?
+            # TODO simplify interface: why condition inside marginalized_association?
             dist_is = x -> KernelNormal(x, σ)
             dist_not = _ -> TailUniform(min_depth, max_depth)
             marginalized_association(dist_is, dist_not, o, μ, z)
@@ -103,7 +103,6 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 
     # Setup experiment
     camera = crop_camera(df_row)
-    # TODO use from row?
     prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height)
     prior_o[mask_img] .= parameters.o_mask_is
     # Prior t from mask is imprecise no need to bias
@@ -113,7 +112,6 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
     # Model
     μ_node = point_prior(parameters, experiment, cpu_rng)
     pixel_fn, class_fn = pixel_model(pixel, parameters)
-    # TODO this is the special sauce
     if classification == :no
         o_node = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
     else
@@ -222,7 +220,7 @@ recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :
 CSV.write(datadir("exp_pro", experiment_name, "pixel_classification_recall.csv"), recalls)
 display(recalls)
 
-# TODO plot heatmap of components
+# Heatmap for table
 groups = groupby(recalls, :classification)
 res = [sort!(group, :pixel).vsd_recall for group in groups]
 mat = reduce(hcat, res)
@@ -237,4 +235,5 @@ ax = MK.Axis(fig[1, 1]; xticks=xticks, yticks=yticks, aspect=1)
 fig
 hm = MK.heatmap!(ax, mat)
 MK.Colorbar(fig[1, 2], hm)
+MK.colsize!(fig.layout, 1, MK.Aspect(1, 1.0))
 fig
