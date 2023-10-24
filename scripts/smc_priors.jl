@@ -195,7 +195,8 @@ end
 
 fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
 # Dataset names on x-axis
-xticks = (1:3, fig_xtick.(sort(unique(pro_df.dataset))))
+xnames = unique(pro_df.dataset) .|> fig_xtick
+xticks = (eachindex(xnames), xnames)
 
 ax = MK.Axis(fig[1, 1]; title="ADDS", xticks=xticks, limits=(nothing, (0.5, 1)))
 groups = groupby(recalls, [:prior])

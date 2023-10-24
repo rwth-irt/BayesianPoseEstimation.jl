@@ -2,6 +2,8 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# TODO which section in Diss?
+
 using DrWatson
 @quickactivate("MCMCDepth")
 
@@ -28,7 +30,7 @@ CUDA.allowscalar(false)
 # General experiment
 experiment_name = "smc_observation"
 result_dir = datadir("exp_raw", experiment_name)
-dataset = ["lm"] # TODO , "tless", "itodd"]
+dataset = ["lm", "tless", "itodd"]
 pixel = [:no_exp, :exp, :smooth]
 # Classification and regularization: 
 # :no - no classification, simple regularization
@@ -221,3 +223,18 @@ CSV.write(datadir("exp_pro", experiment_name, "pixel_classification_recall.csv")
 display(recalls)
 
 # TODO plot heatmap of components
+groups = groupby(recalls, :classification)
+res = [sort!(group, :pixel).vsd_recall for group in groups]
+mat = reduce(hcat, res)
+
+column_names = unique(recalls.pixel)
+xticks = (eachindex(column_names), column_names)
+row_names = unique(recalls.classification)
+yticks = (eachindex(row_names), row_names)
+
+fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
+ax = MK.Axis(fig[1, 1]; xticks=xticks, yticks=yticks, aspect=1)
+fig
+hm = MK.heatmap!(ax, mat)
+MK.Colorbar(fig[1, 2], hm)
+fig
