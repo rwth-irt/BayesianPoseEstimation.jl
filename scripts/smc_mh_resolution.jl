@@ -23,7 +23,6 @@ using PoseErrors
 using Random
 using SciGL
 
-
 using Logging
 using ProgressLogging
 using TerminalLoggers

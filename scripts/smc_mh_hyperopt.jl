@@ -2,6 +2,9 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+# TODO re-run baseline script with these parameters.association_σ
+# TODO optimize MCMC-MH
+
 using DrWatson
 @quickactivate
 
@@ -25,7 +28,7 @@ CUDA.allowscalar(false)
 experiment_name = "smc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
-dataset = ["lm", "itodd"] #, "tless", "steri"]
+dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
 optsampler = [:BCAPSampler]
 testset = "train_pbr"
 scene_id = 0
@@ -165,9 +168,9 @@ function run_hyperopt(config)
 
         # Capture local parameters in this closure which suffices the HyperTuning interface
         function objective(trial)
-            @unpack c_reg, σ_t, proposal_σ_r, pixel_σ = trial
+            @unpack c_reg, proposal_σ_r, pixel_σ = trial
             @reset parameters.c_reg = c_reg
-            @reset parameters.σ_t = fill(σ_t, 3)
+            # NOTE does not make sense to optimize heavily correlated variables e.g. σ_t & c_reg
             @reset parameters.proposal_σ_r = fill(proposal_σ_r, 3)
             @reset parameters.pixel_σ = pixel_σ
             @reset parameters.association_σ = pixel_σ
@@ -176,7 +179,6 @@ function run_hyperopt(config)
         max_trials = 250
         scenario = Scenario(
             c_reg=(5.0 .. 100.0),
-            σ_t=(0.005 .. 0.5),
             pixel_σ=(0.0001 .. 0.1),
             proposal_σ_r=(0.05 .. 1.0),
             sampler=eval(optsampler)(),
@@ -200,7 +202,7 @@ end
     @produce_or_load(run_hyperopt, config, result_dir; filename=my_savename)
 end
 
-# TODO analyze and plot results
+# TODO analyze results on a per-dataset basis. Different scenes - different parameters?
 pro_df = collect_results(result_dir)
 
 for row in eachrow(pro_df)
@@ -209,4 +211,8 @@ for row in eachrow(pro_df)
     println(row.path)
     show(best_parameters(scenario))
 end
+
+# NOTE ITODD might be influenced by different surface discrepancy threshold
+
+# TODO analyze and plot results on validation set, scene 1-4
 
