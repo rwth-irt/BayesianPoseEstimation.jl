@@ -239,7 +239,7 @@ for row in eachrow(raw_df)
 
     # Final adjustment, display, save
     MK.colsize!(fig.layout, 2, MK.Auto(0.5))
-    display(fig)
+    # display(fig)
     mkpath(joinpath("plots", "pf"))
     save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior).pdf"), fig)
     # Remove files

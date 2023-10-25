@@ -221,5 +221,5 @@ end
 
 MK.Legend(fig[1, 4], ax)
 save(joinpath("plots", "$(experiment_name).pdf"), fig)
-display(fig)
+# display(fig)
 

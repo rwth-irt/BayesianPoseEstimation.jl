@@ -74,7 +74,6 @@ hm = plot_depth_img!(ax_exp, render_img)
 plot_depth_img!(ax_gen, gen_img)
 cb = MCMCDepth.heatmap_colorbar!(fig, hm; label="", ticks=([minimum(render_img[render_img.>0]) + 0.01, maximum(render_img) - 0.01], ["close", "far"]))
 display(fig)
-display(fig)
 MK.save(joinpath("plots", "gen_depth.pdf"), fig)
 
 # Using the prior

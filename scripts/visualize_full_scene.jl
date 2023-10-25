@@ -28,7 +28,7 @@ begin
     fig_width = 0.5 * DISS_WIDTH
     fig = MK.Figure(resolution=(fig_width, fig_width / aspect_ratio))
     plot_scene_ontop!(fig, gl_context, scene, color_img; aspect=aspect_ratio)
-    display(fig)
+    # display(fig)
     MK.save(joinpath("plots", "full_scene.pdf"), fig)
 
     destroy_context(gl_context)

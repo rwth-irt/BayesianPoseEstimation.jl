@@ -273,4 +273,4 @@ end
 MK.colsize!(fig.layout, 1, MK.Aspect(1, 1.0))
 MK.colsize!(fig.layout, 3, MK.Aspect(1, 1.0))
 save(joinpath("plots", "$(experiment_name).pdf"), fig)
-display(fig)
+# display(fig)
