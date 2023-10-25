@@ -25,7 +25,7 @@ using TerminalLoggers
 global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
-experiment_name = "smc_mh_hyperopt"
+experiment_name = "mcmc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
 dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
@@ -53,10 +53,9 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 
     # Model
     prior = point_prior(parameters, experiment, cpu_rng)
-    # TODO which one should I settle on? If enough time, test simple_posterior and association_posterior
     posterior = association_posterior(parameters, experiment, prior, dev_rng)
     # Sampler
-    sampler = smc_mh(cpu_rng, parameters, posterior)
+    sampler = mh_sampler(cpu_rng, parameters, posterior)
     # Result
     cpu_rng, posterior, sampler
 end
@@ -69,15 +68,14 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
     time = @elapsed begin
         # Assemble sampler and run inference
         rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
-        states, final_state = smc_inference(rng, posterior, sampler, parameters)
-
+        # Only MTM supports multiple particles. Metropolis Hastings in recall_n_steps.jl
+        chain = sample(rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning, progress=false)
         # Extract best pose and score
-        final_sample = final_state.sample
-        score, idx = findmax(loglikelihood(final_sample))
-        t = variables(final_sample).t[:, idx]
-        r = variables(final_sample).r[idx]
+        score, idx = findmax(loglikelihood.(chain))
+        t = variables(chain[idx]).t
+        r = variables(chain[idx]).r
     end
-    t, r, score, final_state, states, time
+    t, r, score, time
 end
 
 """
@@ -93,25 +91,17 @@ function cost_function(parameters, gl_context, config, scene_df)
     est_df.R = Vector{Quaternion{Float32}}(undef, nrow(est_df))
     est_df.t = Vector{Vector{Float32}}(undef, nrow(est_df))
     est_df.time = Vector{Float32}(undef, nrow(est_df))
-    est_df.final_state = Vector{SmcState}(undef, nrow(est_df))
-    est_df.log_evidence = Vector{Vector{Float32}}(undef, nrow(est_df))
 
     # Run inference per detection
     @progress "dataset: $dataset, scene_id: $scene_id" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
-        t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
-        # Avoid too large files by only saving t, r, and the logevidence not the sequence of states
-        final_state = collect_variables(final_state, (:t, :r))
-        # Avoid out of GPU errors
-        @reset final_state.sample = to_cpu(final_state.sample)
+        t, R, score, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
         est_df[idx, :].score = score
         est_df[idx, :].R = R
         est_df[idx, :].t = t
         est_df[idx, :].time = time
-        est_df[idx, :].final_state = final_state
-        est_df[idx, :].log_evidence = logevidence.(states)
     end
 
     # Add gt_R & gt_t for testset

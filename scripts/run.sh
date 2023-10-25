@@ -7,6 +7,7 @@
 
 julia_remote_nvidia.sh scripts/smc_mh_resolution.jl
 julia_remote_nvidia.sh scripts/smc_mh_hyperopt.jl
+julia_remote_nvidia.sh scripts/mcmc_mh_hyperopt.jl
 julia_remote_nvidia.sh scripts/inference_time.jl
 julia_remote_nvidia.sh scripts/smc_benchmark.jl
 julia_remote_nvidia.sh scripts/mcmc_benchmark.jl
