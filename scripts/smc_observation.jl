@@ -237,7 +237,7 @@ recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :
 CSV.write(datadir("exp_pro", experiment_name, "pixel_classification_recall.csv"), recalls)
 display(recalls)
 
-fig = MK.Figure(resolution=(DISS_WIDTH, 0.5 * DISS_WIDTH))
+fig = MK.Figure(resolution=(DISS_WIDTH, 0.4 * DISS_WIDTH))
 # Heatmap for table
 for (idx, group) in enumerate(groupby(recalls, :o_prior))
     # into matrix shape
