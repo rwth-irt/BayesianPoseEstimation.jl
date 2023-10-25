@@ -136,7 +136,7 @@ See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref), [`plot_best_pos
 function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="", aspect=1, kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title, aspect=aspect)
     # Plot the image as background
-    MK.image!(ax, img; aspect=1)
+    MK.image!(ax, img; aspect=1, interpolate=false, rasterize=true)
     hm = plot_depth_img!(ax, depth_img; alpha=0.5, kwargs...)
     (ax, hm)
 end

@@ -111,7 +111,7 @@ function scene_inference(config)
             depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
             rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
             step_time = mean_step_time(rng, posterior, sampler)
-            @reset parameters.n_steps = floor(Int, 0.5 / step_time)
+            @reset parameters.n_steps = floor(Int, parameters.time_budget / step_time)
         end
 
         # Store result in DataFrame. Numerical precision doesn't matter here → Float32
