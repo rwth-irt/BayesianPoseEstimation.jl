@@ -29,16 +29,18 @@ experiment_name = "smc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
 dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
-optsampler = [:BCAPSampler]
 testset = "train_pbr"
 scene_id = 0
-configs = dict_list(@dict dataset testset scene_id optsampler)
+optsampler = [:BCAPSampler]
+model = [:simple_posterior, :association_posterior]
+configs = dict_list(@dict dataset testset scene_id optsampler model)
 
 """
-    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
 Assembles the posterior model and the sampler from the loaded images, mesh, and DataFrame row.
 """
-function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
+    @unpack model = config
     # Context
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
@@ -53,8 +55,7 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 
     # Model
     prior = point_prior(parameters, experiment, cpu_rng)
-    # TODO which one should I settle on? If enough time, test simple_posterior and association_posterior
-    posterior = association_posterior(parameters, experiment, prior, dev_rng)
+    posterior = eval(model)(parameters, experiment, prior, dev_rng)
     # Sampler
     sampler = smc_mh(cpu_rng, parameters, posterior)
     # Result
@@ -62,13 +63,13 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 end
 
 """
-    timed_inference
+    timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
 Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded.
 """
-function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
     time = @elapsed begin
         # Assemble sampler and run inference
-        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         states, final_state = smc_inference(rng, posterior, sampler, parameters)
 
         # Extract best pose and score
@@ -101,7 +102,7 @@ function cost_function(parameters, gl_context, config, scene_df)
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
-        t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         # Avoid too large files by only saving t, r, and the logevidence not the sequence of states
         final_state = collect_variables(final_state, (:t, :r))
         # Avoid out of GPU errors
@@ -163,7 +164,7 @@ function run_hyperopt(config)
         # Benchmark model sampler configuration to adapt number of steps - also avoids timing pre-compilation
         df_row = first(scene_df)
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         step_time = mean_step_time(rng, posterior, sampler)
         @reset parameters.n_steps = floor(Int, parameters.time_budget / step_time)
 

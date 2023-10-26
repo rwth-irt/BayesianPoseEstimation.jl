@@ -29,9 +29,9 @@ experiment_name = "mcmc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
 dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
-optsampler = [:BCAPSampler]
 testset = "train_pbr"
 scene_id = 0
+optsampler = [:BCAPSampler]
 configs = dict_list(@dict dataset testset scene_id optsampler)
 
 """
