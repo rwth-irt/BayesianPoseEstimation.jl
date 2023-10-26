@@ -31,7 +31,7 @@ import CairoMakie as MK
 img_sizes = [25, 50, 100]
 for img_size in img_sizes
     experiment_name = "inference_time_$img_size"
-    sampler = [:mtm_sampler, :smc_bootstrap, :smc_mh]
+    sampler = [:mh_sampler, :mtm_sampler, :smc_mh]
     configs = dict_list(@dict sampler)
 
     # Context
@@ -93,8 +93,8 @@ for img_size in img_sizes
 
     # Visualize and save plot
     diss_defaults()
-    samplers = ["mtm_sampler", "smc_bootstrap", "smc_mh"]
-    labels = ["MTM", "SMC bootstrap", "SMC MH"]
+    samplers = ["mh_sampler", "mtm_sampler", "smc_mh"]
+    labels = ["MCMC-MH", "MTM", "SMC-MH"]
 
     function draw_samplers!(axis, samplers, labels)
         for (s, l) in zip(samplers, labels)
