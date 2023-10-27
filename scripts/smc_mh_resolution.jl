@@ -51,10 +51,9 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 
     # Setup experiment
     camera = crop_camera(df_row)
-    prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
-    prior_o[mask_img] .= parameters.o_mask_is
-    # Prior t from mask is imprecise no need to bias
-    prior_t = point_from_segmentation(df_row.bbox, depth_img, mask_img, df_row.cv_camera)
+    prior_o = parameters.float_type(0.5)
+    # Bias the point prior
+    prior_t = df_row.gt_t + rand(KernelNormal(0, parameters.σ_t), 3)
     experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
     # Model
@@ -195,7 +194,7 @@ MK.lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS"
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
 MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP")
 ax2 = MK.Axis(f1[1, 1]; ylabel="pose inference time", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, xgridvisible=false, ygridvisible=false, limits=(nothing, (0, 1)))
-MK.lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="mean time", linestyle=:dash, color=:black)
+MK.lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="avg. inference time", linestyle=:dash, color=:black)
 MK.axislegend(ax1; position=:rb)
 MK.axislegend(ax2; position=:cb)
 
@@ -214,7 +213,7 @@ MK.lines!(ax1, time_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
 MK.lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")
 MK.lines!(ax1, time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP")
 ax2 = MK.Axis(f2[1, 1]; ylabel="steps per inference", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, xgridvisible=false, ygridvisible=false, limits=(nothing, (0, 1)))
-MK.lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="mean steps", linestyle=:dash, color=:black)
+MK.lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="avg. inference steps", linestyle=:dash, color=:black)
 MK.limits!(ax2, 0, nothing, 0, nothing)
 MK.axislegend(ax1; position=:rb)
 MK.axislegend(ax2; position=:cb)
