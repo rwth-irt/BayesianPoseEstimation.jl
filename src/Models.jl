@@ -44,11 +44,11 @@ NOTE: Seems to be beneficial for occlusions.
 
 ℓ_reg = c_reg / n_visible_pixel * ℓ
 """
-struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T}}
+struct ImageLikelihoodNormalizer{T<:Real,M<:AbstractArray{T},N<:AbstractArray{T}}
     c_reg::T
     μ::M
     # NOTE using the prior_o instead of the estimated o is worse
-    o::M
+    o::N
 end
 
 ImageLikelihoodNormalizer(c_reg::T, μ::M, _...) where {T,M} = ImageLikelihoodNormalizer{T,M}(c_reg, μ)
