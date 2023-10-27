@@ -27,12 +27,12 @@ end
 # Assumes that all positions are close
 SciGL.crop(camera::CvCamera, centers::AbstractMatrix, diameter) = crop(camera, centers[:, 1], diameter)
 
-# BUG depth_offscreen_context with CUDA OpenGL interop does not work on multi GPU system
+# BUG depth_offscreen_context with CUDA OpenGL interop does not work on multi GPU system, depth_copy_offscreen_context causes out-of-GPU-memory
 """
     render_context(params)
 Generate a context from the MCMCDepth Parameters.
 """
-render_context(params::Parameters) = depth_copy_offscreen_context(params.width, params.height, params.depth, device_array_type(params))
+render_context(params::Parameters) = depth_offscreen_context(params.width, params.height, params.depth, device_array_type(params))
 
 """
     render(render_context, scene, pose)
