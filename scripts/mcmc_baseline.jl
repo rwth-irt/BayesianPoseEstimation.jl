@@ -56,7 +56,7 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
     camera = crop_camera(df_row)
     prior_o = parameters.float_type(0.5)
     # Bias the point prior
-    prior_t = df_row.gt_t + rand(KernelNormal(0, parameters.σ_t), 3)
+    prior_t = df_row.gt_t + rand(KernelNormal(0, first(parameters.σ_t)), 3)
     experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
 
     # Model
