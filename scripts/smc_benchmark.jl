@@ -110,6 +110,10 @@ function scene_inference(gl_context, config)
     rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, sampler_symbol)
     step_time = mean_step_time(rng, posterior, sampler)
     @reset parameters.n_steps = floor(Int, pose_time / step_time)
+    # For slow systems
+    if parameters.n_steps < 2
+        @reset parameters.n_steps = 2
+    end
 
     # Run inference per detection
     @progress "sampler: $(sampler_symbol), n_particles: $(n_particles)" for (idx, df_row) in enumerate(eachrow(scene_df))
