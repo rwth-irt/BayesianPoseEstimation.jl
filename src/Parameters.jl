@@ -16,7 +16,7 @@ Data which might change from one experiment to another
 * `depth_img` depth image of the observed scene
 """
 struct Experiment{T}
-    gl_context::OffscreenContext
+    gl_context
     scene::Scene
     prior_o
     prior_t::Vector{T}
@@ -30,7 +30,7 @@ struct Experiment{T}
 
         Automatically transfers `prior_o` `depth_image` to the device of the `gl_context`.
     """
-    function Experiment(gl_context::OffscreenContext, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {T}
+    function Experiment(gl_context, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {T}
         device_img = to_device(gl_context, depth_image)
         # can also be a scalar
         if prior_o isa AbstractArray
@@ -46,7 +46,7 @@ end
     Experiment(gl_context, scene, prior_o, prior_t, depth_image)
 Defaults the prior_r to the identity quaternion.
 """
-Experiment(gl_context::OffscreenContext, scene, prior_o, prior_t, depth_image::AbstractMatrix) = Experiment(gl_context, scene, prior_o, prior_t, one(Quaternion), depth_image)
+Experiment(gl_context, scene, prior_o, prior_t, depth_image::AbstractMatrix) = Experiment(gl_context, scene, prior_o, prior_t, one(Quaternion), depth_image)
 
 """
     Experiment(experiment, depth_image)
