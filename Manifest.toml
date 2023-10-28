@@ -1697,11 +1697,11 @@ version = "0.7.0"
 
 [[deps.SciGL]]
 deps = ["CUDA", "ColorTypes", "CoordinateTransformations", "FileIO", "FixedPointNumbers", "GLAbstraction", "GLFW", "GeometryBasics", "LinearAlgebra", "Logging", "MeshIO", "ModernGL", "Reexport", "Rotations", "StaticArrays"]
-git-tree-sha1 = "553077e05402c9ccda61b123370eef434b9fc585"
+git-tree-sha1 = "f4cca8264c056a8a46b714c4e310c3d2ed0cc93a"
 repo-rev = "master"
 repo-url = "https://git-ce.rwth-aachen.de/diss/scigl.jl.git"
 uuid = "e33cfb9f-2574-42f7-bc46-3c25fa028886"
-version = "0.3.15"
+version = "0.3.13"
 
 [[deps.Scratch]]
 deps = ["Dates"]
