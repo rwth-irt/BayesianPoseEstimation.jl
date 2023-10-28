@@ -241,7 +241,7 @@ fig = MK.Figure(resolution=(DISS_WIDTH, 0.4 * DISS_WIDTH))
 # Heatmap for table
 for (idx, group) in enumerate(groupby(recalls, :o_prior))
     # into matrix shape
-    vsd_df = unstack(group, :classification, :pixel, :vsd_recall)
+    vsd_df = unstack(group, :classification, :pixel, :vsdbop_recall)
     # increasing complexity
     select!(vsd_df, [:classification, :no_exp, :exp, :smooth])
     permute!(vsd_df, [2, 3, 1])
@@ -261,7 +261,7 @@ for (idx, group) in enumerate(groupby(recalls, :o_prior))
 
     # Plot
     ax = MK.Axis(fig[1, 2*idx-1]; title=title, xticks=xticks, yticks=yticks, xlabel="pixel model", ylabel="class. & regul.", aspect=1)
-    hm = MK.heatmap!(ax, data')
+    hm = MK.heatmap!(ax, data'; colorrange=(0.62, 0.7))
     data_string(data) = @sprintf("%.3f", data)
     MK.text!(ax,
         data_string.(vec(data)),
@@ -273,4 +273,4 @@ end
 MK.colsize!(fig.layout, 1, MK.Aspect(1, 1.0))
 MK.colsize!(fig.layout, 3, MK.Aspect(1, 1.0))
 save(joinpath("plots", "$(experiment_name).pdf"), fig)
-# display(fig)
+display(fig)

@@ -11,7 +11,7 @@ import CairoMakie as MK
 diss_defaults()
 
 parameters = Parameters()
-resolutions = [15, 25, 50]
+resolutions = [15, 30, 60]
 
 fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
 for (idx, width) in enumerate(resolutions)
