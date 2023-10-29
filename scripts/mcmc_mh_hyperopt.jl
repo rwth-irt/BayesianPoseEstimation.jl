@@ -3,7 +3,7 @@
 # All rights reserved. 
 
 using DrWatson
-@quickactivate
+@quickactivate("MCMCDepth")
 
 using Accessors
 using BenchmarkTools
@@ -26,17 +26,20 @@ experiment_name = "mcmc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
 # NOTE ITODD might be influenced by different surface discrepancy threshold
-dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
+dataset = ["lm", "itodd", "tless", "steri"]
 testset = "train_pbr"
 scene_id = 0
-optsampler = [:BCAPSampler]
-configs = dict_list(@dict dataset testset scene_id optsampler)
+max_trials = 100
+optsampler = :BCAPSampler
+model = [:association_simple_reg, :smooth_posterior]
+configs = dict_list(@dict dataset testset scene_id optsampler model max_trials)
 
 """
-    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+    rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
 Assembles the posterior model and the sampler from the loaded images, mesh, and DataFrame row.
 """
-function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
+    @unpack model = config
     # Context
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
@@ -51,7 +54,7 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 
     # Model
     prior = point_prior(parameters, experiment, cpu_rng)
-    posterior = association_posterior(parameters, experiment, prior, dev_rng)
+    posterior = eval(model)(parameters, experiment, prior, dev_rng)
     # Sampler
     sampler = mh_sampler(cpu_rng, parameters, posterior)
     # Result
@@ -59,13 +62,13 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
 end
 
 """
-    timed_inference
+    timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
 Report the wall time from the point right after the raw data (the image, 3D object models etc.) is loaded.
 """
-function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
     time = @elapsed begin
         # Assemble sampler and run inference
-        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         # Only MTM supports multiple particles. Metropolis Hastings in recall_n_steps.jl
         chain = sample(rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning, progress=false)
         # Extract best pose and score
@@ -95,7 +98,7 @@ function cost_function(parameters, gl_context, config, scene_df)
         # Image crops differ per object
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
         # Run and collect results
-        t, R, score, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        t, R, score, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         est_df[idx, :].score = score
         est_df[idx, :].R = R
         est_df[idx, :].t = t
@@ -142,7 +145,7 @@ run_hyperopt(config)
 """
 function run_hyperopt(config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id, optsampler = config
+    @unpack dataset, testset, scene_id, model, optsampler, max_trials = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
     # Finally destroy OpenGL context
@@ -151,7 +154,7 @@ function run_hyperopt(config)
         # Benchmark model sampler configuration to adapt number of steps - also avoids timing pre-compilation
         df_row = first(scene_df)
         depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
-        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
+        rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
         step_time = mean_step_time(rng, posterior, sampler)
         @reset parameters.n_steps = floor(Int, parameters.time_budget / step_time)
 
@@ -166,17 +169,16 @@ function run_hyperopt(config)
             @reset parameters.association_σ = pixel_σ
             cost_function(parameters, gl_context, config, scene_df)
         end
-        max_trials = 250
         scenario = Scenario(
             c_reg=(5.0 .. 100.0),
-            pixel_σ=(0.0001 .. 0.1),
-            proposal_σ_r=(0.05 .. 1.0),
+            pixel_σ=(0.001 .. 0.1),
+            proposal_σ_r=(0.01 .. 1.0),
             proposal_σ_t=(0.001 .. 0.1),
             sampler=eval(optsampler)(),
             max_trials=max_trials,
             batch_size=1    # No support for multiple OpenGL contexts
         )
-        @progress "dataset $dataset" for _ in 1:max_trials
+        @progress "Optimizer: $optsampler Model: $model " for _ in 1:max_trials
             if default_stop_criteria(scenario)
                 break
             end

@@ -172,6 +172,7 @@ export load_tum
 
 # Experiment models
 export association_posterior
+export association_simple_reg
 export point_from_segmentation
 export point_prior
 export simple_posterior

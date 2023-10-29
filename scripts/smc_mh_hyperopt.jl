@@ -3,7 +3,7 @@
 # All rights reserved. 
 
 using DrWatson
-@quickactivate
+@quickactivate("MCMCDepth")
 
 using Accessors
 using BenchmarkTools
@@ -26,12 +26,13 @@ experiment_name = "smc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
 # NOTE ITODD might be influenced by different surface discrepancy threshold
-dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
+dataset = ["lm", "itodd", "tless", "steri"]
 testset = "train_pbr"
 scene_id = 0
+max_trials = 100
 optsampler = :BCAPSampler
-model = [:simple_posterior, :association_posterior]
-configs = dict_list(@dict dataset testset scene_id optsampler model)
+model = [:association_simple_reg, :smooth_posterior]
+configs = dict_list(@dict dataset testset scene_id optsampler model max_trials)
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
@@ -85,7 +86,7 @@ Returns (1 - VSD recall) as the costs for the hyperparameter optimization.
 Pass the scene_df to avoid loading it twice.
 """
 function cost_function(parameters, gl_context, config, scene_df)
-    HyperTuning.@unpack dataset, testset, scene_id = config
+    @unpack dataset, testset, scene_id = config
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     est_df = select(scene_df, :scene_id, :img_id, :obj_id)
     est_df.score = Vector{Float32}(undef, nrow(est_df))
@@ -153,7 +154,7 @@ run_hyperopt(config)
 """
 function run_hyperopt(config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id, optsampler = config
+    @unpack dataset, testset, scene_id, model, optsampler, max_trials = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
     # Finally destroy OpenGL context
@@ -176,16 +177,15 @@ function run_hyperopt(config)
             @reset parameters.association_σ = pixel_σ
             cost_function(parameters, gl_context, config, scene_df)
         end
-        max_trials = 250
         scenario = Scenario(
             c_reg=(5.0 .. 100.0),
-            pixel_σ=(0.0001 .. 0.1),
-            proposal_σ_r=(0.05 .. 1.0),
+            pixel_σ=(0.001 .. 0.1),
+            proposal_σ_r=(0.01 .. 1.0),
             sampler=eval(optsampler)(),
             max_trials=max_trials,
             batch_size=1    # No support for multiple OpenGL contexts
         )
-        @progress "dataset $dataset" for _ in 1:max_trials
+        @progress "Optimizer: $optsampler Model: $model " for _ in 1:max_trials
             if default_stop_criteria(scenario)
                 break
             end
@@ -204,7 +204,7 @@ end
 
 # TODO analyze results on a per-dataset basis. Different scenes - different parameters?
 pro_df = collect_results(result_dir)
-
+# NOTE scores of 0.13 should be achievable
 for row in eachrow(pro_df)
     scenario = row.scenario
     hist = history(scenario)
@@ -212,7 +212,9 @@ for row in eachrow(pro_df)
     show(best_parameters(scenario))
 end
 
+# TODO exclude steri when calculating mean
 
+# TODO analyze and plot results on validation set, scene 1-4
 experiment_name = "smc_mh_hyperopt_validation"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
