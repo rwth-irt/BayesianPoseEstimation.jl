@@ -2,9 +2,6 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
-# TODO re-run baseline script with these parameters.association_σ
-# TODO optimize MCMC-MH
-
 using DrWatson
 @quickactivate
 
@@ -28,6 +25,7 @@ CUDA.allowscalar(false)
 experiment_name = "mcmc_mh_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 # Different hyperparameter for different datasets?
+# NOTE ITODD might be influenced by different surface discrepancy threshold
 dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
 testset = "train_pbr"
 scene_id = 0
@@ -178,7 +176,7 @@ function run_hyperopt(config)
             max_trials=max_trials,
             batch_size=1    # No support for multiple OpenGL contexts
         )
-        @progress "optimizer $optsampler" for _ in 1:max_trials
+        @progress "dataset $dataset" for _ in 1:max_trials
             if default_stop_criteria(scenario)
                 break
             end
@@ -205,7 +203,6 @@ for row in eachrow(pro_df)
     show(best_parameters(scenario))
 end
 
-# NOTE ITODD might be influenced by different surface discrepancy threshold
 
 # TODO analyze and plot results on validation set, scene 1-4
 

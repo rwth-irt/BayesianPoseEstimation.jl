@@ -234,10 +234,14 @@ transform!(pro_df, :vsdbop => ByRow(x -> threshold_errors(vcat(x...), BOP19_THRE
 # Recall by pixel model and classification
 groups = groupby(pro_df, [:pixel, :classification, :o_prior])
 recalls = combine(groups, :adds_thresh => (x -> recall(x...)) => :adds_recall, :vsd_thresh => (x -> recall(x...)) => :vsd_recall, :vsdbop_thresh => (x -> recall(x...)) => :vsdbop_recall)
+# calculate core recall
+recalls = transform(recalls, [:adds_recall, :vsd_recall, :vsdbop_recall] => ByRow((a, b, c) -> mean([a, b, c])) => :avg_recall)
+
 CSV.write(datadir("exp_pro", experiment_name, "pixel_classification_recall.csv"), recalls)
 display(recalls)
 
 fig = MK.Figure(resolution=(DISS_WIDTH, 0.4 * DISS_WIDTH))
+crange = (minimum(recalls.vsdbop_recall), maximum(recalls.vsdbop_recall))
 # Heatmap for table
 for (idx, group) in enumerate(groupby(recalls, :o_prior))
     # into matrix shape
@@ -260,17 +264,18 @@ for (idx, group) in enumerate(groupby(recalls, :o_prior))
     yticks = (eachindex(row_names), row_names)
 
     # Plot
-    ax = MK.Axis(fig[1, 2*idx-1]; title=title, xticks=xticks, yticks=yticks, xlabel="pixel model", ylabel="class. & regul.", aspect=1)
-    hm = MK.heatmap!(ax, data'; colorrange=(0.62, 0.7))
+    ax = MK.Axis(fig[1, idx]; title=title, xticks=xticks, yticks=yticks, xlabel="occlusion model", ylabel="class. & regul.", aspect=1)
+    hm = MK.heatmap!(ax, data'; colorrange=crange)
     data_string(data) = @sprintf("%.3f", data)
     MK.text!(ax,
         data_string.(vec(data)),
         position=[MK.Point2f(x, y) for x in eachindex(column_names) for y in eachindex(row_names)],
         align=(:center, :center)
     )
-    MK.Colorbar(fig[1, 2*idx], hm; height=MK.@lift(MK.Fixed($(MK.pixelarea(ax.scene)).widths[2])))
+    MK.colsize!(fig.layout, idx, MK.Aspect(1, 1.0))
 end
-MK.colsize!(fig.layout, 1, MK.Aspect(1, 1.0))
-MK.colsize!(fig.layout, 3, MK.Aspect(1, 1.0))
-save(joinpath("plots", "$(experiment_name).pdf"), fig)
+MK.Colorbar(fig[1, 3]; label="average recall", limits=crange)
+
+# MK.colsize!(fig.layout, 2, MK.Aspect(1, 1.0))
 display(fig)
+save(joinpath("plots", "$(experiment_name).pdf"), fig)
