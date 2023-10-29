@@ -277,5 +277,5 @@ end
 MK.Colorbar(fig[1, 3]; label="average recall", limits=crange)
 
 # MK.colsize!(fig.layout, 2, MK.Aspect(1, 1.0))
-display(fig)
+# display(fig)
 save(joinpath("plots", "$(experiment_name).pdf"), fig)
