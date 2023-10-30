@@ -196,7 +196,7 @@ recall_groups = groupby(mtm_recalls, :n_particles)
 time_groups = groupby(mtm_times, :n_particles)
 
 # Actually plot it
-fig = MK.Figure(resolution=(DISS_WIDTH, 2 / 3 * DISS_WIDTH); figure_padding=10)
+fig = MK.Figure(resolution=(DISS_WIDTH, 0.5 * DISS_WIDTH); figure_padding=10)
 ax_vsd = MK.Axis(fig[2, 1]; xlabel="pose inference time / s", ylabel="recall", title="VSD", limits=(nothing, (0, 1)), yticks=0:0.25:1)
 for (rec, tim) in zip(recall_groups, time_groups)
     MK.lines!(ax_vsd, tim.mean_time, rec.vsd_recall; label="MTM $(rec.n_particles |> first) particles")
