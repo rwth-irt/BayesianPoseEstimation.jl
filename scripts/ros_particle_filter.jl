@@ -33,7 +33,7 @@ global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
 # TODO p2_li_0 only contain half the data?
-bag_name = ["p2_li_25_50", "p2_li_50_95"] # , "p2_li_0"]
+bag_name = ["p2_li_25_50", "p2_li_50_95"]
 # NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
@@ -45,18 +45,18 @@ configs = dict_list(@dict bag_name sampler posterior)
 parameters = Parameters()
 @reset parameters.width = 80
 @reset parameters.height = 60
-@reset parameters.depth = 1_000
+@reset parameters.depth = 1_500
 gl_context = render_context(parameters)
 @reset parameters.relative_ess = 0.5
+prior_o = parameters.float_type(0.5)
 # NOTE low value crucial for best performance
-prior_o = 0.9f0
 @reset parameters.pixel_σ = 0.001
 @reset parameters.min_depth = 0.15
 @reset parameters.max_depth = 10
 @reset parameters.association_σ = parameters.pixel_σ
 @reset parameters.proposal_σ_t = fill(1e-3, 3)
 @reset parameters.proposal_σ_r = fill(1e-3, 3)
-@reset parameters.velocity_decay = 0.5
+@reset parameters.velocity_decay = 0.9
 
 function pf_inference(config, gl_context, parameters)
     # Extract config and load dataset to memory so disk is no bottleneck
@@ -77,9 +77,9 @@ function pf_inference(config, gl_context, parameters)
     # Coordinate PF evaluates the likelihood twice
     # Targets 90Hz of Intel Realsense cameras
     if sampler == :bootstrap_pf
-        @reset parameters.n_particles = 800
+        @reset parameters.n_particles = 1250
     elseif sampler == :coordinate_pf
-        @reset parameters.n_particles = 400
+        @reset parameters.n_particles = 600
     end
     cpu_rng = Random.default_rng(parameters)
     dev_rng = device_rng(parameters)
@@ -246,38 +246,3 @@ for row in eachrow(raw_df)
     isfile(julia_tum) ? rm(julia_tum) : nothing
     isfile(baseline_tum) ? rm(baseline_tum) : nothing
 end
-
-# # Plot ESS
-# begin
-#     # NOTE looks like smooth_posterior degrades ESS / really focuses on one
-#     # NOTE coordinate PF has way less sample degeneration
-#     states = row.states
-#     MK.lines(1:length(states), exp.(getproperty.(states, :ess)))
-# end
-
-# # Poses ontop of depth image
-# begin
-#     rosbag_dir = datadir("rosbags", row.bag_name)
-#     rosbag = load(joinpath(rosbag_dir, "original.bag"))
-
-#     depth_imgs = @. rosbag["/camera/depth/image_rect_raw"] |> ros_depth_img
-#     parameters = row.parameters
-#     gl_context = render_context(parameters)
-#     mesh = upload_mesh(gl_context, joinpath(rosbag_dir, "track.obj"))
-#     camera = rosbag["/camera/depth/camera_info"] |> first |> CvCamera
-#     scene = Scene(camera, [mesh])
-#     experiment = Experiment(gl_context, scene, 0.5, fill(0, 3), one(Quaternion), first(depth_imgs))
-
-#     diss_defaults()
-#     idx = 600
-#     img = depth_resize(depth_imgs[idx], parameters.width, parameters.height)
-#     experiment = Experiment(experiment, img)
-#     depth_img = copy(img)
-#     depth_min = minimum(depth_img)
-#     depth_img[depth_img.>1] .= 0
-#     depth_img = depth_img / maximum(depth_img)
-#     fig = plot_best_pose(states[idx].sample, experiment, Gray.(depth_img), logprobability)
-#     display(fig)
-
-#     destroy_context(gl_context)
-# end
