@@ -30,6 +30,6 @@ begin
     plot_scene_ontop!(fig, gl_context, scene, color_img; aspect=aspect_ratio)
     # display(fig)
     MK.save(joinpath("plots", "full_scene.pdf"), fig)
-
+    display(fig)
     destroy_context(gl_context)
 end
