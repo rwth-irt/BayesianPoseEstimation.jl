@@ -31,13 +31,12 @@ struct Experiment{T}
         Automatically transfers `prior_o` `depth_image` to the device of the `gl_context`.
     """
     function Experiment(gl_context, scene, prior_o, prior_t, prior_r, depth_image::AbstractMatrix{T}) where {T}
+        depth_image[depth_image.<=0] .= typemax(T)
         device_img = to_device(gl_context, depth_image)
         # can also be a scalar
         if prior_o isa AbstractArray
             prior_o = to_device(gl_context, prior_o)
         end
-        indices = device_img .<= 0
-        device_img[indices] .= typemax(T)
         new{T}(gl_context, scene, prior_o, prior_t, prior_r, device_img)
     end
 end
