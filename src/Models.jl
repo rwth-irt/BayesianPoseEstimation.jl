@@ -185,8 +185,8 @@ function marginalized_association(dist_is, dist_not, prior, μ, z)
     nominator = prior * p_is
     # Marginalize Bernoulli distributed by summing out o
     marginal = nominator + (1 - prior) * p_not
-    # Normalized posterior
-    nominator / marginal
+    # Normalized posterior, division by zero possible if prior==1 && p_is==0
+    iszero(marginal) ? nominator : nominator / marginal
 end
 
 """
