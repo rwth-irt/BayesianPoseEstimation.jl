@@ -180,6 +180,7 @@ Moreover, a `prior` is required for the association probability `o`.
 The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
 """
 function marginalized_association(dist_is, dist_not, prior, μ, z)
+    # nothing to update for invalid μ, avoid division by zero
     if (isinf(μ) || μ <= 0)
         return prior
     end
