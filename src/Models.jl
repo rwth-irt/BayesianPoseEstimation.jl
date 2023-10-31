@@ -55,7 +55,8 @@ ImageLikelihoodNormalizer(c_reg::T, μ::M, _...) where {T,M} = ImageLikelihoodNo
 
 Base.rand(::AbstractRNG, ::ImageLikelihoodNormalizer, value) = value
 function DensityInterface.logdensityof(model::ImageLikelihoodNormalizer, z, ℓ)
-    n_o = sum_and_dropdims(model.o .>= 0.5, (1, 2))
+    # Must be >0.5, >=0.5 would include the indifferent 50:50 prior
+    n_o = sum_and_dropdims(model.o .> 0.5, (1, 2))
     logdensity_npixel.(ℓ, model.c_reg, n_o)
 end
 """
