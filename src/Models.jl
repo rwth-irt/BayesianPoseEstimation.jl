@@ -83,7 +83,7 @@ end
 SimpleImageRegularization(c_reg, _...) = SimpleImageRegularization(c_reg)
 
 Base.rand(::AbstractRNG, ::SimpleImageRegularization, value) = value
-DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ) = logdensity_npixel(ℓ, model.c_reg, length(z))
+DensityInterface.logdensityof(model::SimpleImageRegularization, z, ℓ) = logdensity_npixel.(ℓ, model.c_reg, length(z))
 
 ######### Pixel models #########
 
@@ -179,10 +179,13 @@ end
 Consists of a distribution `dist_is(μ)` for the probability of a pixel belonging to the object of interest and `dist_not(μ)` which models the probability of the pixel not belonging to this object.
 Moreover, a `prior` is required for the association probability `o`.
 The `logdensityof` the observation `z` is calculated analytically by marginalizing the two distributions.
+
+Assumes that dist_not covers ℝ and returns a nonzero probability.
+Limit cases: prior==1 → 1, prior==0 → 0
 """
 function marginalized_association(dist_is, dist_not, prior, μ, z)
-    # nothing to update for invalid μ, avoid division by zero
-    if (isinf(μ) || μ <= 0)
+    # Return limit if no update is possible - avoids divisions by zero
+    if iszero(prior) || isone(prior) || iszero(μ)
         return prior
     end
     p_is = pdf(dist_is(μ), z)
@@ -190,8 +193,7 @@ function marginalized_association(dist_is, dist_not, prior, μ, z)
     nominator = prior * p_is
     # Marginalize Bernoulli distributed by summing out o
     marginal = nominator + (1 - prior) * p_not
-    # Normalized posterior, division by zero possible if prior==1 && p_is==0
-    iszero(marginal) ? prior : nominator / marginal
+    nominator / marginal
 end
 
 """

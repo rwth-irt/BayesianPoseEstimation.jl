@@ -178,6 +178,7 @@ export point_prior
 export simple_posterior
 export smooth_posterior
 export smooth_simple_posterior
+export smooth_simple_reg
 
 # Experiment sampler
 export mh_local_sampler

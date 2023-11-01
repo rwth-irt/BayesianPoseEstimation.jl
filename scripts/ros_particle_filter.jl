@@ -38,17 +38,18 @@ bag_name = ["p2_li_25_50", "p2_li_50_95"]
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
 # NOTE simple most stable, association and smooth smoother.
-posterior = [:simple_posterior, :smooth_posterior, :smooth_simple_posterior, :association_posterior]
+posterior = [:simple_posterior, :smooth_posterior]
+prior_o = [0.4, 0.6]
 configs = dict_list(@dict bag_name sampler posterior)
 
-# WARN frequent destruction and recreation of gl_context leads to weird behavior (nothing is rendered?)
 parameters = Parameters()
 @reset parameters.width = 80
 @reset parameters.height = 60
 @reset parameters.depth = 1_500
 gl_context = render_context(parameters)
 @reset parameters.relative_ess = 0.5
-prior_o = parameters.float_type(0.5)
+# NOTE >0.5 assigns almost all pixels to the regularization except the ones certainly not - way better performance even though it is almost similar to SimpleImageRegularization
+prior_o = parameters.float_type(0.6)
 # NOTE low value crucial for best performance
 @reset parameters.pixel_σ = 0.001
 @reset parameters.min_depth = 0.15
@@ -131,7 +132,7 @@ run(`bash -c """cd scripts/rosbag \
 exp_pro = datadir("exp_pro", "pf")
 mkpath(exp_pro)
 
-function pf_title(bag_name, sampler, posterior, fps)
+function pf_title(bag_name, sampler, posterior, prior_o, fps)
     occ_string = sampler_str = model_str = ""
     if contains(bag_name, "25_50")
         occ_string = "25-50% occlusion, "
@@ -144,15 +145,11 @@ function pf_title(bag_name, sampler, posterior, fps)
         sampler_str = "block-wise, "
     end
     if posterior == "simple_posterior"
-        model_str = "unmodified, "
-    elseif posterior == "association_posterior"
-        model_str = "unmodified & classification, "
+        model_str = "simple, "
     elseif posterior == "smooth_posterior"
-        model_str = "smooth truncated & classification, "
-    elseif posterior == "smooth_simple_posterior"
-        model_str = "smooth truncated, "
+        model_str = "complex, "
     end
-    occ_string * sampler_str * model_str * "$(round(Int, fps))Hz"
+    occ_string * sampler_str * model_str * "p(cₒ)=$(prior_o), " * "$(round(Int, fps))Hz"
 end
 
 for row in eachrow(raw_df)
