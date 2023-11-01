@@ -37,7 +37,7 @@ testset = "train_pbr"
 scene_id = 0
 resolution = [2, 5:5:25..., 30, 40, 50:25:100...]
 # Which one to keep constant
-mode = [:time, :steps]
+mode = :time # [:time, :steps]
 configs = dict_list(@dict dataset testset scene_id mode resolution)
 
 """
@@ -183,40 +183,44 @@ import CairoMakie as MK
 diss_defaults()
 
 # Const n_steps
-steps_recalls = filter(:mode => x -> x == "steps", recalls)
-steps_time = filter(:mode => x -> x == "steps", times_and_steps)
-sort!(steps_recalls, :resolution)
-sort!(steps_time, :resolution)
+if "steps" in recalls.mode
+    steps_recalls = filter(:mode => x -> x == "steps", recalls)
+    steps_time = filter(:mode => x -> x == "steps", times_and_steps)
+    sort!(steps_recalls, :resolution)
+    sort!(steps_time, :resolution)
 
-f1 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
-ax1 = MK.Axis(f1[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, yticks=0:0.2:1, limits=(nothing, nothing, 0, 1))
-MK.lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
-MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
-MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP")
-ax2 = MK.Axis(f1[1, 1]; ylabel="pose inference time", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, xgridvisible=false, ygridvisible=false, limits=(nothing, (0, 1)))
-MK.lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="avg. inference time", linestyle=:dash, color=:black)
-MK.axislegend(ax1; position=:rb)
-MK.axislegend(ax2; position=:cb)
+    f1 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
+    ax1 = MK.Axis(f1[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, yticks=0:0.2:1, limits=(nothing, nothing, 0, 1))
+    MK.lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
+    MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
+    MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsdbop_recall; label="VSDBOP")
+    ax2 = MK.Axis(f1[1, 1]; ylabel="pose inference time", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, xgridvisible=false, ygridvisible=false, limits=(nothing, (0, 1)))
+    MK.lines!(ax2, steps_recalls.resolution, steps_time.mean_time; label="avg. inference time", linestyle=:dash, color=:black)
+    MK.axislegend(ax1; position=:rb)
+    MK.axislegend(ax2; position=:cb)
 
-# display(f1)
-save(joinpath("plots", "$(experiment_name)_const_steps.pdf"), f1)
+    # display(f1)
+    save(joinpath("plots", "$(experiment_name)_const_steps.pdf"), f1)
+end
 
 # Const time
-time_recalls = filter(:mode => x -> x == "time", recalls)
-time_steps = filter(:mode => x -> x == "time", times_and_steps)
-sort!(time_recalls, :resolution)
-sort!(time_steps, :resolution)
+if "time" in recalls.mode
+    time_recalls = filter(:mode => x -> x == "time", recalls)
+    time_steps = filter(:mode => x -> x == "time", times_and_steps)
+    sort!(time_recalls, :resolution)
+    sort!(time_steps, :resolution)
 
-f2 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
-ax1 = MK.Axis(f2[1, 1], xlabel="resolution / px", ylabel="recall", xticks=steps_recalls.resolution, yticks=0:0.2:1, limits=(nothing, (0, 1)))
-MK.lines!(ax1, time_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
-MK.lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")
-MK.lines!(ax1, time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP")
-ax2 = MK.Axis(f2[1, 1]; ylabel="steps per inference", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, xgridvisible=false, ygridvisible=false, limits=(nothing, (0, 1)))
-MK.lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="avg. inference steps", linestyle=:dash, color=:black)
-MK.limits!(ax2, 0, nothing, 0, nothing)
-MK.axislegend(ax1; position=:rb)
-MK.axislegend(ax2; position=:cb)
+    f2 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
+    ax1 = MK.Axis(f2[1, 1], xlabel="resolution / px", ylabel="recall", xticks=time_recalls.resolution, yticks=0:0.2:1, limits=(nothing, (0, 1)))
+    MK.lines!(ax1, time_recalls.resolution, time_recalls.adds_recall; label="ADDS")
+    MK.lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")
+    MK.lines!(ax1, time_recalls.resolution, time_recalls.vsdbop_recall; label="VSDBOP")
+    ax2 = MK.Axis(f2[1, 1]; ylabel="steps per inference", yaxisposition=:right, xticksvisible=false, xticklabelsvisible=false, xgridvisible=false, ygridvisible=false, limits=(nothing, (0, 1)))
+    MK.lines!(ax2, time_recalls.resolution, time_steps.mean_steps; label="avg. inference steps", linestyle=:dash, color=:black)
+    MK.limits!(ax2, 0, nothing, 0, nothing)
+    MK.axislegend(ax1; position=:rb)
+    MK.axislegend(ax2; position=:cb)
 
-# display(f2)
-save(joinpath("plots", "$(experiment_name)_const_time.pdf"), f2)
+    # display(f2)
+    save(joinpath("plots", "$(experiment_name)_const_time.pdf"), f2)
+end

@@ -33,7 +33,7 @@ function smc_parameters(parameters=Parameters())
     # NOTE SMC: tempering is essential. More steps (MCMC) allows higher c_reg than more particles (FP, Bootstrap)
     # NOTE FP & Bootstrap do not allow independent moves so they profit from a large number of particles. They are also resampling dominated instead of acceptance.
     # NOTE Why is MTM so much worse? One reason might have been that tempering was not implemented.
-    @reset parameters.n_steps = 200
+    @reset parameters.n_steps = 400
     @reset parameters.n_particles = 100
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.depth = parameters.n_particles
@@ -66,6 +66,13 @@ gl_context = render_context(parameters)
 df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
 row = df[204, :]
 
+# Steri on flat surface
+# df = train_targets(joinpath("data", "bop", "steri", "train_pbr"), 2)
+# row = df[10, :]
+# # NOTE high probability for segmentation mask seems beneficial, as well as simple model
+# @reset parameters.o_mask_is = 0.9
+# @reset parameters.o_mask_not = 1 - parameters.o_mask_is
+
 # Experiment setup
 camera = crop_camera(row)
 mesh = upload_mesh(gl_context, load_mesh(row))
@@ -91,7 +98,8 @@ plot_scene_ontop(gl_context, scene, color_img)
 prior = point_prior(parameters, experiment, cpu_rng)
 
 # NOTE no association → prior_o has strong influence
-posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+# posterior = smooth_simple_posterior(parameters, experiment, prior, dev_rng)
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
 # NOTE flat prior_o .= 0.5 seems to require the association and truncation
 # NOTE only smooth_posterior seems to succeed with the T-LESS scene
@@ -100,11 +108,12 @@ posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 # Sampler
 parameters = smc_parameters(parameters)
 sampler = smc_mh(cpu_rng, parameters, posterior)
-# sampler = smc_bootstrap(cpu_rng, parameters, posterior)
 
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
 # TODO diagnostics: Accepted steps, resampling steps
 @time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
+
+diss_defaults()
 # NOTE evidence actually seems to be a pretty good convergence indicator. Once the minimum has been reached, the algorithm seems to have converged.
 fig = plot_logevidence(states)
 MK.save(joinpath("plots", "evidence_smc_clutter.pdf"), fig)
@@ -114,19 +123,10 @@ MK.save(joinpath("plots", "density_smc_clutter.pdf"), fig)
 
 MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 fig = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
-display(fig)
 MK.save(joinpath("plots", "best_smc_clutter.pdf"), fig)
 fig = plot_prob_img(mean_image(final_state, :o))
+display(fig)
 MK.save(joinpath("plots", "prob_img_smc_clutter.pdf"), fig)
-diss_defaults()
-
-# TODO animate Makie
-# step_size = length(states) ÷ 100
-# anim = @animate for idx in 1:step_size:length(states)
-#     # White background required for accurate axis colors
-#     plot_best_pose(states[idx].sample, experiment, color_img; title="Iteration $(idx)", background_color=:white)
-# end;
-# gif(anim, "smc.gif", fps=15)
 
 # MCMC samplers
 parameters = mh_parameters(parameters)
@@ -137,9 +137,10 @@ sampler = mh_sampler(cpu_rng, parameters, posterior)
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
 # TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 @time chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
+
+diss_defaults()
 fig = plot_pose_chain(chain, 50)
 MK.save(joinpath("plots", "density_mcmc_clutter.pdf"), fig)
-
 # plot_logprob(chain, 50)
 MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 # plot_prob_img(mean_image(chain, :o))
@@ -147,13 +148,5 @@ fig = plot_best_pose(chain, experiment, color_img)
 display(fig)
 MK.save(joinpath("plots", "best_mcmc_clutter.pdf"), fig)
 diss_defaults()
-
-# TODO animate Makie
-# step_size = length(chain) ÷ 100
-# anim = @animate for idx in 1:step_size:length(chain)
-#     # White background required for accurate axis colors
-#     plot_best_pose(chain[idx], experiment, color_img; title="Iteration $(idx)", background_color=:white)
-# end;
-# gif(anim, "mcmc.gif"; fps=15)
 
 destroy_context(gl_context)

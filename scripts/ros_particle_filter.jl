@@ -32,12 +32,11 @@ using Logging: global_logger
 global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
-# TODO p2_li_0 only contain half the data?
-bag_name = "p2_li_50_95"  # TODO ["p2_li_25_50", "p2_li_50_95"]
+# TODO p2_li_0 only contains half the data?
+bag_name = "p2_li_50_95"  # ["p2_li_25_50", "p2_li_50_95"]
 # NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
-# NOTE simple most stable, association and smooth smoother.
 posterior = [:simple_posterior, :smooth_posterior]
 prior_o = [0.49, 0.51]
 configs = dict_list(@dict bag_name sampler posterior prior_o)
@@ -92,7 +91,7 @@ function pf_inference(config, gl_context, parameters)
     scene = Scene(camera, [scene_mesh])
     experiment = Experiment(gl_context, scene, prior_o, t, R, first(depth_imgs))
 
-    # NOTE regularization only makes a difference for association models... Only better for low pixel_σ
+    # NOTE regularization only makes a difference for association models
     # avoid timing pre-compilation
     eval(sampler)(cpu_rng, dev_rng, eval(posterior), parameters, experiment, diameter, depth_imgs[1:2])
     elaps = @elapsed begin
