@@ -267,4 +267,8 @@ end
 normalize_log_weights(log_weights)
     Normalization of the weights in the log domain using the log-sum-exp trick.
 """
-normalize_log_weights(log_weights) = log_weights .- logsumexp(log_weights)
+function normalize_log_weights(log_weights)
+    # avoid division by zero / NaN in case all elements are -Inf
+    denom = logsumexp(log_weights)
+    isinf(denom) ? log_weights : (log_weights .- denom)
+end

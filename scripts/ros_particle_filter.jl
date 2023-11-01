@@ -33,14 +33,14 @@ global_logger(TerminalLogger(right_justify=120))
 
 result_dir = datadir("exp_raw", "pf")
 # TODO p2_li_0 only contain half the data?
-bag_name = ["p2_li_25_50", "p2_li_50_95"]
+bag_name = "p2_li_50_95"  # TODO ["p2_li_25_50", "p2_li_50_95"]
 # NOTE coordinate a bit more stable (association p2_li_25_50) otherwise no big difference?
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
 # NOTE simple most stable, association and smooth smoother.
 posterior = [:simple_posterior, :smooth_posterior]
-prior_o = [0.4, 0.6]
-configs = dict_list(@dict bag_name sampler posterior)
+prior_o = [0.49, 0.51]
+configs = dict_list(@dict bag_name sampler posterior prior_o)
 
 parameters = Parameters()
 @reset parameters.width = 80
@@ -48,20 +48,19 @@ parameters = Parameters()
 @reset parameters.depth = 1_500
 gl_context = render_context(parameters)
 @reset parameters.relative_ess = 0.5
-# NOTE >0.5 assigns almost all pixels to the regularization except the ones certainly not - way better performance even though it is almost similar to SimpleImageRegularization
-prior_o = parameters.float_type(0.6)
 # NOTE low value crucial for best performance
 @reset parameters.pixel_σ = 0.001
+@reset parameters.association_σ = parameters.pixel_σ
 @reset parameters.min_depth = 0.15
 @reset parameters.max_depth = 10
-@reset parameters.association_σ = parameters.pixel_σ
 @reset parameters.proposal_σ_t = fill(1e-3, 3)
 @reset parameters.proposal_σ_r = fill(1e-3, 3)
 @reset parameters.velocity_decay = 0.9
 
 function pf_inference(config, gl_context, parameters)
     # Extract config and load dataset to memory so disk is no bottleneck
-    @unpack bag_name, sampler, posterior = config
+    @unpack bag_name, sampler, posterior, prior_o = config
+    prior_o = parameters.float_type(prior_o)
 
     # ROS bag
     rosbag_dir = datadir("rosbags", bag_name)
@@ -115,13 +114,13 @@ destroy_context(gl_context)
 # Convert results to TUM for processing in evo
 function parse_config(path)
     config = my_parse_savename(path)
-    @unpack bag_name, sampler, posterior = config
-    bag_name, sampler, posterior
+    @unpack bag_name, sampler, posterior, prior_o = config
+    bag_name, sampler, posterior, prior_o
 end
 to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
 ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
 raw_df = collect_results(datadir("exp_raw", "pf"))
-transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior])
+transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior, :prior_o])
 
 # Setup python environment for evo
 run(`bash -c """cd scripts/rosbag \
@@ -227,7 +226,7 @@ for row in eachrow(raw_df)
     MK.axislegend(ax, position=:lt)
 
     # position
-    ax = MK.Axis(fig[1, :]; ylabel="error / mm", title=pf_title(row.bag_name, row.sampler, row.posterior, row.fps))
+    ax = MK.Axis(fig[1, :]; ylabel="error / mm", title=pf_title(row.bag_name, row.sampler, row.posterior, row.prior_o, row.fps))
     MK.lines!(ax, stamp_robot, t_err_robot * 1e3; label="at robot")
     MK.lines!(ax, stamp_only, t_err_only * 1e3; label="at only")
     MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
@@ -238,7 +237,7 @@ for row in eachrow(raw_df)
     MK.colsize!(fig.layout, 2, MK.Auto(0.5))
     # display(fig)
     mkpath(joinpath("plots", "pf"))
-    save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior).pdf"), fig)
+    save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior)_$(row.prior_o).pdf"), fig)
     # Remove files
     isfile(julia_tum) ? rm(julia_tum) : nothing
     isfile(baseline_tum) ? rm(baseline_tum) : nothing

@@ -184,7 +184,7 @@ Assumes that dist_not covers ℝ and returns a nonzero probability.
 Limit cases: prior==1 → 1, prior==0 → 0
 """
 function marginalized_association(dist_is, dist_not, prior, μ, z)
-    # Return limit if no update is possible - avoids divisions by zero
+    # Return limit if no update is possible - avoids division by zero
     if iszero(prior) || isone(prior) || iszero(μ)
         return prior
     end
