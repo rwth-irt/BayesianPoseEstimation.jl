@@ -31,7 +31,8 @@ testset = "train_pbr"
 scene_id = 0
 max_trials = 100
 optsampler = :BCAPSampler
-model = [:association_simple_reg, :smooth_posterior]
+# TODO if I cannot decide use the simpler one
+model = [:simple_posterior, :smooth_posterior]
 configs = dict_list(@dict dataset testset scene_id optsampler model max_trials)
 
 """
@@ -169,8 +170,9 @@ function run_hyperopt(config)
 
         # Capture local parameters in this closure which suffices the HyperTuning interface
         function objective(trial)
-            @unpack c_reg, proposal_σ_r, pixel_σ = trial
-            @reset parameters.c_reg = c_reg
+            @unpack o_mask_is, pixel_σ, proposal_σ_r = trial
+            @reset parameters.o_mask_is = o_mask_is
+            @reset parameters.o_mask_not = 1 - o_mask_is
             # NOTE does not make sense to optimize heavily correlated variables e.g. σ_t & c_reg
             @reset parameters.proposal_σ_r = fill(proposal_σ_r, 3)
             @reset parameters.pixel_σ = pixel_σ
@@ -178,7 +180,7 @@ function run_hyperopt(config)
             cost_function(parameters, gl_context, config, scene_df)
         end
         scenario = Scenario(
-            c_reg=(5.0 .. 100.0),
+            o_mask_is=(0 .. 1.0),
             pixel_σ=(0.001 .. 0.1),
             proposal_σ_r=(0.01 .. 1.0),
             sampler=eval(optsampler)(),
@@ -212,6 +214,7 @@ for row in eachrow(pro_df)
     show(best_parameters(scenario))
 end
 
+# TODO ITODD 0.22 should be possible
 # TODO exclude steri when calculating mean
 
 # TODO analyze and plot results on validation set, scene 1-4

@@ -140,12 +140,12 @@ sampler = mh_sampler(cpu_rng, parameters, posterior)
 
 diss_defaults()
 fig = plot_pose_chain(chain, 50)
+display(fig)
 MK.save(joinpath("plots", "density_mcmc_clutter.pdf"), fig)
 # plot_logprob(chain, 50)
 MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 # plot_prob_img(mean_image(chain, :o))
 fig = plot_best_pose(chain, experiment, color_img)
-display(fig)
 MK.save(joinpath("plots", "best_mcmc_clutter.pdf"), fig)
 diss_defaults()
 

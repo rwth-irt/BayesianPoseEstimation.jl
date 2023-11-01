@@ -31,13 +31,14 @@ CUDA.allowscalar(false)
 # General experiment
 experiment_name = "smc_observation"
 result_dir = datadir("exp_raw", experiment_name)
-dataset = ["lm", "tless", "itodd"]
+dataset = ["itodd", "lm", "tless"]
 pixel = [:no_exp, :exp, :smooth]
 o_prior = [:flat, :mask]
 # Classification and regularization:
 # :no - no classification, simple regularization
 # :simple - classification, simple regularization
 # :class - classification, L0 regularization
+# TODO it seems like a lower pixel_σ is required to make the class work
 classification = [:no, :simple, :class]
 testset = "train_pbr"
 scene_id = [0:4...]
@@ -177,7 +178,6 @@ function scene_inference(gl_context, config)
     depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
     rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
     step_time = mean_step_time(rng, posterior, sampler)
-    # time budget of 0.5 seconds
     @reset parameters.n_steps = floor(Int, parameters.time_budget / step_time)
 
     # Run inference per detection
