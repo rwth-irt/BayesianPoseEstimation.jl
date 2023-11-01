@@ -199,12 +199,17 @@ function plot_best_pose(chain::AbstractVector{<:Sample}, experiment, img, getter
     plot_scene_ontop(experiment.gl_context, scene, img)
 end
 
+mean_image(img::AbstractMatrix) = img
+mean_image(img::AbstractMatrix, weights) = img
+mean_image(img::AbstractArray) = dropdims(mean(img, dims=3); dims=3)
+mean_image(img::AbstractArray, weights) = dropdims(mean(img, weights, dims=3); dims=3)
+
 """
     mean_image(sample, var_name)
 Creates an image of the mean of the given variable.
 """
-mean_image(sample::Sample, var_name) = dropdims(mean(variables(sample)[var_name], dims=3); dims=3)
-mean_image(state::SmcState, var_name) = dropdims(mean(variables(state.sample)[var_name] |> Array, weights(exp.(state.log_weights)); dims=3); dims=3)
+mean_image(sample::Sample, var_name) = mean_image(variables(sample)[var_name] |> Array)
+mean_image(state::SmcState, var_name) = mean_image(variables(state.sample)[var_name] |> Array, weights(exp.(state.log_weights)))
 mean_image(chain::AbstractVector{<:Sample}, var_name) = mean(x -> variables(x)[var_name], chain)
 mean_image(chains::AbstractVector{<:AbstractVector{<:Sample}}, var_name) = mean(x -> mean_image(x, var_name), chains)
 
