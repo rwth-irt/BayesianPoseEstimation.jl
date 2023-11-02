@@ -38,8 +38,7 @@ bag_name = "p2_li_50_95"  # ["p2_li_25_50", "p2_li_50_95"]
 # WARN do not crop - shaky due to discretization error
 sampler = [:coordinate_pf, :bootstrap_pf]
 posterior = [:simple_posterior, :smooth_posterior]
-prior_o = [0.49, 0.51]
-configs = dict_list(@dict bag_name sampler posterior prior_o)
+configs = dict_list(@dict bag_name sampler posterior)
 
 parameters = Parameters()
 @reset parameters.width = 80
@@ -58,8 +57,8 @@ gl_context = render_context(parameters)
 
 function pf_inference(config, gl_context, parameters)
     # Extract config and load dataset to memory so disk is no bottleneck
-    @unpack bag_name, sampler, posterior, prior_o = config
-    prior_o = parameters.float_type(prior_o)
+    @unpack bag_name, sampler, posterior = config
+    prior_o = parameters.float_type(0.5)
 
     # ROS bag
     rosbag_dir = datadir("rosbags", bag_name)
@@ -113,13 +112,13 @@ destroy_context(gl_context)
 # Convert results to TUM for processing in evo
 function parse_config(path)
     config = my_parse_savename(path)
-    @unpack bag_name, sampler, posterior, prior_o = config
-    bag_name, sampler, posterior, prior_o
+    @unpack bag_name, sampler, posterior = config
+    bag_name, sampler, posterior
 end
 to_secs(time::ROSTime) = Float64(time.secs) + time.nsecs / 1e9
 ros_time_secs(msg::MessageData) = to_secs(msg.data.header.time)
 raw_df = collect_results(datadir("exp_raw", "pf"))
-transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior, :prior_o])
+transform!(raw_df, :path => ByRow(parse_config) => [:bag_name, :sampler, :posterior])
 
 # Setup python environment for evo
 run(`bash -c """cd scripts/rosbag \
@@ -130,7 +129,7 @@ run(`bash -c """cd scripts/rosbag \
 exp_pro = datadir("exp_pro", "pf")
 mkpath(exp_pro)
 
-function pf_title(bag_name, sampler, posterior, prior_o, fps)
+function pf_title(bag_name, sampler, posterior, fps)
     occ_string = sampler_str = model_str = ""
     if contains(bag_name, "25_50")
         occ_string = "25-50% occlusion, "
@@ -147,7 +146,7 @@ function pf_title(bag_name, sampler, posterior, prior_o, fps)
     elseif posterior == "smooth_posterior"
         model_str = "complex, "
     end
-    occ_string * sampler_str * model_str * "p(cₒ)=$(prior_o), " * "$(round(Int, fps))Hz"
+    occ_string * sampler_str * model_str * "$(round(Int, fps))Hz"
 end
 
 for row in eachrow(raw_df)
@@ -225,7 +224,7 @@ for row in eachrow(raw_df)
     MK.axislegend(ax, position=:lt)
 
     # position
-    ax = MK.Axis(fig[1, :]; ylabel="error / mm", title=pf_title(row.bag_name, row.sampler, row.posterior, row.prior_o, row.fps))
+    ax = MK.Axis(fig[1, :]; ylabel="error / mm", title=pf_title(row.bag_name, row.sampler, row.posterior, row.fps))
     MK.lines!(ax, stamp_robot, t_err_robot * 1e3; label="at robot")
     MK.lines!(ax, stamp_only, t_err_only * 1e3; label="at only")
     MK.lines!(ax, stamp_julia, t_err_julia * 1e3; label="smc pf")
@@ -236,7 +235,7 @@ for row in eachrow(raw_df)
     MK.colsize!(fig.layout, 2, MK.Auto(0.5))
     # display(fig)
     mkpath(joinpath("plots", "pf"))
-    save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior)_$(row.prior_o).pdf"), fig)
+    save(joinpath("plots", "pf", "$(row.bag_name)_$(row.sampler)_$(row.posterior).pdf"), fig)
     # Remove files
     isfile(julia_tum) ? rm(julia_tum) : nothing
     isfile(baseline_tum) ? rm(baseline_tum) : nothing

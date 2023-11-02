@@ -120,7 +120,7 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
     μ_node = point_prior(parameters, experiment, cpu_rng)
     pixel_fn, class_fn = pixel_model(pixel, parameters)
     if classification == :no
-        o_node = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
+        o_node = DeterministicNode(:o, () -> experiment.prior_o)
     else
         o_node = DeterministicNode(:o, μ -> class_fn.(experiment.prior_o, μ, experiment.depth_image), (μ_node,))
     end
