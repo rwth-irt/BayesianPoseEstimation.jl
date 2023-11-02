@@ -38,8 +38,9 @@ Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 Uses the `SimpleImageRegularization` which considers the number of pixels in the image.
 """
 function simple_posterior(params, experiment, μ_node, dev_rng)
-    # BroadcastedNode(KernelDirac) is slow due to memory allocations
-    o_node = DeterministicNode(:o, () -> experiment.prior_o)
+    # BroadcastedNode(KernelDirac) is slow due to memory allocations, DeterministicNode does not scale to correct dims for resampling
+    # o_node = DeterministicNode(:o, () -> experiment.prior_o)
+    o_node = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
     z_i = pixel_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o_node))
     z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization | params.c_reg)
@@ -127,8 +128,9 @@ Provide a prior for `t, r` and the expected depth `μ` via the `μ_node`.
 Uses the `SimpleImageRegularization` which considers the number of pixels in the image.
 """
 function smooth_simple_posterior(params, experiment, μ_node, dev_rng)
-    # BroadcastedNode(KernelDirac) is slow due to memory allocations
-    o_node = DeterministicNode(:o, () -> experiment.prior_o)
+    # BroadcastedNode(KernelDirac) is slow due to memory allocations, DeterministicNode does not scale to correct dims for resampling
+    # o_node = DeterministicNode(:o, () -> experiment.prior_o)
+    o_node = BroadcastedNode(:o, dev_rng, KernelDirac, experiment.prior_o)
     z_i = pixel_mixture | (params.min_depth, params.max_depth, params.pixel_θ, params.pixel_σ)
     z = BroadcastedNode(:z, dev_rng, z_i, (μ_node, o_node))
     z_norm = ModifierNode(z, dev_rng, SimpleImageRegularization | params.c_reg)

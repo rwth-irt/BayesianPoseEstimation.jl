@@ -221,13 +221,9 @@ Returns the resampled SmcState where all log-weights are equal.
 function resample_systematic(rng::AbstractRNG, state::SmcState)
     # Resample variables
     indices = systematic_resampling_indices(rng, state.log_weights)
+    # TODO resampling all variables includin o & μ is expensive - would have reduce prior
     vars = map(variables(state.sample)) do x
-        if x isa Number
-            # e.g. from DeterministicNode
-            x
-        else
-            @view x[.., indices]
-        end
+        @view x[.., indices]
     end
     log_probs = logprobability(state.sample)[indices]
     log_likes = loglikelihood(state.sample)[indices]
