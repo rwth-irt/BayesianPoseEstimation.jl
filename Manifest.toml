@@ -2,7 +2,7 @@
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "3875bc75ba094e7c21ec6175c3f710d226905ae0"
+project_hash = "5edd914e6eb3eef2af86b7c5f2b0ed95bf73b1fc"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1678,9 +1678,9 @@ version = "0.3.13"
 
 [[deps.Scratch]]
 deps = ["Dates"]
-git-tree-sha1 = "30449ee12237627992a99d5e30ae63e4d78cd24a"
+git-tree-sha1 = "3bac05bc7e74a75fd9cba4295cde4045d9fe2386"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
-version = "1.2.0"
+version = "1.2.1"
 
 [[deps.SearchSpaces]]
 deps = ["Combinatorics", "Random"]
