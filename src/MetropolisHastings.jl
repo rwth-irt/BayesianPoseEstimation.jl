@@ -98,6 +98,8 @@ function reject_barrier(rejected::AbstractArray{Bool}, proposed, previous)
 end
 # Scalar case
 reject_barrier(rejected::Bool, proposed, previous) = rejected ? previous : proposed
+# DeterminsticNode as root
+reject_barrier(rejected::AbstractVector{Bool}, proposed, previous) = previous
 
 """
     reject_vectorized!(rejected, proposed, previous)
