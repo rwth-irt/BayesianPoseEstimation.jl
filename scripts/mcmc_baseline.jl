@@ -142,5 +142,6 @@ gl_scene_inference = scene_inference | gl_context
 end
 destroy_context(gl_context)
 
-# Calculate errors
+# Calculate errors and recalls
 evaluate_errors(experiment_name)
+evaluate_recalls(experiment_name)

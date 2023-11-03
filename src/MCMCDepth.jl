@@ -204,6 +204,7 @@ export vsdbop_row
 export vsd_depth_row
 
 export evaluate_errors
+export evaluate_recalls
 export match_obj_errors
 export mean_step_time
 export my_parse_savename, my_savename
