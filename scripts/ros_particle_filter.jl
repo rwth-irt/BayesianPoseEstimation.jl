@@ -162,6 +162,10 @@ for row in eachrow(raw_df)
     for (idx, state) in enumerate(row.states)
         t_mean = mean(state.sample.variables.t, weights(exp.(state.log_weights)); dims=2)
         q_mean = mean(state.sample.variables.r, weights(exp.(state.log_weights)))
+        # evaluate maximum likelihood instead
+        # _, max_idx = findmax(state.sample.log_like)
+        # t_mean = state.sample.variables.t[:, max_idx]
+        # q_mean = state.sample.variables.r[max_idx]
         x[idx], y[idx], z[idx] = t_mean
         qw[idx] = real(q_mean)
         qx[idx], qy[idx], qz[idx] = imag_part(q_mean)
