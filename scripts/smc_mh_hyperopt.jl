@@ -180,9 +180,9 @@ function run_hyperopt(config)
             cost_function(parameters, gl_context, config, scene_df)
         end
         scenario = Scenario(
-            o_mask_is=(0.5 .. 1.0),
-            pixel_σ=(0.001 .. 0.1),
-            proposal_σ_r=(0.01 .. 1.0),
+            o_mask_is=(0.5f0 .. 1.0f0),
+            pixel_σ=(0.001f0 .. 0.02f0),
+            proposal_σ_r=(0.01f0 .. Float32(π)),
             sampler=eval(optsampler)(),
             max_trials=max_trials,
             batch_size=1    # No support for multiple OpenGL contexts
