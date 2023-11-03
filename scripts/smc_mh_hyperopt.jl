@@ -180,7 +180,7 @@ function run_hyperopt(config)
             cost_function(parameters, gl_context, config, scene_df)
         end
         scenario = Scenario(
-            o_mask_is=(0 .. 1.0),
+            o_mask_is=(0.5 .. 1.0),
             pixel_σ=(0.001 .. 0.1),
             proposal_σ_r=(0.01 .. 1.0),
             sampler=eval(optsampler)(),
