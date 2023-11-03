@@ -124,7 +124,7 @@ n_particles = 1
 dataset = ["lm", "tless", "itodd"]
 testset = "train_pbr"
 scene_id = 0
-pose_time = [0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0]
+pose_time = [0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 3.0]
 configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
 # OpenGL context
 parameters = Parameters()
@@ -201,7 +201,7 @@ ax_vsd = MK.Axis(fig[2, 1]; xlabel="pose inference time / s", ylabel="recall", t
 for (rec, tim) in zip(recall_groups, time_groups)
     MK.lines!(ax_vsd, tim.mean_time, rec.vsd_recall; label="MTM $(rec.n_particles |> first) particles")
 end
-MK.lines!(ax_vsd, mh_times.mean_time, mh_recalls.vsd_recall; label="MCMC-MH")
+MK.lines!(ax_vsd, mh_times.mean_time, mh_recalls.vsd_recall; label="MH")
 MK.vlines!(ax_vsd, [0.5]; color=:black, linestyle=:dash)
 
 ax_adds = MK.Axis(fig[2, 2]; xlabel="pose inference time / s", ylabel="recall", title="ADDS", limits=(nothing, (0, 1)), yticks=0:0.25:1)
@@ -209,7 +209,7 @@ for (rec, tim) in zip(recall_groups, time_groups)
     MK.lines!(ax_adds, tim.mean_time, rec.adds_recall; label="MTM $(rec.n_particles |> first) particles")
 
 end
-MK.lines!(ax_adds, mh_times.mean_time, mh_recalls.adds_recall; label="MCMC-MH")
+MK.lines!(ax_adds, mh_times.mean_time, mh_recalls.adds_recall; label="MH")
 MK.vlines!(ax_adds, [0.5]; color=:black, linestyle=:dash)
 
 ga = fig[1, :] = MK.GridLayout()
@@ -217,7 +217,7 @@ ax_vsdbop = MK.Axis(ga[1, 1]; xlabel="pose inference time / s", ylabel="recall",
 for (rec, tim) in zip(recall_groups, time_groups)
     MK.lines!(ax_vsdbop, tim.mean_time, rec.vsdbop_recall; label="MTM $(rec.n_particles |> first) particles")
 end
-MK.lines!(ax_vsdbop, mh_times.mean_time, mh_recalls.vsdbop_recall; label="MCMC-MH")
+MK.lines!(ax_vsdbop, mh_times.mean_time, mh_recalls.vsdbop_recall; label="MH")
 MK.vlines!(ax_vsdbop, [0.5]; color=:black, linestyle=:dash)
 MK.Legend(ga[1, 2], ax_vsdbop)
 

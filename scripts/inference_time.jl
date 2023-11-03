@@ -94,7 +94,7 @@ for img_size in img_sizes
     # Visualize and save plot
     diss_defaults()
     samplers = ["mh_sampler", "mtm_sampler", "smc_mh"]
-    labels = ["MCMC-MH", "MTM", "SMC-MH"]
+    labels = ["MH", "MTM", "SMC"]
 
     function draw_samplers!(axis, samplers, labels)
         for (s, l) in zip(samplers, labels)
