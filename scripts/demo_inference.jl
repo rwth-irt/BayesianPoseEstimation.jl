@@ -40,9 +40,9 @@ function smc_parameters(parameters=Parameters())
 end
 
 parameters = smc_parameters()
-# Inference 25x25 seems sufficient, visualization requires more
-@reset parameters.width = 100;
-@reset parameters.height = 100;
+# Inference 30x30 seems sufficient, visualization requires more
+@reset parameters.width = 30;
+@reset parameters.height = 30;
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
@@ -63,20 +63,27 @@ gl_context = render_context(parameters)
 # row = df[100, :]
 
 # Clutter and occlusions
-df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-row = df[204, :]
+# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+# row = df[204, :]
 
 # Steri on flat surface
-# df = train_targets(joinpath("data", "bop", "steri", "train_pbr"), 2)
-# row = df[10, :]
+df = train_targets(joinpath("data", "bop", "steri", "train_pbr"), 1)
+row = df[2, :]
 # # NOTE high probability for segmentation mask seems beneficial, as well as simple model
-# @reset parameters.o_mask_is = 0.9
-# @reset parameters.o_mask_not = 1 - parameters.o_mask_is
+@reset parameters.o_mask_is = 0.9
+@reset parameters.o_mask_not = 1 - parameters.o_mask_is
 
-# Experiment setup
+# Load Scene
 camera = crop_camera(row)
 mesh = upload_mesh(gl_context, load_mesh(row))
 @reset mesh.pose = to_pose(row.gt_t, row.gt_R)
+
+# Draw result for visual validation
+color_img = load_color_image(row, parameters.img_size...)
+scene = Scene(camera, [mesh])
+plot_scene_ontop(gl_context, scene, color_img)
+
+# Experiment setup
 # Observation is cropped and resized to match the gl_context and crop_camera
 depth_img = load_depth_image(row, parameters.img_size...) |> device_array_type(parameters)
 mask_img = load_mask_image(row, parameters.img_size...) |> device_array_type(parameters)
@@ -86,31 +93,23 @@ prior_o[mask_img] .= parameters.o_mask_is
 prior_t = point_from_segmentation(row.bbox, depth_img, mask_img, row.cv_camera)
 # For RFID scenario
 # prior_t = row.gt_t + rand(cpu_rng, KernelNormal(0, 0.01f0), 3)
-prior_o .= 0.5
+# prior_o .= 0.5
+# prior_o = parameters.float_type(0.5)
 experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
-
-# Draw result for visual validation
-color_img = load_color_image(row, parameters.img_size...)
-scene = Scene(camera, [mesh])
-plot_scene_ontop(gl_context, scene, color_img)
 
 # Model
 prior = point_prior(parameters, experiment, cpu_rng)
 
-# NOTE no association → prior_o has strong influence
-# posterior = simple_posterior(parameters, experiment, prior, dev_rng)
+posterior = simple_posterior(parameters, experiment, prior, dev_rng)
 # posterior = smooth_simple_posterior(parameters, experiment, prior, dev_rng)
 # posterior = association_posterior(parameters, experiment, prior, dev_rng)
-# NOTE flat prior_o .= 0.5 seems to require the association and truncation
-# NOTE only smooth_posterior seems to succeed with the T-LESS scene
-posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
+# posterior = smooth_posterior(parameters, experiment, prior, dev_rng)
 
 # Sampler
 parameters = smc_parameters(parameters)
 sampler = smc_mh(cpu_rng, parameters, posterior)
 
 # NOTE diverges if σ_t is too large - masking the image helps. A reasonably strong prior_o also helps to robustify the algorithm
-# TODO diagnostics: Accepted steps, resampling steps
 @time states, final_state = smc_inference(cpu_rng, posterior, sampler, parameters);
 
 diss_defaults()
