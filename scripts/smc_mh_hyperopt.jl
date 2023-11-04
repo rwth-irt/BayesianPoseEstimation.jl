@@ -29,11 +29,11 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "itodd", "tless", "steri"]
 testset = "train_pbr"
 scene_id = 0
-max_trials = 100
+max_evals = 100
 optsampler = :BCAPSampler
 # TODO if I cannot decide use the simpler one
 model = [:simple_posterior, :smooth_posterior]
-configs = dict_list(@dict dataset testset scene_id optsampler model max_trials)
+configs = dict_list(@dict dataset testset scene_id optsampler model max_evals)
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
@@ -155,7 +155,7 @@ run_hyperopt(config)
 """
 function run_hyperopt(config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id, model, optsampler, max_trials = config
+    @unpack dataset, testset, scene_id, model, optsampler, max_evals = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
     # Finally destroy OpenGL context
@@ -170,24 +170,29 @@ function run_hyperopt(config)
 
         # Capture local parameters in this closure which suffices the HyperTuning interface
         function objective(trial)
-            @unpack o_mask_is, pixel_σ, proposal_σ_r = trial
-            @reset parameters.o_mask_is = o_mask_is
-            @reset parameters.o_mask_not = 1 - o_mask_is
+            @unpack c_reg, pixel_σ, proposal_σ_r = trial
+            # Not interesting
+            # @reset parameters.o_mask_is = o_mask_is
+            # @reset parameters.o_mask_not = 1 - o_mask_is
             # NOTE does not make sense to optimize heavily correlated variables e.g. σ_t & c_reg
+            @reset parameters.c_reg = c_reg
             @reset parameters.proposal_σ_r = fill(proposal_σ_r, 3)
             @reset parameters.pixel_σ = pixel_σ
             @reset parameters.association_σ = pixel_σ
             cost_function(parameters, gl_context, config, scene_df)
         end
         scenario = Scenario(
-            o_mask_is=(0.5f0 .. 1.0f0),
+            # Not really interesting
+            # o_mask_is=(0.5f0 .. 1.0f0),
             pixel_σ=(0.001f0 .. 0.02f0),
             proposal_σ_r=(0.01f0 .. Float32(π)),
+            c_reg=(1 .. 500),
             sampler=eval(optsampler)(),
-            max_trials=max_trials,
-            batch_size=1    # No support for multiple OpenGL contexts
+            max_evals=max_evals,
+            batch_size=1,    # No support for multiple OpenGL contexts
+            verbose=true
         )
-        @progress "Optimizer: $optsampler Model: $model " for _ in 1:max_trials
+        @progress "Optimizer: $optsampler Model: $model " for _ in 1:max_evals
             if default_stop_criteria(scenario)
                 break
             end
