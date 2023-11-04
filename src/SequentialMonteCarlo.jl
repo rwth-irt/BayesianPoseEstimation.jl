@@ -255,7 +255,7 @@ function systematic_resampling_indices(rng::AbstractRNG, log_weights::AbstractAr
     for n in 1:Nₚ
         # Julia: n-1 so we only add (Nₚ-1) steps
         U = log(r + (n - 1) / Nₚ)
-        while U > log_c
+        while U > log_c && i < Nₚ
             i += 1
             log_c = logaddexp(log_c, log_weights[i])
         end
