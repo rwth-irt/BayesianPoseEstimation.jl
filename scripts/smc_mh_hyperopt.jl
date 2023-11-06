@@ -158,6 +158,10 @@ function run_hyperopt(config)
     @unpack dataset, testset, scene_id, model, optsampler, max_evals = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
+    if dataset == "steri" || dataset == "itdodd"
+        @reset parameters.width = 60
+        @reset parameters.height = 60
+    end
     # Finally destroy OpenGL context
     gl_context = render_context(parameters)
     try
