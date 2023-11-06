@@ -170,25 +170,25 @@ function run_hyperopt(config)
 
         # Capture local parameters in this closure which suffices the HyperTuning interface
         function objective(trial)
-            @unpack c_reg, pixel_σ, proposal_σ_r = trial
-            # Not interesting
-            # @reset parameters.o_mask_is = o_mask_is
-            # @reset parameters.o_mask_not = 1 - o_mask_is
+            @unpack o_mask_is, pixel_σ, proposal_σ_r = trial
+            @reset parameters.o_mask_is = o_mask_is
+            @reset parameters.o_mask_not = 1 - o_mask_is
             # NOTE does not make sense to optimize heavily correlated variables e.g. σ_t & c_reg
-            @reset parameters.c_reg = c_reg
+            # @reset parameters.c_reg = c_reg
             @reset parameters.proposal_σ_r = fill(proposal_σ_r, 3)
             @reset parameters.pixel_σ = pixel_σ
             @reset parameters.association_σ = pixel_σ
             cost_function(parameters, gl_context, config, scene_df)
         end
         scenario = Scenario(
-            # Not really interesting
-            # o_mask_is=(0.5f0 .. 1.0f0),
-            pixel_σ=(0.001f0 .. 0.02f0),
+            o_mask_is=(0.5f0 .. 1.0f0),
+            pixel_σ=(0.0001f0 .. 0.02f0),
             proposal_σ_r=(0.01f0 .. Float32(π)),
-            c_reg=(1 .. 500),
+            # Not really interesting?
+            # c_reg=(1 .. 500),
             sampler=eval(optsampler)(),
             max_evals=max_evals,
+            max_trials=max_evals,
             batch_size=1,    # No support for multiple OpenGL contexts
             verbose=true
         )
