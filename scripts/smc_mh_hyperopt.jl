@@ -202,7 +202,7 @@ function run_hyperopt(config)
             end
             HyperTuning.optimize!(objective, scenario)
         end
-        Dict("scenario" => scenario)
+        Dict("scenario" => scenario, "parameters" => parameters)
     finally
         # If not destroyed, weird stuff happens
         destroy_context(gl_context)
