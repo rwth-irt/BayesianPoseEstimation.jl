@@ -25,6 +25,9 @@ function point_from_segmentation(bounding_box, depth_image, mask_img, cv_camera)
     u, v = (left + right, top + bottom) ./ 2
     # Assumption: Most pixels belong to the object.
     masked = depth_image[mask_img.>=0]
+    # Ignore invalid pixels
+    mask_mask = @. masked > 0 && !isinf(masked)
+    masked = masked[mask_mask]
     z = median(masked)
     x, y = reproject_3D(u, v, z, cv_camera)
     [x, y, z]
