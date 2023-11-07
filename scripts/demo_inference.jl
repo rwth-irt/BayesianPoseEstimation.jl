@@ -5,6 +5,7 @@
 using AbstractMCMC: step
 using Accessors
 using CUDA
+using DataFrames
 using MCMCDepth
 using Random
 using PoseErrors
@@ -40,9 +41,9 @@ function smc_parameters(parameters=Parameters())
 end
 
 parameters = smc_parameters()
-# Inference 30x30 seems sufficient, visualization requires more
-@reset parameters.width = 30;
-@reset parameters.height = 30;
+# STERI requires higher resolution for thin instruments
+@reset parameters.width = 50;
+@reset parameters.height = 50;
 
 # NOTE takes minutes instead of seconds
 # @reset parameters.device = :CPU
@@ -66,22 +67,32 @@ gl_context = render_context(parameters)
 # df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
 # row = df[204, :]
 
-# Steri on flat surface
-df = train_targets(joinpath("data", "bop", "steri", "train_pbr"), 1)
+# Parts cut from the image
+df = train_targets(joinpath("data", "bop", "itodd", "train_pbr"), 1)
 row = df[2, :]
-# # NOTE high probability for segmentation mask seems beneficial, as well as simple model
-@reset parameters.o_mask_is = 0.9
-@reset parameters.o_mask_not = 1 - parameters.o_mask_is
 
-# Load Scene
-camera = crop_camera(row)
-mesh = upload_mesh(gl_context, load_mesh(row))
-@reset mesh.pose = to_pose(row.gt_t, row.gt_R)
+# Small screw
+# df = train_targets(joinpath("data", "bop", "itodd", "val"), 1)
+# row = df[8, :]
 
-# Draw result for visual validation
-color_img = load_color_image(row, parameters.img_size...)
-scene = Scene(camera, [mesh])
-plot_scene_ontop(gl_context, scene, color_img)
+# Steri on flat surface
+# df = train_targets(joinpath("data", "bop", "steri", "train_pbr"), 1)
+# row = df[5, :]
+# # # NOTE high probability for segmentation mask seems beneficial, as well as simple model
+# @reset parameters.o_mask_is = 0.95
+# @reset parameters.o_mask_not = 1 - parameters.o_mask_is
+
+begin
+    # Load Scene
+    camera = crop_camera(row)
+    mesh = upload_mesh(gl_context, load_mesh(row))
+    @reset mesh.pose = to_pose(row.gt_t, row.gt_R)
+
+    # Draw result for visual validation
+    color_img = load_color_image(row, parameters.img_size...)
+    scene = Scene(camera, [mesh])
+    plot_scene_ontop(gl_context, scene, color_img)
+end
 
 # Experiment setup
 # Observation is cropped and resized to match the gl_context and crop_camera
