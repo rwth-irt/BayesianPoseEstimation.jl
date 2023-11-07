@@ -31,8 +31,8 @@ testset = "train_pbr"
 scene_id = 0
 max_evals = 100
 optsampler = :BCAPSampler
-# TODO if I cannot decide use the simpler one
-model = [:simple_posterior, :smooth_posterior]
+# smooth posterior won't perform any better
+model = :simple_posterior # [:simple_posterior, :smooth_posterior]
 configs = dict_list(@dict dataset testset scene_id optsampler model max_evals)
 
 """
@@ -158,7 +158,7 @@ function run_hyperopt(config)
     @unpack dataset, testset, scene_id, model, optsampler, max_evals = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
-    if dataset == "steri" || dataset == "itdodd"
+    if dataset == "steri"
         @reset parameters.width = 60
         @reset parameters.height = 60
     end

@@ -29,10 +29,11 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "itodd", "tless", "steri"]
 testset = "train_pbr"
 scene_id = 0
-max_trials = 100
+max_evals = 100
 optsampler = :BCAPSampler
-model = [:simple_posterior, :smooth_posterior]
-configs = dict_list(@dict dataset testset scene_id optsampler model max_trials)
+# smooth posterior won't perform any better
+model = :simple_posterior # [:simple_posterior, :smooth_posterior]
+configs = dict_list(@dict dataset testset scene_id optsampler model max_evals)
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row, config)
@@ -85,7 +86,7 @@ Returns (1 - VSD recall) as the costs for the hyperparameter optimization.
 Pass the scene_df to avoid loading it twice.
 """
 function cost_function(parameters, gl_context, config, scene_df)
-    HyperTuning.@unpack dataset, testset, scene_id = config
+    @unpack dataset, testset, scene_id = config
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     est_df = select(scene_df, :scene_id, :img_id, :obj_id)
     est_df.score = Vector{Float32}(undef, nrow(est_df))
@@ -145,9 +146,13 @@ run_hyperopt(config)
 """
 function run_hyperopt(config)
     # Extract config and load dataset
-    @unpack dataset, testset, scene_id, model, optsampler, max_trials = config
+    @unpack dataset, testset, scene_id, model, optsampler, max_evals = config
     scene_df = bop_test_or_train(dataset, testset, scene_id)
     parameters = Parameters()
+    if dataset == "steri"
+        @reset parameters.width = 60
+        @reset parameters.height = 60
+    end
     # Finally destroy OpenGL context
     gl_context = render_context(parameters)
     try
@@ -160,7 +165,7 @@ function run_hyperopt(config)
 
         # Capture local parameters in this closure which suffices the HyperTuning interface
         function objective(trial)
-            @unpack o_mask_is, proposal_σ_r, proposal_σ_t, pixel_σ = trial
+            @unpack o_mask_is, pixel_σ, proposal_σ_r = trial
             @reset parameters.o_mask_is = o_mask_is
             @reset parameters.o_mask_not = 1 - o_mask_is
             # NOTE does not make sense to optimize heavily correlated variables e.g. σ_t & c_reg
@@ -171,21 +176,24 @@ function run_hyperopt(config)
             cost_function(parameters, gl_context, config, scene_df)
         end
         scenario = Scenario(
-            o_mask_is=(0 .. 1.0),
-            pixel_σ=(0.001 .. 0.1),
-            proposal_σ_r=(0.01 .. 1.0),
-            proposal_σ_t=(0.001 .. 0.1),
+            o_mask_is=(0.5f0 .. 1.0f0),
+            pixel_σ=(0.0001f0 .. 0.02f0),
+            proposal_σ_r=(0.01f0 .. Float32(π)),
+            # Not really interesting?
+            # c_reg=(1 .. 500),
             sampler=eval(optsampler)(),
-            max_trials=max_trials,
-            batch_size=1    # No support for multiple OpenGL contexts
+            max_evals=max_evals,
+            max_trials=max_evals,
+            batch_size=1,    # No support for multiple OpenGL contexts
+            verbose=true
         )
-        @progress "Optimizer: $optsampler Model: $model " for _ in 1:max_trials
+        @progress "Optimizer: $optsampler Model: $model " for _ in 1:max_evals
             if default_stop_criteria(scenario)
                 break
             end
             HyperTuning.optimize!(objective, scenario)
         end
-        Dict("scenario" => scenario)
+        Dict("scenario" => scenario, "parameters" => parameters)
     finally
         # If not destroyed, weird stuff happens
         destroy_context(gl_context)
@@ -198,7 +206,6 @@ end
 
 # TODO analyze results on a per-dataset basis. Different scenes - different parameters?
 pro_df = collect_results(result_dir)
-
 for row in eachrow(pro_df)
     scenario = row.scenario
     hist = history(scenario)
