@@ -145,7 +145,13 @@ function scene_inference(gl_context, parameters, config)
     # Run inference per detection
     @progress "scene_id: $scene_id" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
-        depth_img, mask_img, mesh = load_img_mesh(df_row, parameters, gl_context)
+        depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
+        if ("segmentation" in names(df_row))
+            mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
+        else
+            mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
+        end
+        mesh = upload_mesh(gl_context, load_mesh(df_row))
         # Run and collect results
         t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
         # Avoid too large files by only saving t, r, and the logevidence not the sequence of states
