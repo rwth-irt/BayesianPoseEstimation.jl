@@ -125,7 +125,6 @@ end
 """
     match_obj_errors(df_group)
 `group` must be grouped by the scene_id, image_id, and obj_id.
-For this estimate, 
 Greedily matches at most one ground truth to each estimated pose of the object.
 If no estimate is available for a ground truth, Inf set as error.
 """
@@ -182,7 +181,7 @@ function calc_n_match_errors(dist_context, experiment_name, config)
     est_df = est_df[!, [:scene_id, :img_id, :obj_id, :t, :R, :score]]
 
     # Add gt_R & gt_t for testset
-    gt_df = bop_test_or_train(dataset, testset, scene_id)
+    gt_df = train_targets(datadir("bop", dataset, testset), scene_id)
     datasubset_path = datadir("bop", dataset, testset)
     if !("gt_t" in names(gt_df))
         leftjoin!(gt_df, PoseErrors.gt_dataframe(datasubset_path, scene_id)
@@ -194,7 +193,7 @@ function calc_n_match_errors(dist_context, experiment_name, config)
     df = outerjoin(gt_df, est_df; on=[:scene_id, :img_id, :obj_id])
 
     # Keep only visibility fraction >= 0.1
-    filter!(:visib_fract => (x -> x >= 0.1), df)
+    filter!(:visib_fract => (x -> !ismissing(x) && x >= 0.1), df)
     # Only estimates for which a ground truth exists are relevant for the recall
     filter!(:gt_t => (x -> !ismissing(x)), df)
 

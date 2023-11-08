@@ -3,14 +3,7 @@
 # All rights reserved. 
 
 """
-Run different SMC algorithms on the synthetic BOP datasets:
-* MCMC
-* Forward Proposals
-* Bootstrap
-
-Model setup for segmentation:
-* Segmentation prior for position `t` and pixel association `o`
-* Simple likelihood function with mixture model for the pixels, a simple regularization, and without modeling the association,
+Run the algorithms on validation and test sets using ground truth masks
 """
 
 using DrWatson
@@ -32,21 +25,21 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 # TODO update default detection for vera station
+# TODO eval gt masks for comparability synth-to-real, eval default detections for BOP
 # General experiment
-experiment_name = "smc_bop"
+experiment_name = "smc_bop_val"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
 @reset parameters.depth = parameters.n_particles
 sampler = :smc_mh
-# NOTE itodd val only contains gt masks not the default ones
-# TODO need dataset and testset keys for evaluation functions
-# dataset = "itodd"
-# testset = "val" # [("itodd", "val"), ("lm", "test"), ("tless", "test_primesense")]
-# # TODO automatically list available scene_ids
-# scene_id = 1 # [0:4...]
 
-# TODO default detections not available only gt
+# no default detections in val
+dataset = "itodd"
+testset = "val"
+scene_id = 1
+
+# no default detections
 # dataset = "lm"
 # testset = "test"
 # scene_id = [1:15...]
@@ -113,7 +106,8 @@ scene_inference(gl_context, config)
 function scene_inference(gl_context, parameters, config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset = config
-    scene_df = bop_test_or_train(dataset, testset, scene_id)
+    # TODO in test script
+    scene_df = train_targets(datadir("bop", dataset, testset), scene_id)
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)
@@ -127,11 +121,9 @@ function scene_inference(gl_context, parameters, config)
     # Load data and setup sampler
     df_row = first(scene_df)
     depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-    if ("segmentation" in names(df_row))
-        mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
-    else
-        mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-    end
+    # TODO in test script
+    # mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
+    mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
     mesh = upload_mesh(gl_context, load_mesh(df_row))
     rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
     # Benchmark model sampler configuration to adapt number of steps - also avoids timing pre-compilation
@@ -146,11 +138,9 @@ function scene_inference(gl_context, parameters, config)
     @progress "scene_id: $scene_id" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
         depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-        if ("segmentation" in names(df_row))
-            mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
-        else
-            mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-        end
+        # TODO in test script
+        # mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
+        mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
         mesh = upload_mesh(gl_context, load_mesh(df_row))
         # Run and collect results
         t, R, score, final_state, states, time = timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_row)
