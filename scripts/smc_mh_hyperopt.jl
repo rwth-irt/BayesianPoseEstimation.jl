@@ -8,6 +8,7 @@ using DrWatson
 using Accessors
 using BenchmarkTools
 using CUDA
+using CSV
 using DataFrames
 using MCMCDepth
 using PoseErrors
@@ -214,24 +215,34 @@ end
 end
 
 # TODO analyze results on a per-dataset basis. Different scenes - different parameters?
-pro_df = collect_results(result_dir)
-# NOTE scores of 0.13 should be achievable
-for row in eachrow(pro_df)
-    scenario = row.scenario
-    hist = history(scenario)
-    println(row.path)
-    show(best_parameters(scenario))
+function parse_config(path)
+    config = my_parse_savename(path)
+    @unpack dataset, model = config
+    dataset, model
 end
-
-# TODO ITODD 0.22 should be possible
+transform!(pro_df, :path => ByRow(parse_config) => [:dataset, :model])
+pro_dir = datadir("exp_pro", experiment_name)
+mkpath(pro_dir)
+groups = groupby(pro_df, :model)
+for (key, group) in zip(keys(groups), groups)
+    res_df = DataFrame(dataset=String[], o_mask_is=Float64[], pixel_σ=Float64[], proposal_σ_r=Float64[], vsd_recall=[])
+    for row in eachrow(group)
+        best = best_parameters(row.scenario)
+        recall = 1 - best.performance
+        vals = best.values
+        push!(res_df, (; dataset=row.dataset, o_mask_is=vals[:o_mask_is], pixel_σ=vals[:pixel_σ], proposal_σ_r=vals[:proposal_σ_r], vsd_recall=recall))
+    end
+    display(res_df)
+    CSV.write(joinpath(pro_dir, "$(key.model).csv"), res_df)
+end
 # TODO exclude steri when calculating mean
 
-# TODO analyze and plot results on validation set, scene 1-4
-experiment_name = "smc_mh_hyperopt_validation"
-result_dir = datadir("exp_raw", experiment_name)
-# Different hyperparameter for different datasets?
-dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
-testset = "train_pbr"
-scene_id = [1:4...]
-model = [:simple_posterior, :association_posterior]
-configs = dict_list(@dict dataset testset scene_id optsampler model)
+# TODO analyze and plot results on synthetic holdout, scenes 1-4
+# experiment_name = "smc_mh_hyperopt_validation"
+# result_dir = datadir("exp_raw", experiment_name)
+# # Different hyperparameter for different datasets?
+# dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
+# testset = "train_pbr"
+# scene_id = [1:4...]
+# model = [:simple_posterior, :association_posterior]
+# configs = dict_list(@dict dataset testset scene_id optsampler model)
