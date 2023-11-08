@@ -24,7 +24,6 @@ global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
-# TODO update default detection for vera station
 # TODO eval gt masks for comparability synth-to-real, eval default detections for BOP
 # General experiment
 experiment_name = "smc_bop_val"
@@ -40,17 +39,17 @@ testset = "val"
 scene_id = 1
 
 # no default detections
-# dataset = "lm"
-# testset = "test"
-# scene_id = [1:15...]
+dataset = "lm"
+testset = "test"
+scene_id = [1:15...]
 
 dataset = "lmo"
 testset = "test"
 scene_id = 2
 
-# dataset = "tless"
-# testset = "test_primesense"
-# scene_id = [1:20...]
+dataset = "tless"
+testset = "test_primesense"
+scene_id = [1:20...]
 
 configs = dict_list(@dict sampler dataset testset scene_id)
 

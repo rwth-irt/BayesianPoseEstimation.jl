@@ -30,7 +30,7 @@ result_dir = datadir("exp_raw", experiment_name)
 dataset = ["lm", "itodd", "tless", "steri"]
 testset = "train_pbr"
 scene_id = 0
-max_evals = 100
+max_evals = 200
 optsampler = :BCAPSampler
 # smooth posterior won't perform any better
 model = :simple_posterior # [:simple_posterior, :smooth_posterior]

@@ -16,5 +16,6 @@ julia_remote_nvidia.sh --startup-file=no scripts/smc_observation.jl
 julia_remote_nvidia.sh --startup-file=no scripts/mcmc_baseline.jl
 julia_remote_nvidia.sh --startup-file=no scripts/smc_mh_baseline.jl
 
+julia_remote_nvidia.sh --startup-file=no scripts/smc_bop_val.jl
 julia_remote_nvidia.sh --startup-file=no scripts/smc_mh_hyperopt.jl
 julia_remote_nvidia.sh --startup-file=no scripts/mcmc_mh_hyperopt.jl
