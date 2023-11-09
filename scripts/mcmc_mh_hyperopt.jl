@@ -227,14 +227,14 @@ pro_dir = datadir("exp_pro", experiment_name)
 mkpath(pro_dir)
 groups = groupby(pro_df, :model)
 for (key, group) in zip(keys(groups), groups)
-    res_df = DataFrame(dataset=String[], o_mask_is=Float64[], pixel_σ=Float64[], proposal_σ_r=Float64[], vsd_recall=[])
+    res_df = DataFrame(dataset=String[], o_mask_is=Float64[], pixel_σ=Float64[], proposal_σ_r=Float64[], proposal_σ_t=Float64[], vsd_recall=[])
     for row in eachrow(group)
         best = best_parameters(row.scenario)
         println(row.dataset)
         display(best)
         recall = 1 - best.performance
         vals = best.values
-        push!(res_df, (; dataset=row.dataset, o_mask_is=vals[:o_mask_is], pixel_σ=vals[:pixel_σ], proposal_σ_r=vals[:proposal_σ_r], vsd_recall=recall))
+        push!(res_df, (; dataset=row.dataset, o_mask_is=vals[:o_mask_is], pixel_σ=vals[:pixel_σ], proposal_σ_r=vals[:proposal_σ_r], proposal_σ_t=vals[:proposal_σ_t], vsd_recall=recall))
     end
     display(res_df)
     CSV.write(joinpath(pro_dir, "$(key.model).csv"), res_df)

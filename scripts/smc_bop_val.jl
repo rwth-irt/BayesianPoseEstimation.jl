@@ -26,11 +26,14 @@ CUDA.allowscalar(false)
 
 # TODO eval gt masks for comparability synth-to-real, eval default detections for BOP
 # General experiment
-experiment_name = "smc_bop_val"
+experiment_name = "smc_bop_val_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
 @reset parameters.depth = parameters.n_particles
+@reset parameters.o_mask_is = 0.9
+@reset parameters.pixel_σ = 0.005
+@reset parameters.proposal_σ_r = fill(π, 3)
 sampler = :smc_mh
 
 # no default detections in val
@@ -160,7 +163,7 @@ end
 # Avoid recreating the context in scene_inference by conditioning on it / closure
 gl_context = render_context(parameters)
 gl_scene_inference = scene_inference | (gl_context, parameters)
-@progress "SMC baseline" for config in configs
+@progress "SMC BOP validation" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)
 end
 destroy_context(gl_context)
