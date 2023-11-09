@@ -214,7 +214,6 @@ end
     @produce_or_load(run_hyperopt, config, result_dir; filename=my_savename)
 end
 
-# TODO analyze results on a per-dataset basis. Different scenes - different parameters?
 function parse_config(path)
     config = my_parse_savename(path)
     @unpack dataset, model = config
