@@ -220,6 +220,7 @@ function parse_config(path)
     @unpack dataset, model = config
     dataset, model
 end
+pro_df = collect_results(result_dir)
 transform!(pro_df, :path => ByRow(parse_config) => [:dataset, :model])
 pro_dir = datadir("exp_pro", experiment_name)
 mkpath(pro_dir)
@@ -228,6 +229,8 @@ for (key, group) in zip(keys(groups), groups)
     res_df = DataFrame(dataset=String[], o_mask_is=Float64[], pixel_σ=Float64[], proposal_σ_r=Float64[], vsd_recall=[])
     for row in eachrow(group)
         best = best_parameters(row.scenario)
+        println(row.dataset)
+        display(best)
         recall = 1 - best.performance
         vals = best.values
         push!(res_df, (; dataset=row.dataset, o_mask_is=vals[:o_mask_is], pixel_σ=vals[:pixel_σ], proposal_σ_r=vals[:proposal_σ_r], vsd_recall=recall))
@@ -236,13 +239,3 @@ for (key, group) in zip(keys(groups), groups)
     CSV.write(joinpath(pro_dir, "$(key.model).csv"), res_df)
 end
 # TODO exclude steri when calculating mean
-
-# TODO analyze and plot results on synthetic holdout, scenes 1-4
-# experiment_name = "smc_mh_hyperopt_validation"
-# result_dir = datadir("exp_raw", experiment_name)
-# # Different hyperparameter for different datasets?
-# dataset = ["lm", "itodd", "tless"] #TODO, "steri"]
-# testset = "train_pbr"
-# scene_id = [1:4...]
-# model = [:simple_posterior, :association_posterior]
-# configs = dict_list(@dict dataset testset scene_id optsampler model)
