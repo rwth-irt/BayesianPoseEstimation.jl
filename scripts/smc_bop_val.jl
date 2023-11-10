@@ -40,21 +40,25 @@ sampler = :smc_mh
 dataset = "itodd"
 testset = "val"
 scene_id = 1
+itodd_config = dict_list(@dict sampler dataset testset scene_id)
 
 # no default detections
 dataset = "lm"
 testset = "test"
 scene_id = [1:15...]
+lm_config = dict_list(@dict sampler dataset testset scene_id)
 
 dataset = "lmo"
 testset = "test"
 scene_id = 2
+lmo_config = dict_list(@dict sampler dataset testset scene_id)
 
 dataset = "tless"
 testset = "test_primesense"
 scene_id = [1:20...]
+tless_config = dict_list(@dict sampler dataset testset scene_id)
 
-configs = dict_list(@dict sampler dataset testset scene_id)
+configs = [itodd_config..., lmo_config..., tless_config...]
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
