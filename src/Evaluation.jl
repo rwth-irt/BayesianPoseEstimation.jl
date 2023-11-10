@@ -54,7 +54,7 @@ function vsd_row(df_row, dist_context::OffscreenContext, δ)
         width, height = size(dist_context.render_data)
         depth_img = to_device(dist_context, load_depth_image(df_row, width, height))
         dist_img = depth_to_distance(depth_img, cv_camera)
-        # BOP19 and later use normalized version with multiple τ
+        # BOP18 uses unnormalized version
         vsd_error(dist_context, cv_camera, mesh, dist_img, es, gt; δ=δ)
     end
 end
@@ -283,10 +283,10 @@ function evaluate_recalls(experiment_name)
     ax_vsdbop_recall = MK.Axis(gl_recall[1, 1]; xlabel="error threshold", ylabel="recall", limits=(nothing, (0, 1)), title="VSDBOP")
 
     fig_density = MK.Figure(figure_padding=10)
-    ax_vsd_density = MK.Axis(fig_density[2, 1]; xlabel="error value", ylabel="density", title="VSD")
-    ax_adds_density = MK.Axis(fig_density[2, 2]; xlabel="error value", ylabel="density", title="ADDS")
+    ax_vsd_density = MK.Axis(fig_density[2, 1]; xlabel="normalized error value", ylabel="density", title="VSD")
+    ax_adds_density = MK.Axis(fig_density[2, 2]; xlabel="normalized error value", ylabel="density", title="ADDS")
     gl_density = fig_density[1, :] = MK.GridLayout()
-    ax_vsdbop_density = MK.Axis(gl_density[1, 1]; xlabel="error value", ylabel="density", title="VSDBOP")
+    ax_vsdbop_density = MK.Axis(gl_density[1, 1]; xlabel="normalized error value", ylabel="density", title="VSDBOP")
 
     θ_range = 0:0.02:1
     groups = groupby(results, :sampler)

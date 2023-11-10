@@ -111,7 +111,6 @@ scene_inference(gl_context, config)
 function scene_inference(gl_context, parameters, config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset = config
-    # TODO in test script
     scene_df = train_targets(datadir("bop", dataset, testset), scene_id)
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
@@ -126,8 +125,6 @@ function scene_inference(gl_context, parameters, config)
     # Load data and setup sampler
     df_row = first(scene_df)
     depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-    # TODO in test script
-    # mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
     mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
     mesh = upload_mesh(gl_context, load_mesh(df_row))
     rng, posterior, sampler = rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
@@ -143,8 +140,6 @@ function scene_inference(gl_context, parameters, config)
     @progress "scene_id: $scene_id" for (idx, df_row) in enumerate(eachrow(scene_df))
         # Image crops differ per object
         depth_img = load_depth_image(df_row, parameters.img_size...) |> device_array_type(parameters)
-        # TODO in test script
-        # mask_img = load_segmentation(df_row, parameters.img_size...) |> device_array_type(parameters)
         mask_img = load_mask_image(df_row, parameters.img_size...) |> device_array_type(parameters)
         mesh = upload_mesh(gl_context, load_mesh(df_row))
         # Run and collect results
