@@ -29,8 +29,8 @@ dataset = "steri"
 testset = "train_pbr"
 scene_id = 1 #TODO[1:9...]
 sampler = :smc_mh
-n_particles = [100, 250]
-pose_time = [0.05, 0.5, 1.0, 2.0, 3.0]
+n_particles = 100 # [50, 100]
+pose_time = [0.05, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
 configs = dict_list(@dict dataset testset scene_id n_particles pose_time sampler)
 
 parameters = Parameters()
@@ -86,10 +86,10 @@ function timed_inference(gl_context, parameters, depth_img, mask_img, mesh, df_r
 end
 
 """
-scene_inference(gl_context, config)
+scene_inference(gl_context, parameters, config)
     Save results per scene via DrWatson's produce_or_load for the `config`
 """
-function scene_inference(gl_context, config, parameters)
+function scene_inference(gl_context, parameters, config)
     # Extract config and load dataset
     @unpack dataset, testset, scene_id, pose_time, n_particles, sampler = config
     sampler_symbol = sampler
@@ -131,7 +131,7 @@ end
 
 # OpenGL context - avoid recreating the context in scene_inference by using it in a closure
 gl_context = render_context(parameters)
-gl_scene_inference = scene_inference | gl_context
+gl_scene_inference = scene_inference | (gl_context, parameters)
 @progress "SMC Benchmark" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=c -> savename(c; connector=","))
 end
@@ -203,6 +203,4 @@ function plot_sampler(sampler_name, recalls, times)
     save(joinpath("plots", "$(experiment_name)_$(sampler_name).pdf"), fig)
 end
 
-for sampler_name in ["smc_bootstrap", "smc_mh"]
-    plot_sampler(sampler_name, recalls, times)
-end
+plot_sampler("smc_mh", recalls, times)
