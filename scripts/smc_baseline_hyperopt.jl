@@ -33,7 +33,7 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 # General experiment
-experiment_name = "baseline_hyperopt"
+experiment_name = "baseline_hyperopt_select"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
@@ -111,8 +111,15 @@ function scene_inference(gl_context, parameters, config)
     idx = findfirst(x -> x == dataset, pro_df.dataset)
     best_params = best_parameters(pro_df[idx, :].scenario).values
     @reset parameters.o_mask_is = best_params[:o_mask_is]
+    @reset parameters.o_mask_not = 1 - parameters.o_mask_is
     @reset parameters.pixel_σ = best_params[:pixel_σ]
     @reset parameters.proposal_σ_r = fill(best_params[:proposal_σ_r], 3)
+
+    # selection similar to best TLESS performance
+    # @reset parameters.o_mask_is = 0.9
+    # @reset parameters.o_mask_not = 1 - parameters.o_mask_is
+    # @reset parameters.pixel_σ = 0.005
+    # @reset parameters.proposal_σ_r = fill(π, 3)
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)

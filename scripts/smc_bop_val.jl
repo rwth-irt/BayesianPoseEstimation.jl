@@ -26,16 +26,16 @@ CUDA.allowscalar(false)
 
 # TODO eval gt masks for comparability synth-to-real, eval default detections for BOP
 # General experiment
-experiment_name = "smc_bop_val_hyperopt"
+experiment_name = "smc_bop_val_steri"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
 @reset parameters.depth = parameters.n_particles
 @reset parameters.o_mask_is = 0.9
+@reset parameters.o_mask_not = 1 - parameters.o_mask_is
 @reset parameters.pixel_σ = 0.005
 @reset parameters.proposal_σ_r = fill(π, 3)
 sampler = :smc_mh
-
 # no default detections in val
 dataset = "itodd"
 testset = "val"

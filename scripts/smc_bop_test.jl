@@ -16,6 +16,7 @@ using DataFrames
 using MCMCDepth
 using PoseErrors
 using Random
+using Rotations
 using SciGL
 using Statistics
 
@@ -26,7 +27,6 @@ global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
-# TODO eval gt masks for comparability synth-to-real, eval default detections for BOP
 # General experiment
 experiment_name = "smc_bop_test"
 result_dir = datadir("exp_raw", experiment_name)
@@ -35,13 +35,14 @@ parameters = Parameters()
 @reset parameters.depth = parameters.n_particles
 
 @reset parameters.o_mask_is = 0.9
+@reset parameters.o_mask_not = 1 - parameters.o_mask_not
 @reset parameters.pixel_σ = 0.005
 @reset parameters.proposal_σ_r = fill(π, 3)
 
 sampler = :smc_mh
 # no default detections in val
 dataset = "itodd"
-testset = "val"
+testset = "test"
 scene_id = 1
 itodd_config = dict_list(@dict sampler dataset testset scene_id)
 
@@ -61,7 +62,7 @@ testset = "test_primesense"
 scene_id = [1:20...]
 tless_config = dict_list(@dict sampler dataset testset scene_id)
 
-configs = tless_config # TODO [itodd_config..., lmo_config..., tless_config...]
+configs = [itodd_config..., lmo_config..., tless_config...]
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
@@ -115,8 +116,7 @@ scene_inference(gl_context, config)
 function scene_inference(gl_context, parameters, config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset = config
-    # TODO in test script
-    scene_df = test_targets(datadir("bop", dataset, testset), scene_id; detections_file="default_detections_task1.json")
+    scene_df = test_targets(datadir("bop", dataset, testset), scene_id; detections_file="default_detections_task4.json")
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)
@@ -166,7 +166,7 @@ end
 # Avoid recreating the context in scene_inference by conditioning on it / closure
 gl_context = render_context(parameters)
 gl_scene_inference = scene_inference | (gl_context, parameters)
-@progress "SMC BOP validation" for config in configs
+@progress "SMC BOP test" for config in configs
     @produce_or_load(gl_scene_inference, config, result_dir; filename=my_savename)
 end
 destroy_context(gl_context)
@@ -204,15 +204,4 @@ for (key, group) in zip(keys(groups), groups)
         end
     end
     CSV.write(joinpath(outdir, "$(key.dataset).csv"), csv_df)
-end
-
-configs = my_parse_savename.(files)
-parameters = load(joinpath(dir, first(files)))["parameters"]
-
-try
-    @progress "evaluating error metrics, experiment: $experiment_name" for config in configs
-        @produce_or_load(calc_n_match_closure, config, datadir("exp_pro", experiment_name, "errors"); filename=my_savename)
-    end
-finally
-    destroy_context(dist_context)
 end
