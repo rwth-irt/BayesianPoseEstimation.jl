@@ -24,9 +24,8 @@ global_logger(TerminalLogger(right_justify=120))
 
 CUDA.allowscalar(false)
 
-# TODO eval gt masks for comparability synth-to-real, eval default detections for BOP
 # General experiment
-experiment_name = "smc_bop_val_steri"
+experiment_name = "smc_bop_val_hyperopt"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
