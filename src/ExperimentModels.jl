@@ -28,7 +28,12 @@ function point_from_segmentation(bounding_box, depth_image, mask_img, cv_camera)
     # Ignore invalid pixels
     mask_mask = @. masked > 0 && !isinf(masked)
     masked = masked[mask_mask]
-    z = median(masked)
+    if !isempty(masked)
+        z = median(masked)
+    else
+        # fallback to center of bounding box which is the center of the crop
+        CUDA.@allowscalar z = depth_image[(size(depth_image) .÷ 2)...]
+    end
     x, y = reproject_3D(u, v, z, cv_camera)
     [x, y, z]
 end

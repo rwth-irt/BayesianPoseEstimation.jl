@@ -1466,11 +1466,11 @@ version = "1.4.3"
 
 [[deps.PoseErrors]]
 deps = ["Accessors", "CUDA", "CoordinateTransformations", "DataFrames", "Distances", "FileIO", "GLAbstraction", "GeometryBasics", "ImageCore", "ImageIO", "ImageTransformations", "Interpolations", "JSON", "JSONTables", "LinearAlgebra", "NearestNeighbors", "Reexport", "Rotations", "SciGL", "StaticArrays", "Statistics"]
-git-tree-sha1 = "26ac9501d883646fa88ffd2a561c0dd3c0190871"
+git-tree-sha1 = "bdeba4907f6e233e7381a8bfd92c2788ee1247a3"
 repo-rev = "main"
 repo-url = "https://git-ce.rwth-aachen.de/diss/poseerrors.jl.git"
 uuid = "0e048aec-5af0-406a-9f6c-fdc882ab1032"
-version = "0.3.15"
+version = "0.3.16"
 
 [[deps.PositiveFactorizations]]
 deps = ["LinearAlgebra"]
