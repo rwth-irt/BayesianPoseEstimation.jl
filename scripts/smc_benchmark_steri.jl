@@ -23,11 +23,11 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 # General experiment
-experiment_name = "smc_benchmark_steri"
+experiment_name = "smc_steri"
 result_dir = datadir("exp_raw", experiment_name)
 dataset = "steri"
 testset = "train_pbr"
-scene_id = 1 #TODO[1:9...]
+scene_id = [1:9...]
 sampler = :smc_mh
 n_particles = 100 # [50, 100]
 pose_time = [0.05, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
@@ -54,6 +54,8 @@ function rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh
     camera = crop_camera(df_row)
     prior_o = fill(parameters.float_type(parameters.o_mask_not), parameters.width, parameters.height) |> device_array_type(parameters)
     prior_o[mask_img] .= parameters.float_type(parameters.o_mask_is)
+    # run without masks
+    # prior_o = parameters.float_type(0.5)
     # Bias the point prior
     prior_t = df_row.gt_t + rand(KernelNormal(0, first(parameters.σ_t)), 3)
     experiment = Experiment(gl_context, Scene(camera, [mesh]), prior_o, prior_t, depth_img)
