@@ -12,7 +12,7 @@ import CairoMakie as MK
 diss_defaults()
 begin
     df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-    row = df[204, :]
+    row = df[200, :]
     color_img = load(row.color_path)'
 
     parameters = Parameters()
@@ -25,7 +25,7 @@ begin
     @reset mesh.pose = to_pose(row.gt_t, row.gt_R)
     scene = Scene(row.cv_camera, [mesh])
     aspect_ratio = parameters.width / parameters.height
-    fig_width = 0.5 * DISS_WIDTH
+    fig_width = 0.7 * DISS_WIDTH
     fig = MK.Figure(resolution=(fig_width, fig_width / aspect_ratio))
     plot_scene_ontop!(fig, gl_context, scene, color_img; aspect=aspect_ratio)
     # display(fig)
