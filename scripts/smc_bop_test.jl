@@ -28,11 +28,12 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 # General experiment
-experiment_name = "smc_bop_test"
+experiment_name = "smc_bop_test_1s"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
 @reset parameters.depth = parameters.n_particles
+@reset parameters.time_budget = 1
 
 @reset parameters.o_mask_is = 0.9
 @reset parameters.o_mask_not = 1 - parameters.o_mask_not
