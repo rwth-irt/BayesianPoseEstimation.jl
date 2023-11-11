@@ -65,7 +65,7 @@ gl_context = render_context(parameters)
 
 # Clutter and occlusions
 # df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-# row = df[204, :]
+# row = df[200, :]
 
 # Parts cut from the image
 df = train_targets(joinpath("data", "bop", "itodd", "train_pbr"), 1)
