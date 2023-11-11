@@ -28,12 +28,13 @@ global_logger(TerminalLogger(right_justify=120))
 CUDA.allowscalar(false)
 
 # General experiment
-experiment_name = "smc_bop_test_3s"
+time_budget = 1
+experiment_name = "smc_bop_test_$(time_budget)s"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
 @reset parameters.depth = parameters.n_particles
-@reset parameters.time_budget = 3
+@reset parameters.time_budget = time_budget
 
 @reset parameters.o_mask_is = 0.9
 @reset parameters.o_mask_not = 1 - parameters.o_mask_not
@@ -41,7 +42,17 @@ parameters = Parameters()
 @reset parameters.proposal_σ_r = fill(π, 3)
 
 sampler = :smc_mh
-# no default detections in val
+
+dataset = "hb"
+testset = "test_primesense"
+scene_id = [3, 5, 13]
+hb_config = dict_list(@dict sampler dataset testset scene_id)
+
+dataset = "icbin"
+testset = "test"
+scene_id = [1:3...]
+icbin_config = dict_list(@dict sampler dataset testset scene_id)
+
 dataset = "itodd"
 testset = "test"
 scene_id = 1
@@ -63,7 +74,17 @@ testset = "test_primesense"
 scene_id = [1:20...]
 tless_config = dict_list(@dict sampler dataset testset scene_id)
 
-configs = [itodd_config..., lmo_config..., tless_config...]
+dataset = "tudl"
+testset = "test"
+scene_id = [1:3...]
+tudl_config = dict_list(@dict sampler dataset testset scene_id)
+
+dataset = "ycbv"
+testset = "test"
+scene_id = [48:59...]
+ycbv_config = dict_list(@dict sampler dataset testset scene_id)
+
+configs = [hb_config..., icbin_config..., itodd_config..., lmo_config..., tless_config..., tudl_config..., ycbv_config...]
 
 """
     rng_posterior_sampler(gl_context, parameters, depth_img, mask_img, mesh, df_row)
