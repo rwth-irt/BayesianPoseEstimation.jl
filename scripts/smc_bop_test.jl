@@ -29,7 +29,7 @@ CUDA.allowscalar(false)
 
 # General experiment
 time_budget = 1
-experiment_name = "smc_bop_test_$(time_budget)s"
+experiment_name = "smc_bop_test_with_bad_$(time_budget)s"
 result_dir = datadir("exp_raw", experiment_name)
 parameters = Parameters()
 @reset parameters.n_particles = 100
@@ -138,7 +138,8 @@ scene_inference(gl_context, config)
 function scene_inference(gl_context, parameters, config)
     # Extract config and load dataset
     @unpack scene_id, dataset, testset = config
-    scene_df = test_targets(datadir("bop", dataset, testset), scene_id; detections_file="default_detections_task4.json")
+    # TODO run with remove_bad = false
+    scene_df = test_targets(datadir("bop", dataset, testset), scene_id; detections_file="default_detections_task4.json", remove_bad=false)
 
     # Store result in DataFrame. Numerical precision doesn't matter here → Float32
     result_df = select(scene_df, :scene_id, :img_id, :obj_id)
@@ -204,25 +205,29 @@ function parse_config(path)
 end
 DataFrames.transform!(est_df, :path => ByRow(parse_config) => [:dataset, :scene_id])
 
-groups = groupby(est_df, :dataset)
-for (key, group) in zip(keys(groups), groups)
+dataset_groups = groupby(est_df, :dataset)
+for (key, dataset_group) in zip(keys(dataset_groups), dataset_groups)
     csv_df = DataFrame(scene_id=Int[], im_id=Int[], obj_id=Int[], score=Float64[], R=String[], t=String[], time=Float64[])
-    for scene_row in eachrow(group)
-        # all times must be the same for a scene and img - not true for my method so use mean
-        mean_time = mean(scene_row.result_df.time)
-        for row in eachrow(scene_row.result_df)
-            # r_ij for i-th row and j-th column, separated by spaces
-            R = row.R |> QuatRotation |> RotMatrix
-            r = [R[i, j] for i in 1:size(R)[1] for j in 1:size(R)[2]]
-            r_str = reduce(r) do x, y
-                string(x) * " " * string(y)
+    for scene_row in eachrow(dataset_group)
+        result_df = scene_row.result_df
+        # times are reported for all pose estimates in an image
+        img_groups = groupby(result_df, :img_id)
+        for img_group in img_groups
+            img_time = sum(img_group.time)
+            for row in eachrow(img_group)
+                # r_ij for i-th row and j-th column, separated by spaces
+                R = row.R |> QuatRotation |> RotMatrix
+                r = [R[i, j] for i in 1:size(R)[1] for j in 1:size(R)[2]]
+                r_str = reduce(r) do x, y
+                    string(x) * " " * string(y)
+                end
+                # in mm, separated by spaces
+                t = row.t .* 1e3
+                t_str = reduce(t) do x, y
+                    string(x) * " " * string(y)
+                end
+                push!(csv_df, (; scene_id=row.scene_id, im_id=row.img_id, obj_id=row.obj_id, score=row.score, R=r_str, t=t_str, time=img_time))
             end
-            # in mm, separated by spaces
-            t = row.t .* 1e3
-            t_str = reduce(t) do x, y
-                string(x) * " " * string(y)
-            end
-            push!(csv_df, (; scene_id=row.scene_id, im_id=row.img_id, obj_id=row.obj_id, score=row.score, R=r_str, t=t_str, time=mean_time))
         end
     end
     CSV.write(joinpath(outdir, "$(key.dataset).csv"), csv_df)
