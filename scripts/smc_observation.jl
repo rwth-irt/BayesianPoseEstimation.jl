@@ -2,7 +2,10 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-# TODO which section in Diss?
+"""
+Different observation models for "Modeling Occlusions: Exponential Distribution,
+Classification, Regularization"
+"""
 
 using DrWatson
 @quickactivate("MCMCDepth")

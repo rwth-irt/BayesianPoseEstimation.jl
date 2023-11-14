@@ -2,6 +2,10 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+"""
+Visualization of crop resolutions in "Qualitative Analysis of Samplers"
+"""
+
 using Accessors
 using FileIO
 using MCMCDepth

@@ -2,6 +2,10 @@
 # Copyright (c) 2022, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
+"""
+Used for chains and densities in "Qualitative Analysis of Samplers"
+"""
+
 using AbstractMCMC: step
 using Accessors
 using CUDA

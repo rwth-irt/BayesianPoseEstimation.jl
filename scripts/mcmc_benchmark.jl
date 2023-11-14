@@ -7,6 +7,7 @@ Run different Metropolis Hastings MCMC on  the synthetic BOP datasets.
 Only the first scene of each dataset is evaluated because of the computation time.
 
 WARN: Results vary based on sampler configuration
+Section: "Optimal Number of Particles and Inference Time"
 """
 
 using DrWatson

@@ -2,6 +2,10 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+"""
+Image of full scene in "Qualitative Analysis of Samplers"
+"""
+
 using Accessors
 using FileIO
 using MCMCDepth
@@ -12,7 +16,7 @@ import CairoMakie as MK
 diss_defaults()
 begin
     df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-    row = df[200, :]
+    row = df[204, :]
     color_img = load(row.color_path)'
 
     parameters = Parameters()

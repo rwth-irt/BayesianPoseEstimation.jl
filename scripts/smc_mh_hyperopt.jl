@@ -2,6 +2,11 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+"""
+Try to find optimal model parameters on a per-data set basis.
+Section: "Automatic Parameter Tuning"
+"""
+
 using DrWatson
 @quickactivate("MCMCDepth")
 

@@ -2,6 +2,10 @@
 # Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved. 
 
+"""
+Test the influence of masks and point priors in "Choice of Priors for Position and Classfication"
+"""
+
 using DrWatson
 @quickactivate("MCMCDepth")
 

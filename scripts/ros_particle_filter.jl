@@ -5,7 +5,9 @@
 """
 Runs the particle filters on the at - Automatisierungstechnik test set.
 Running the evo_traj shell command gets stuck when used in run.sh.
-Since this script does not take too long, it should not matter. 
+Since this script does not take too long, it should not matter.
+
+Used in "Particle Filtering for 6D Pose Tracking of Iliac Crest Bones"
 """
 
 using DrWatson

@@ -3,7 +3,8 @@
 # All rights reserved. 
 
 """
-Run the algorithms on validation and test sets using ground truth masks
+Run the algorithms on validation and test sets using ground truth masks in "Benchmark for 6D Object Pose Estimation:
+Results on Real Data"
 """
 
 using DrWatson

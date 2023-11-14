@@ -10,6 +10,10 @@ Run different MCMC algorithms on the synthetic BOP datasets:
 Model setup for segmentation:
 * Segmentation prior for position `t` and pixel association `o`
 * Simple likelihood function with mixture model for the pixels, a simple regularization, and without modeling the association,
+
+Establish quantitative baseline for MCMC algorithm in "Quantitative Evaluation of Baseline Samplers on
+Synthetic Data"
+
 """
 
 using DrWatson

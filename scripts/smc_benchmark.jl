@@ -8,6 +8,8 @@ Run different Metropolis Hastings MCMC on  the synthetic BOP datasets.
     WARN: Results vary based on sampler configuration
     NOTE: Inference time grows linearly with n_hypotheses = n_particles * n_steps
     NOTE: smc_bootstrap & smc_forward mainly benefit from n_particles not n_steps
+
+Section: "Optimal Number of Particles and Inference Time"
 """
 
 using DrWatson
