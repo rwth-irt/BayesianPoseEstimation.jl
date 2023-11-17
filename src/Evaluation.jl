@@ -277,16 +277,16 @@ function evaluate_recalls(experiment_name)
     diss_defaults()
 
     fig_recall = MK.Figure()
-    ax_vsd_recall = MK.Axis(fig_recall[2, 1]; xlabel="error threshold", ylabel="recall", limits=(nothing, (0, 1)), title="VSD")
-    ax_adds_recall = MK.Axis(fig_recall[2, 2]; xlabel="error threshold", ylabel="recall", limits=(nothing, (0, 1)), title="ADDS")
+    ax_vsd_recall = MK.Axis(fig_recall[2, 1]; xlabel="error threshold / -", ylabel="recall / -", limits=(nothing, (0, 1)), title="VSD")
+    ax_adds_recall = MK.Axis(fig_recall[2, 2]; xlabel="error threshold / -", ylabel="recall / -", limits=(nothing, (0, 1)), title="ADDS")
     gl_recall = fig_recall[1, :] = MK.GridLayout()
-    ax_vsdbop_recall = MK.Axis(gl_recall[1, 1]; xlabel="error threshold", ylabel="recall", limits=(nothing, (0, 1)), title="VSDBOP")
+    ax_vsdbop_recall = MK.Axis(gl_recall[1, 1]; xlabel="error threshold / -", ylabel="recall / -", limits=(nothing, (0, 1)), title="VSDBOP")
 
     fig_density = MK.Figure(figure_padding=10)
-    ax_vsd_density = MK.Axis(fig_density[2, 1]; xlabel="normalized error value", ylabel="density", title="VSD")
-    ax_adds_density = MK.Axis(fig_density[2, 2]; xlabel="normalized error value", ylabel="density", title="ADDS")
+    ax_vsd_density = MK.Axis(fig_density[2, 1]; xlabel="normalized error / -", ylabel="density / -", title="VSD")
+    ax_adds_density = MK.Axis(fig_density[2, 2]; xlabel="normalized error / -", ylabel="density / -", title="ADDS")
     gl_density = fig_density[1, :] = MK.GridLayout()
-    ax_vsdbop_density = MK.Axis(gl_density[1, 1]; xlabel="normalized error value", ylabel="density", title="VSDBOP")
+    ax_vsdbop_density = MK.Axis(gl_density[1, 1]; xlabel="normalized error / -", ylabel="density / -", title="VSDBOP")
 
     θ_range = 0:0.02:1
     groups = groupby(results, :sampler)

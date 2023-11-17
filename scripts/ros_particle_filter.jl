@@ -225,7 +225,7 @@ for row in eachrow(raw_df)
     # NOTE looks like smooth_posterior degrades ESS / really focuses on one
     # NOTE coordinate PF has way less sample degeneration
     states = row.states
-    ax = MK.Axis(fig[2, 2]; xlabel="iteration", ylabel="relative ESS", limits=(nothing, (0, 1)))
+    ax = MK.Axis(fig[2, 2]; xlabel="iteration / -", ylabel="relative ESS / -", limits=(nothing, (0, 1)))
     MK.lines!(ax, 1:length(states), exp.(getproperty.(states, :log_relative_ess)); label="smc pf")
     MK.axislegend(ax, position=:lt)
 

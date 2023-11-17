@@ -39,7 +39,7 @@ end
 
 # Image plotting
 
-function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0, rasterize=3, kwargs...)
+function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0, kwargs...)
     # Transfer to CPU
     img = Array(img)
     if reverse
@@ -47,7 +47,7 @@ function plot_depth_img!(ax, img; colormap=:viridis, reverse=true, alpha=1.0, ra
     end
     min_depth = minimum(x -> x > 0 ? x : typemax(x), img)
     max_depth = maximum(x -> isinf(x) ? zero(x) : x, img)
-    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, alpha=alpha, rasterize=rasterize, kwargs...)
+    MK.heatmap!(ax, img; colormap=colormap, colorrange=(min_depth, max_depth), lowclip=:transparent, alpha=alpha, kwargs...)
 end
 
 function plot_prob_img!(ax, img; colormap=:viridis, reverse=false)
@@ -69,7 +69,7 @@ function plot_prob_img!(ax, img; colormap=:viridis, reverse=false)
     MK.heatmap!(ax, img; colormap=colormap, colorrange=(0, 1), lowclip=:black, highclip=:white)
 end
 
-function img_axis(grid_pos::MK.GridPosition; xlabel="x-pixels", ylabel="y-pixels", kwargs...)
+function img_axis(grid_pos::MK.GridPosition; xlabel="x-pixels / px", ylabel="y-pixels / px", kwargs...)
     ax = MK.Axis(grid_pos; xlabel=xlabel, ylabel=ylabel, aspect=1, yreversed=true, kwargs...)
     MK.hidedecorations!(ax; label=false, ticklabels=false, ticks=false)
     ax
@@ -106,7 +106,7 @@ Returns (Axis, Heatmap)
 
 See also [`plot_depth_img`](@ref)
 """
-function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels", ylabel="y-pixels", aspect=1, kwargs...)
+function plot_depth_img!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img; colorbar_label="depth / m", xlabel="x-pixels / px", ylabel="y-pixels / px", aspect=1, kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, aspect=aspect)
     hm = plot_depth_img!(ax, img, kwargs...)
     heatmap_colorbar!(figure, ax, hm; label=colorbar_label)
@@ -133,10 +133,10 @@ Returns (Axis, Heatmap)
 
 See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref), [`plot_best_pose`](@ref).
 """
-function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels", ylabel="y-pixels", title="", aspect=1, kwargs...)
+function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels / px", ylabel="y-pixels / px", title="", aspect=1, rasterize=2, kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title, aspect=aspect)
     # Plot the image as background
-    MK.image!(ax, img; aspect=1, interpolate=false, rasterize=true)
+    MK.image!(ax, img; aspect=1, interpolate=true, rasterize=rasterize)
     hm = plot_depth_img!(ax, depth_img; alpha=0.5, kwargs...)
     (ax, hm)
 end
@@ -271,9 +271,9 @@ end
 
 function plot_pose_density(sample; weights=nothing)
     fig = MK.Figure(; resolution=(DISS_WIDTH, 1 / 4 * DISS_WIDTH))
-    ax_t = MK.Axis(fig[1, 1]; xlabel="position / m", ylabel="density")
+    ax_t = MK.Axis(fig[1, 1]; xlabel="position / m", ylabel="density / -")
     density_variable!(ax_t, sample, :t; labels=["x" "y" "z"], weights=weights)
-    ax_r = MK.Axis(fig[1, 2]; xlabel="orientation / rad", ylabel="density")
+    ax_r = MK.Axis(fig[1, 2]; xlabel="orientation / rad", ylabel="density / -")
     density_variable!(ax_r, sample, :r; labels=["x" "y" "z"], weights=weights)
     MK.axislegend(ax_t; position=:ct)
     fig
@@ -286,12 +286,12 @@ function plot_pose_chain(model_chain, len=50)
     fig = MK.Figure()
     ax_ts = MK.Axis(fig[1, 1]; xlabel="iteration ÷ $(length(model_chain) ÷ len)", ylabel="position / m")
     scatter_variable!(ax_ts, model_chain, :t, len; labels=["x" "y" "z"])
-    ax_td = MK.Axis(fig[2, 1]; xlabel="position / m", ylabel="density")
+    ax_td = MK.Axis(fig[2, 1]; xlabel="position / m", ylabel="density / -")
     density_variable!(ax_td, model_chain, :t; labels=["x" "y" "z"])
 
     ax_rs = MK.Axis(fig[1, 2]; xlabel="iteration ÷ $(length(model_chain) ÷ len)", ylabel="orien. / rad")
     scatter_variable!(ax_rs, model_chain, :r, len; labels=["x" "y" "z"])
-    ax_rd = MK.Axis(fig[2, 2]; xlabel="orientation / rad", ylabel="density")
+    ax_rd = MK.Axis(fig[2, 2]; xlabel="orientation / rad", ylabel="density / -")
     density_variable!(ax_rd, model_chain, :r; labels=["x" "y" "z"])
 
     MK.axislegend(ax_td; position=:ct)

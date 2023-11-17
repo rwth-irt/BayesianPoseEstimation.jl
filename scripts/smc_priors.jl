@@ -202,7 +202,7 @@ fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
 xnames = unique(pro_df.dataset) .|> fig_xtick
 xticks = (eachindex(xnames), xnames)
 
-ax = MK.Axis(fig[1, 1]; title="ADDS", xticks=xticks, limits=(nothing, (0.5, 1)))
+ax = MK.Axis(fig[1, 1]; title="ADDS", xticks=xticks, ylabel="avg. recall / -", limits=(nothing, (0.5, 1)))
 groups = groupby(recalls, [:prior])
 for group in groups
     group = sort!(group, :dataset)

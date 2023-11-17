@@ -81,7 +81,7 @@ row = df[2, :]
 
 # Steri on flat surface
 # df = train_targets(joinpath("data", "bop", "steri", "train_pbr"), 1)
-# row = df[5, :]
+# row = df[8, :]
 # # # NOTE high probability for segmentation mask seems beneficial, as well as simple model
 # @reset parameters.o_mask_is = 0.95
 # @reset parameters.o_mask_not = 1 - parameters.o_mask_is
@@ -133,10 +133,12 @@ fig = plot_logevidence(states)
 MK.save(joinpath("plots", "evidence_smc_clutter.pdf"), fig)
 # Plot state which uses the weights
 fig = plot_pose_density(final_state)
+display(fig)
 MK.save(joinpath("plots", "density_smc_clutter.pdf"), fig)
 
 MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 fig = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
+display(fig)
 MK.save(joinpath("plots", "best_smc_clutter.pdf"), fig)
 fig = plot_prob_img(mean_image(final_state, :o))
 display(fig)
@@ -160,6 +162,7 @@ MK.save(joinpath("plots", "density_mcmc_clutter.pdf"), fig)
 MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 # plot_prob_img(mean_image(chain, :o))
 fig = plot_best_pose(chain, experiment, color_img)
+display(fig)
 MK.save(joinpath("plots", "best_mcmc_clutter.pdf"), fig)
 diss_defaults()
 
