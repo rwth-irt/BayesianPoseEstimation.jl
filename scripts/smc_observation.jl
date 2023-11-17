@@ -277,7 +277,7 @@ for (idx, group) in enumerate(groupby(recalls, :o_prior))
     )
     MK.colsize!(fig.layout, idx, MK.Aspect(1, 1.0))
 end
-MK.Colorbar(fig[1, 3]; label="avg. recall / -", limits=crange)
+MK.Colorbar(fig[1, 3]; label="recall / -", limits=crange)
 
 # display(fig)
 save(joinpath("plots", "$(experiment_name).pdf"), fig)
