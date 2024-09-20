@@ -2,7 +2,7 @@
 Evaluates sampling-based Bayesian inference (different variants of MCMC, SMC) for the 6D pose estimation of objects using depth images and CAD models only.
 This code has been produced during while writing my Ph.D. (Dr.-Ing.) thesis at the institut of automatic control, RWTH Aachen University.
 If you find it helpful for your research please cite this:
-> T. Redick, „Bayesian inference for CAD-based pose estimation on depth images for robotic manipulation“, RWTH Aachen University, 2024. doi: 10.18154/RWTH-2024-04533.
+> T. Redick, „Bayesian inference for CAD-based pose estimation on depth images for robotic manipulation“, RWTH Aachen University, 2024. doi: [10.18154/RWTH-2024-04533](https://doi.org/10.18154/RWTH-2024-04533).
 
 I submitted my results of the best performing SMC sampler to the [BOP benchmark](https://bop.felk.cvut.cz/home/) with two different time budgets per pose estimate:
 * 1 second: https://bop.felk.cvut.cz/method_info/458/
