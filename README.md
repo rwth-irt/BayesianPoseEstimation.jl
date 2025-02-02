@@ -9,11 +9,11 @@ I submitted my results of the best performing SMC sampler to the [BOP benchmark]
 * 0.5 seconds: https://bop.felk.cvut.cz/method_info/457/
 
 # Required Julia packages
-Since this code has been written, before `[sources]` has been [supported in Project.toml](https://github.com/JuliaLang/Pkg.jl/pull/3783#issuecomment-2138812311) and I didn't register my standalone Julia packages, you might need these in manually:
+These packages will be installed using the `[sources]` section in `Project.toml`.
 * https://github.com/rwth-irt/BayesNet.jl - Type stable implementation of a Bayesian network.
 * https://github.com/rwth-irt/KernelDistributions.jl - Subset of Distributions.jl which can be used in CUDA kernels.
 * https://github.com/rwth-irt/PoseErrors.jl - 6D pose error metrics from [BOP Challenge](https://bop.felk.cvut.cz/home/)
-* https://github.com/rwth-irt/SciGL.jlhttps://github.com/rwth-irt/SciGL.jl - Efficient rendering in OpenGL and CUDA interop for julia
+* https://github.com/rwth-irt/SciGL.jl - Efficient rendering in OpenGL and CUDA interop for julia
 * https://github.com/rwth-irt/BlenderProc.DissTimRedick - BlenderProc setup to generate the synthetic datasets from my dissertation. 
 
 # Note on recent CUDA.jl versions

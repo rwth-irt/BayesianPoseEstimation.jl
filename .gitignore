@@ -15,3 +15,5 @@ notebooks/
 *.gif
 *.svg
 *.png
+
+Manifest.toml
