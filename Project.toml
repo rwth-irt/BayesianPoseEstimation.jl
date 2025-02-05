@@ -1,7 +1,7 @@
 name = "MCMCDepth"
 uuid = "ea9e20e3-5ec9-4a18-b9a5-f98be19e20e6"
 authors = ["Tim Redick <t.redick@irt.rwth-aachen.de>"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
@@ -41,16 +41,16 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TerminalLoggers = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
 ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
 [sources]
 BayesNet = {url = "https://github.com/rwth-irt/BayesNet.jl"}
 GLAbstraction = {url = "https://github.com/Tuebel/GLAbstraction.jl.git"}
-PoseErrors = {url = "https://github.com/rwth-irt/PoseErrors.jl"}
-SciGL = {url = "https://github.com/rwth-irt/SciGL.jl"}
-RobotOSData = {url = "https://github.com/rwth-irt/RobotOSData.jl"}
 KernelDistributions = {url = "https://github.com/rwth-irt/KernelDistributions.jl"}
+PoseErrors = {url = "https://github.com/rwth-irt/PoseErrors.jl"}
+RobotOSData = {url = "https://github.com/rwth-irt/RobotOSData.jl"}
+SciGL = {url = "https://github.com/rwth-irt/SciGL.jl"}
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]

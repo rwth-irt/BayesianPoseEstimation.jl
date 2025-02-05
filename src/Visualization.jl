@@ -31,7 +31,7 @@ function diss_defaults()
         VLines=(; cycle=[:color => :wong2], linestyle=:dash, linewidth=1),
         VSpan=(; cycle=[:color => :wong2_alpha]),
         fontsize=11, # Latex "small" for normal 12
-        resolution=(DISS_WIDTH, DISS_WIDTH / 2),
+        size=(DISS_WIDTH, DISS_WIDTH / 2),
         rowgap=5, colgap=5,
         figure_padding=5
     )
@@ -136,7 +136,7 @@ See also [`plot_depth_ontop`](@ref), [`plot_scene_ontop`](@ref), [`plot_best_pos
 function plot_depth_ontop!(figure::Union{MK.Makie.FigureLike,MK.GridLayout}, img, depth_img; xlabel="x-pixels / px", ylabel="y-pixels / px", title="", aspect=1, rasterize=2, kwargs...)
     ax = img_axis(figure[1, 1]; xlabel=xlabel, ylabel=ylabel, title=title, aspect=aspect)
     # Plot the image as background
-    MK.image!(ax, img; aspect=1, interpolate=true, rasterize=rasterize)
+    MK.image!(ax, img; interpolate=true, rasterize=rasterize)
     hm = plot_depth_img!(ax, depth_img; alpha=0.5, kwargs...)
     (ax, hm)
 end
@@ -270,7 +270,7 @@ function scatter_variable!(axis, chain, var_name, len=100; labels=nothing)
 end
 
 function plot_pose_density(sample; weights=nothing)
-    fig = MK.Figure(; resolution=(DISS_WIDTH, 1 / 4 * DISS_WIDTH))
+    fig = MK.Figure(; size=(DISS_WIDTH, 1 / 4 * DISS_WIDTH))
     ax_t = MK.Axis(fig[1, 1]; xlabel="position / m", ylabel="density / -")
     density_variable!(ax_t, sample, :t; labels=["x" "y" "z"], weights=weights)
     ax_r = MK.Axis(fig[1, 2]; xlabel="orientation / rad", ylabel="density / -")
