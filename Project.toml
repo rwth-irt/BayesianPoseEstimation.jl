@@ -41,6 +41,10 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TerminalLoggers = "5d786b92-1e48-4d6f-9151-6b4477ca9bed"
 ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 
+[compat]
+# https://github.com/MakieOrg/Makie.jl/issues/4759
+CairoMakie = "=0.13.0"
+
 [sources]
 BayesNet = {url = "https://github.com/rwth-irt/BayesNet.jl"}
 GLAbstraction = {url = "https://github.com/Tuebel/GLAbstraction.jl.git"}
