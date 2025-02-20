@@ -8,8 +8,20 @@ I submitted my results of the best performing SMC sampler to the [BOP benchmark]
 * 1 second: https://bop.felk.cvut.cz/method_info/458/
 * 0.5 seconds: https://bop.felk.cvut.cz/method_info/457/
 
-# Required Julia packages
-These packages will be installed using the `[sources]` section in `Project.toml`.
+# Setup
+## VSCode Devcontainer (recommended)
+The easiest way to get started is using the [VSCode Remote - Containers](https://code.visualstudio.com/docs/remote/containers) extension.
+This setup includes:
+- *startup.jl*: automatically loads Julia packages `ImageShow` to visualize results in VSCode, `Revise` automatically recompiles code on changes, and `OhMyREPL` for an improved REPL experience.
+- *OpenGL*: the `docker-compose.yml` includes all necessary mounts to run GUIs and OpenGL applications. You can use `glxinfo -B` to check which OpenGL driver is used.
+- *CUDA*: the Dockerfile is based on the official CUDA image. **Note:** [OpenGl-CUDA interop is not supported on WSL yet](https://docs.nvidia.com/cuda/wsl-user-guide/index.html#features-not-yet-supported).
+
+This will install all required dependencies and launch a Docker container which has access to the GPU (CUDA, DISPLAY, & OpenGL).
+
+
+## Manual Setup
+Like any other Julia project, you can install the required packages using the `Project.toml` and `Manifest.toml` files via `import Pkg; Pkg.activate("."); Pkg.resolve(); Pkg.instantiate()`.
+I have tested the versions in the `Manifest.toml` file, but you can update them to the latest version since I have included  github dependencies in the `[sources]` section of `Project.toml`:
 * https://github.com/rwth-irt/BayesNet.jl - Type stable implementation of a Bayesian network.
 * https://github.com/rwth-irt/KernelDistributions.jl - Subset of Distributions.jl which can be used in CUDA kernels.
 * https://github.com/rwth-irt/PoseErrors.jl - 6D pose error metrics from [BOP Challenge](https://bop.felk.cvut.cz/home/)

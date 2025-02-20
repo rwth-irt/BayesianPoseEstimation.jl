@@ -1,28 +1,46 @@
 # @license BSD-3 https://opensource.org/licenses/BSD-3-Clause
-# Copyright (c) 2020, Tim Redick
+# Copyright (c) 2023, Institute of Automatic Control - RWTH Aachen University
 # All rights reserved.
 
-# OpenGL
-FROM ubuntu:20.04
+# # Mutlistage build for Julia
+FROM docker.io/julia:1.11.3-bookworm AS julia-stage
 
-# dev tools
-RUN apt-get update && apt-get install -y curl git
+# CUDA
+FROM docker.io/nvidia/cuda:12.8.0-runtime-ubuntu22.04
+
+# System packages: dev tools, OpenGL demo
+RUN apt-get update && apt-get install -y curl git mesa-utils
 RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
     apt-get update && \
     apt-get install -y git-lfs
 
-# Non-root-user to avoid file permission problems
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-RUN groupadd --gid $USER_GID $USERNAME && \
-    useradd --uid $USER_UID --gid $USER_GID -m $USERNAME && \
-    apt-get update && \
-    apt-get install -y sudo && \
-    echo $USERNAME ALL=\(root\) NOPASSWD:ALL >/etc/sudoers.d/$USERNAME && \
-    chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Create the user
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    # Add sudo support
+    && apt-get update \
+    && apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Copy Julia from the julia-stage
+COPY --from=julia-stage /usr/local/julia /usr/local/julia
+# Add Julia binaries to PATH
+ENV PATH="/usr/local/julia/bin:${PATH}"
+
+# Set the default user
 USER $USERNAME
 
-# Environment setup
-ENV PATH="/home/vscode/miniconda/bin:${PATH}"
-ENV PATH="/home/vscode/julia/julia-1.6.3/bin:${PATH}"
+# Install some common Julia packages
+RUN julia -e 'import Pkg; Pkg.add(["ImageShow", "OhMyREPL", "Revise"]); Pkg.instantiate(); Pkg.precompile()'
+
+# Copy startup.jl to Julia config directory
+COPY --chown=$USERNAME:$USERNAME .devcontainer/startup.jl /home/$USERNAME/.julia/config/startup.jl
+COPY --chown=$USERNAME:$USERNAME *.toml /home/$USERNAME/workspace/
+
+# Setup environment from Manifest.toml
+RUN julia --project=/home/$USERNAME/workspace -e 'import Pkg; Pkg.instantiate()'
