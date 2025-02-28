@@ -43,7 +43,7 @@ ThreadsX = "ac1d9e8a-700a-412c-b207-f0111f4b6c0d"
 
 [compat]
 # https://github.com/MakieOrg/Makie.jl/issues/4759
-CairoMakie = "=0.13.0"
+# CairoMakie = "=0.13.0"
 
 [sources]
 BayesNet = {url = "https://github.com/rwth-irt/BayesNet.jl"}

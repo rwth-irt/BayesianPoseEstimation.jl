@@ -39,7 +39,7 @@ function smc_parameters(parameters=Parameters())
     # NOTE FP & Bootstrap do not allow independent moves so they profit from a large number of particles. They are also resampling dominated instead of acceptance.
     # NOTE Why is MTM so much worse? One reason might have been that tempering was not implemented.
     @reset parameters.n_steps = 400
-    @reset parameters.n_particles = 100
+    @reset parameters.n_particles = 20
     # Normalization and tempering leads to less resampling, especially in MCMC sampler
     @reset parameters.depth = parameters.n_particles
 end
@@ -50,7 +50,7 @@ parameters = smc_parameters()
 @reset parameters.height = 50;
 
 # NOTE takes minutes instead of seconds
-# @reset parameters.device = :CPU
+@reset parameters.device = :CPU
 cpu_rng = Random.default_rng(parameters)
 dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
@@ -151,7 +151,6 @@ sampler = mh_sampler(cpu_rng, parameters, posterior)
 # parameters = mtm_parameters()
 # sampler = mtm_sampler(cpu_rng, parameters, posterior);
 # sampler = mtm_local_sampler(cpu_rng, parameters, posterior)
-# TODO Diagnostics: Acceptance rate / count, log-likelihood for maximum likelihood selection.
 @time chain = sample(cpu_rng, posterior, sampler, parameters.n_steps; discard_initial=parameters.n_burn_in, thinning=parameters.n_thinning);
 
 diss_defaults()
