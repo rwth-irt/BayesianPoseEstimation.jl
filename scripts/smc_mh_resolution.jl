@@ -189,7 +189,7 @@ if "steps" in recalls.mode
     sort!(steps_recalls, :resolution)
     sort!(steps_time, :resolution)
 
-    f1 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
+    f1 = MK.Figure(size=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
     ax1 = MK.Axis(f1[1, 1], xlabel="resolution / px", ylabel="recall / -", xticks=steps_recalls.resolution, yticks=0:0.2:1, limits=(nothing, nothing, 0, 1))
     MK.lines!(ax1, steps_recalls.resolution, steps_recalls.adds_recall; label="ADDS")
     MK.lines!(ax1, steps_recalls.resolution, steps_recalls.vsd_recall; label="VSD")
@@ -210,7 +210,7 @@ if "time" in recalls.mode
     sort!(time_recalls, :resolution)
     sort!(time_steps, :resolution)
 
-    f2 = MK.Figure(resolution=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
+    f2 = MK.Figure(size=(DISS_WIDTH, 2 / 5 * DISS_WIDTH))
     ax1 = MK.Axis(f2[1, 1], xlabel="resolution / px", ylabel="recall / s", xticks=time_recalls.resolution, yticks=0:0.2:1, limits=(nothing, (0, 1)))
     MK.lines!(ax1, time_recalls.resolution, time_recalls.adds_recall; label="ADDS")
     MK.lines!(ax1, time_recalls.resolution, time_recalls.vsd_recall; label="VSD")

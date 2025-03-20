@@ -30,7 +30,7 @@ begin
     scene = Scene(row.cv_camera, [mesh])
     aspect_ratio = parameters.width / parameters.height
     fig_width = 0.6 * DISS_WIDTH
-    fig = MK.Figure(resolution=(fig_width, fig_width / aspect_ratio))
+    fig = MK.Figure(size=(fig_width, fig_width / aspect_ratio))
     plot_scene_ontop!(fig, gl_context, scene, color_img; aspect=aspect_ratio)
     # display(fig)
     MK.save(joinpath("plots", "full_scene.pdf"), fig)

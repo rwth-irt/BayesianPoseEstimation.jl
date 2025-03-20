@@ -213,7 +213,7 @@ for row in eachrow(raw_df)
 
     # Plot em
     diss_defaults()
-    fig = MK.Figure(resolution=(DISS_WIDTH, 0.55 * DISS_WIDTH))
+    fig = MK.Figure(size=(DISS_WIDTH, 0.55 * DISS_WIDTH))
 
     # orientation
     ax = MK.Axis(fig[2, 1]; xlabel="time / s", ylabel="error / °")

@@ -183,7 +183,7 @@ function plot_sampler(sampler_name, recalls, times)
     recall_groups = groupby(recalls_filtered, :n_particles)
     time_groups = groupby(times_filtered, :n_particles)
 
-    fig = MK.Figure(resolution=(DISS_WIDTH, 0.5 * DISS_WIDTH); figure_padding=10)
+    fig = MK.Figure(size=(DISS_WIDTH, 0.5 * DISS_WIDTH); figure_padding=10)
     ax_vsd = MK.Axis(fig[2, 1]; xlabel="pose inference time / s", ylabel="recall / -", title="VSD", limits=(nothing, (0, 1)), yticks=0:0.25:1)
     for (rec, tim) in zip(recall_groups, time_groups)
         MK.lines!(ax_vsd, tim.mean_time, rec.vsd_recall; label="$(rec.n_particles |> first) particles")

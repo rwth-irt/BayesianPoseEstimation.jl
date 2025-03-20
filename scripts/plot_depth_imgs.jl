@@ -65,7 +65,7 @@ destroy_context(gl_context)
 diss_defaults()
 
 # Simple generative model
-fig = MK.Figure(resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
+fig = MK.Figure(size=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
 grid_meas = MK.GridLayout(fig[1, 1])
 ax_exp = img_axis(fig[1, 2]; title="Expectation μ", ylabel="")
 ax_gen = img_axis(fig[1, 3]; title="μ + Noise", ylabel="")
@@ -77,7 +77,7 @@ display(fig)
 MK.save(joinpath("plots", "gen_depth.pdf"), fig)
 
 # Using the prior
-fig = MK.Figure(resolution=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
+fig = MK.Figure(size=(DISS_WIDTH, 1 / 3 * DISS_WIDTH))
 grid_meas = MK.GridLayout(fig[1, 1])
 ax_unin = img_axis(fig[1, 2]; title="Uninformed Prior", ylabel="")
 ax_mask = img_axis(fig[1, 3]; title="Mask Prior", ylabel="")

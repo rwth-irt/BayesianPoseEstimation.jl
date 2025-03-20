@@ -68,12 +68,12 @@ gl_context = render_context(parameters)
 # row = df[100, :]
 
 # Clutter and occlusions
-# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-# row = df[106, :]
+df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+row = df[106, :]
 
 # Parts cut from the image
-df = train_targets(joinpath("data", "bop", "itodd", "train_pbr"), 1)
-row = df[2, :]
+# df = train_targets(joinpath("data", "bop", "itodd", "train_pbr"), 1)
+# row = df[2, :]
 
 # Small screw
 # df = train_targets(joinpath("data", "bop", "itodd", "val"), 1)
@@ -136,7 +136,7 @@ fig = plot_pose_density(final_state)
 display(fig)
 MK.save(joinpath("plots", "density_smc_clutter.pdf"), fig)
 
-MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
+MK.update_theme!(size=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 fig = plot_best_pose(final_state.sample, experiment, color_img, logprobability)
 display(fig)
 MK.save(joinpath("plots", "best_smc_clutter.pdf"), fig)
@@ -158,7 +158,7 @@ fig = plot_pose_chain(chain, 50)
 display(fig)
 MK.save(joinpath("plots", "density_mcmc_clutter.pdf"), fig)
 # plot_logprob(chain, 50)
-MK.update_theme!(resolution=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
+MK.update_theme!(size=(0.5 * DISS_WIDTH, 0.4 * DISS_WIDTH))
 # plot_prob_img(mean_image(chain, :o))
 fig = plot_best_pose(chain, experiment, color_img)
 display(fig)

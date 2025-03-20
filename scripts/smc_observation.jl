@@ -243,7 +243,7 @@ recalls = transform(recalls, [:adds_recall, :vsd_recall, :vsdbop_recall] => ByRo
 CSV.write(datadir("exp_pro", experiment_name, "pixel_classification_recall.csv"), recalls)
 display(recalls)
 
-fig = MK.Figure(resolution=(DISS_WIDTH, 0.4 * DISS_WIDTH))
+fig = MK.Figure(size=(DISS_WIDTH, 0.4 * DISS_WIDTH))
 crange = (minimum(recalls.vsdbop_recall), maximum(recalls.vsdbop_recall))
 # Heatmap for table
 for (idx, group) in enumerate(groupby(recalls, :o_prior))

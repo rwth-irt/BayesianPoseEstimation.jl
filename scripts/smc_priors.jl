@@ -197,7 +197,7 @@ function fig_label(group)
     end
 end
 
-fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
+fig = MK.Figure(size=(DISS_WIDTH, 0.3 * DISS_WIDTH))
 # Dataset names on x-axis
 xnames = unique(pro_df.dataset) .|> fig_xtick
 xticks = (eachindex(xnames), xnames)

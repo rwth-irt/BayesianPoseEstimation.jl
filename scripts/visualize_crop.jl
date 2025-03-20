@@ -18,7 +18,7 @@ parameters = Parameters()
 resolutions = [15, 30, 60]
 df = gt_targets(joinpath("data", "bop", "lmo", "test"), 2)
 begin
-    fig = MK.Figure(resolution=(DISS_WIDTH, 0.3 * DISS_WIDTH))
+    fig = MK.Figure(size=(DISS_WIDTH, 0.3 * DISS_WIDTH))
     for (idx, width) in enumerate(resolutions)
         @reset parameters.width = width
         @reset parameters.height = parameters.width

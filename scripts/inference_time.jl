@@ -107,7 +107,7 @@ for img_size in img_sizes
         end
     end
 
-    fig = MK.Figure(resolution=(DISS_WIDTH, 0.4 * DISS_WIDTH))
+    fig = MK.Figure(size=(DISS_WIDTH, 0.4 * DISS_WIDTH))
     ax = MK.Axis(fig[1, 1]; xlabel="number of particles / -", ylabel="average step time / s")
     draw_samplers!(ax, samplers, labels)
     MK.axislegend(ax; position=:rb)
