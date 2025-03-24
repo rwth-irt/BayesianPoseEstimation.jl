@@ -25,7 +25,7 @@ services:
       # WSL2: Switch between GPUs for 3D acceleration, e.g., Intel & NVIDIA
       # Integrated GPU recommended since WSL2 does not support OpenGL-CUDA interop
       MESA_D3D12_DEFAULT_ADAPTER_NAME: Intel
-      # Linux (non WSL): Use NVIDIA GPU for rendering, also activate in deploy
+      # Use NVIDIA GPU for rendering, also make the GPU available in the deploy section below
       __NV_PRIME_RENDER_OFFLOAD: 1
       __GLX_VENDOR_LIBRARY_NAME: nvidia
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,display
