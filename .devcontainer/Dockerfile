@@ -40,7 +40,6 @@ RUN julia -e 'import Pkg; Pkg.add(["ImageShow", "OhMyREPL", "Revise"]); Pkg.inst
 
 # Copy startup.jl to Julia config directory
 COPY --chown=$USERNAME:$USERNAME .devcontainer/startup.jl /home/$USERNAME/.julia/config/startup.jl
-COPY --chown=$USERNAME:$USERNAME *.toml /home/$USERNAME/workspace/
+# COPY --chown=$USERNAME:$USERNAME *.toml /home/$USERNAME/workspace/
 
-# Setup environment from Manifest.toml
-RUN julia --project=/home/$USERNAME/workspace -e 'import Pkg; Pkg.instantiate()'
+# Do not setup environment from Manifest.toml since OpenGL driver is not accessible during docker build

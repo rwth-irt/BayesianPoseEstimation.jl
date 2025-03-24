@@ -4,7 +4,7 @@ services:
       dockerfile: .devcontainer/Dockerfile
       context: ..
     volumes:
-      - ..:/home/vscode/workspace:cached 
+      - ..:/home/vscode/workspace:cached
       # GUI support
       - /tmp/.X11-unix:/tmp/.X11-unix
       # Accelerated 3D graphics
@@ -14,24 +14,26 @@ services:
     devices:
       # Accelerated 3D graphics
       - /dev/dri
+    runtime: nvidia
     environment:
-      # GUI support 
+      # GUI support
       DISPLAY: $DISPLAY
       WAYLAND_DISPLAY: $WAYLAND_DISPLAY
       XDG_RUNTIME_DIR: $XDG_RUNTIME_DIR
       PULSE_SERVER: $PULSE_SERVER
       # Accelerated 3D graphics
       LD_LIBRARY_PATH: /usr/lib/wsl/lib
-      # Linux (non WSL): Use NVIDIA GPU for rendering, also activate in deploy
-      __NV_PRIME_RENDER_OFFLOAD: 1
-      __GLX_VENDOR_LIBRARY_NAME: nvidia
       # WSL2: Switch between GPUs for 3D acceleration, e.g., Intel & NVIDIA
       # Integrated GPU recommended since WSL2 does not support OpenGL-CUDA interop
       MESA_D3D12_DEFAULT_ADAPTER_NAME: Intel
+      # Linux (non WSL): Use NVIDIA GPU for rendering, also activate in deploy
+      __NV_PRIME_RENDER_OFFLOAD: 1
+      __GLX_VENDOR_LIBRARY_NAME: nvidia
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,display
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: [gpu]
     # Keep the container running so VS Code can attach
-    tty: true  
+    tty: true

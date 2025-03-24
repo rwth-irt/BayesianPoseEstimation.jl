@@ -6,8 +6,8 @@
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "julia-gpu",
 	"workspaceFolder": "/home/vscode/workspace",
-	// CUDA and SciGL are not instantiated properly in docker build since no runtime is available - this is the fix at runtime
-	"postCreateCommand": "julia --project=/home/vscode/workspace -e 'pkg = Base.PkgId(Base.UUID(\"76a88914-d11a-5bdc-97e0-2f5a05c973a2\"), \"CUDA_Runtime_jll\"); Base.compilecache(pkg); import Pkg; Pkg.activate(\".\"); Pkg.resolve(); Pkg.instantiate()'\nglxinfo -B",
+	// Instantiate the julia environment and check if the NVIDIA GPU is used for OpenGL
+	"postCreateCommand": "cd $HOME/workspace && julia -e 'import Pkg;Pkg.activate(\".\");Pkg.instantiate()'\nglxinfo -B",
 	"customizations": {
 		"vscode": {
 			"extensions": [
