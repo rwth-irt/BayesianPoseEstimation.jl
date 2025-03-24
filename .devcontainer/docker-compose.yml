@@ -7,12 +7,12 @@ services:
       - ..:/home/vscode/workspace:cached
       # GUI support
       - /tmp/.X11-unix:/tmp/.X11-unix
-      # Accelerated 3D graphics
+      # Accelerated 3D graphics in WSL
       - /usr/lib/wsl:/usr/lib/wsl
       # User specific runtime files
       - $XDG_RUNTIME_DIR:$XDG_RUNTIME_DIR
     devices:
-      # Accelerated 3D graphics
+      # Accelerated 3D graphics for Intel
       - /dev/dri
     environment:
       # GUI support
@@ -20,7 +20,7 @@ services:
       WAYLAND_DISPLAY: $WAYLAND_DISPLAY
       XDG_RUNTIME_DIR: $XDG_RUNTIME_DIR
       PULSE_SERVER: $PULSE_SERVER
-      # Accelerated 3D graphics
+      # Accelerated 3D graphics in WSL
       LD_LIBRARY_PATH: /usr/lib/wsl/lib
       # WSL2: Switch between GPUs for 3D acceleration, e.g., Intel & NVIDIA
       # Integrated GPU recommended since WSL2 does not support OpenGL-CUDA interop
