@@ -14,7 +14,6 @@ services:
     devices:
       # Accelerated 3D graphics
       - /dev/dri
-    runtime: nvidia
     environment:
       # GUI support
       DISPLAY: $DISPLAY
