@@ -3,7 +3,7 @@
 # All rights reserved.
 
 # # Mutlistage build for Julia
-FROM docker.io/julia:1.11.3-bookworm AS julia-stage
+FROM docker.io/julia:1.11.4-bookworm AS julia-stage
 
 # CUDA
 FROM docker.io/nvidia/cuda:12.8.0-runtime-ubuntu22.04

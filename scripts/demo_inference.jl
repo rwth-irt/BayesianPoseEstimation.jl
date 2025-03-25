@@ -56,8 +56,8 @@ dev_rng = device_rng(parameters)
 gl_context = render_context(parameters)
 
 # Vice has distinct features, no occlusions
-# df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
-# row = df[101, :]
+df = gt_targets(joinpath("data", "bop", "lm", "test"), 2)
+row = df[101, :]
 
 # Buddha is very smooth without distinct features
 # df = gt_targets(joinpath("data", "bop", "lm", "test"), 1)
@@ -68,8 +68,8 @@ gl_context = render_context(parameters)
 # row = df[100, :]
 
 # Clutter and occlusions
-df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
-row = df[106, :]
+# df = gt_targets(joinpath("data", "bop", "tless", "test_primesense"), 18)
+# row = df[106, :]
 
 # Parts cut from the image
 # df = train_targets(joinpath("data", "bop", "itodd", "train_pbr"), 1)
